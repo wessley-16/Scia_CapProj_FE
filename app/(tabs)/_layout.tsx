@@ -24,17 +24,13 @@ const CustomTabBar = ({
 
   const iconMap: any = {
     home: { label: "Home", icon: "home-outline", active: "home" },
-    upload: {
-      label: "Upload",
-      icon: "cloud-upload-outline",
-      active: "cloud-upload",
+    appointment: {
+      label: "Appt",
+      icon: "calendar-outline",
+      active: "calendar",
     },
-    notification: {
-      label: "Alert",
-      icon: "notifications-outline",
-      active: "notifications",
-    },
-    profile: { label: "Profile", icon: "person-outline", active: "person" },
+    medicine: { label: "Meds", icon: "medkit-outline", active: "medkit" },
+    account: { label: "Account", icon: "person-outline", active: "person" }, // <-- Changed here
   };
 
   const renderTab = (route: any) => {
@@ -72,11 +68,11 @@ const CustomTabBar = ({
     );
   };
   const leftTabs = state.routes.filter(
-    (r: any) => r.name === "home" || r.name === "upload",
+    (r: any) => r.name === "home" || r.name === "appointment",
   );
 
   const rightTabs = state.routes.filter(
-    (r: any) => r.name === "notification" || r.name === "profile",
+    (r: any) => r.name === "medicine" || r.name === "account", // <-- Changed here
   );
 
   return (
@@ -85,7 +81,7 @@ const CustomTabBar = ({
         {leftTabs.map(renderTab)}
 
         <View style={styles.centerSlot}>
-          <Text style={styles.scanLabel}>Scan</Text>
+          <Text style={styles.scanLabel}>Voice assisst</Text>
         </View>
 
         {rightTabs.map(renderTab)}
@@ -107,7 +103,7 @@ export default function Layout() {
   const router = useRouter();
 
   const onScanPress = () => {
-    router.push("/scan");
+    router.push("/voice");
   };
 
   const onUploadPress = () => {
@@ -129,14 +125,14 @@ export default function Layout() {
         >
           <Tabs.Screen name="home" />
 
-          <Tabs.Screen name="upload" options={{}} />
+          <Tabs.Screen name="appointment" options={{}} />
 
           <Tabs.Screen
-            name="scan"
+            name="voice"
             options={{ href: null, tabBarStyle: { display: "none" } }}
           />
-          <Tabs.Screen name="notification" />
-          <Tabs.Screen name="profile" />
+          <Tabs.Screen name="medicine" />
+          <Tabs.Screen name="account" />
         </Tabs>
       </Host>
     </GestureHandlerRootView>
@@ -149,7 +145,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
     alignItems: "center",
-    backgroundColor: "white", 
+    backgroundColor: "white",
   },
   tabBar: {
     flexDirection: "row",
@@ -169,7 +165,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     marginTop: 2,
-    fontFamily: "Inter-Medium", 
+    fontFamily: "Inter-Medium",
   },
   centerSlot: {
     width: 80,
