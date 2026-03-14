@@ -1,17 +1,20 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 
-import { SafeAreaView } from "react-native-safe-area-context";
 import {
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Home() {
+  const router = useRouter();
+
   // Data for the grid menu to keep the JSX clean
   const menuItems = [
     {
@@ -144,6 +147,35 @@ export default function Home() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.chatButton}>
               <Ionicons name="chatbubble-ellipses" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* QUICK NAV CARD */}
+        <View style={styles.quickNavCard}>
+          <Text style={styles.quickNavTitle}>Quick Actions</Text>
+          <View style={styles.quickNavButtons}>
+            <TouchableOpacity
+              style={styles.quickNavButton}
+              onPress={() => router.push("/appointment")}
+            >
+              <MaterialCommunityIcons
+                name="calendar-check"
+                size={22}
+                color="#2563EB"
+              />
+              <Text style={styles.quickNavButtonText}>Appointments</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.quickNavButton}
+              onPress={() => router.push("/medicine")}
+            >
+              <MaterialCommunityIcons
+                name="pill"
+                size={22}
+                color="#10B981"
+              />
+              <Text style={styles.quickNavButtonText}>Medicine</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -382,6 +414,43 @@ const styles = StyleSheet.create({
     backgroundColor: "#FBBF24",
     padding: 10,
     borderRadius: 12,
+  },
+  // QUICK NAV
+  quickNavCard: {
+    backgroundColor: "white",
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+  },
+  quickNavTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1F2937",
+    marginBottom: 12,
+  },
+  quickNavButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  quickNavButton: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 8,
+  },
+  quickNavButtonText: {
+    marginTop: 4,
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1F2937",
   },
   // GRID
   gridContainer: {
