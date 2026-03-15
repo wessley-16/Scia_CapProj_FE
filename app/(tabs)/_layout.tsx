@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import Entypo from '@expo/vector-icons/Entypo';
 import { Tabs, useRouter } from "expo-router";
 import React, { useRef } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -6,7 +7,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Modalize } from "react-native-modalize";
 import { Host } from "react-native-portalize";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 const CustomTabBar = ({
   state,
   navigation,
@@ -24,13 +24,7 @@ const CustomTabBar = ({
 
   const iconMap: any = {
     home: { label: "Home", icon: "home-outline", active: "home" },
-    appointment: {
-      label: "Appt",
-      icon: "calendar-outline",
-      active: "calendar",
-    },
-    medicine: { label: "Meds", icon: "medkit-outline", active: "medkit" },
-    account: { label: "Account", icon: "person-outline", active: "person" }, // <-- Changed here
+    account: { label: "Account", icon: "person-outline", active: "person" },
   };
 
   const renderTab = (route: any) => {
@@ -56,7 +50,7 @@ const CustomTabBar = ({
       >
         <Ionicons
           name={isFocused ? item.active : item.icon}
-          size={24}
+          size={28}
           color={isFocused ? "#1fcc79" : "#6B7280"}
         />
         <Text
@@ -67,13 +61,9 @@ const CustomTabBar = ({
       </TouchableOpacity>
     );
   };
-  const leftTabs = state.routes.filter(
-    (r: any) => r.name === "home" || r.name === "appointment",
-  );
+  const leftTabs = state.routes.filter((r: any) => r.name === "home");
 
-  const rightTabs = state.routes.filter(
-    (r: any) => r.name === "medicine" || r.name === "account", // <-- Changed here
-  );
+  const rightTabs = state.routes.filter((r: any) => r.name === "account");
 
   return (
     <View style={[styles.wrapper, { paddingBottom }]}>
@@ -92,7 +82,7 @@ const CustomTabBar = ({
         onPress={onScanPress}
         style={styles.scanButton}
       >
-        <Ionicons name="scan-outline" size={28} color="white" />
+        <Entypo name="mic" size={24} color="black" />
       </TouchableOpacity>
     </View>
   );
@@ -160,12 +150,15 @@ const styles = StyleSheet.create({
   tabItem: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "center",
+    paddingVertical: 8,
+    minHeight: 70,
   },
   label: {
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 4,
     fontFamily: "Inter-Medium",
+    fontWeight: "600",
   },
   centerSlot: {
     width: 80,
