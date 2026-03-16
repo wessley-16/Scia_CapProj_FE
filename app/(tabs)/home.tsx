@@ -22,7 +22,7 @@ export default function Home() {
         showsVerticalScrollIndicator={false}
       >
         {/* HEADER SECTION */}
-        <View style={styles.header}>
+        <TouchableOpacity style={styles.header} onPress={() => router.push("/account")}>
           <Image
             source={{ uri: "https://randomuser.me/api/portraits/women/68.jpg" }} // Placeholder avatar
             style={styles.avatar}
@@ -35,11 +35,11 @@ export default function Home() {
               <Text style={styles.idText}>Senior Citizen ID: SC-458210</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.bellButton}>
+          <View style={styles.bellButton}>
             <Ionicons name="notifications" size={28} color="#2356E1" />
             <View style={styles.notificationDot} />
-          </TouchableOpacity>
-        </View>
+          </View>
+        </TouchableOpacity>
 
         {/* REMINDER CARD */}
         <View style={styles.reminderCard}>
