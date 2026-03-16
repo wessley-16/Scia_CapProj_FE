@@ -51,10 +51,10 @@ const CustomTabBar = ({
         <Ionicons
           name={isFocused ? item.active : item.icon}
           size={28}
-          color={isFocused ? "#1fcc79" : "#6B7280"}
+          color={isFocused ? "white" : "#e4e4e4"}
         />
         <Text
-          style={[styles.label, { color: isFocused ? "#1fcc79" : "#6B7280" }]}
+          style={[styles.label, { color: isFocused ? "white" : "#e4e4e4" }]}
         >
           {item.label}
         </Text>
@@ -71,7 +71,7 @@ const CustomTabBar = ({
         {leftTabs.map(renderTab)}
 
         <View style={styles.centerSlot}>
-          <Text style={styles.scanLabel}>Voice assisst</Text>
+          <Text style={styles.scanLabel}>Voice Assist</Text>
         </View>
 
         {rightTabs.map(renderTab)}
@@ -115,13 +115,11 @@ export default function Layout() {
         >
           <Tabs.Screen name="home" />
 
-          <Tabs.Screen name="appointment" options={{}} />
-
           <Tabs.Screen
             name="voice"
             options={{ href: null, tabBarStyle: { display: "none" } }}
           />
-          <Tabs.Screen name="medicine" />
+          
           <Tabs.Screen name="account" />
         </Tabs>
       </Host>
@@ -143,8 +141,8 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "flex-end",
     borderTopWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "white",
+    borderColor: "#4672ec",
+    backgroundColor: "#2356E1",
     paddingBottom: 8,
   },
   tabItem: {
@@ -155,7 +153,7 @@ const styles = StyleSheet.create({
     minHeight: 70,
   },
   label: {
-    fontSize: 13,
+    fontSize: 14,
     marginTop: 4,
     fontFamily: "Inter-Medium",
     fontWeight: "600",
@@ -166,18 +164,20 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   scanLabel: {
-    fontSize: 11,
-    color: "#6B7280",
+    fontSize: 14,
+    color: "#e4e4e4",
     marginTop: 40,
     fontFamily: "Inter-Medium",
   },
   scanButton: {
     position: "absolute",
     top: -22,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#1fcc79",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 5,
+    borderColor: "#2356E1",
+    backgroundColor: "white",
     alignItems: "center",
     justifyContent: "center",
     elevation: 8,

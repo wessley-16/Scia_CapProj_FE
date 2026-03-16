@@ -3,86 +3,17 @@ import { useRouter } from "expo-router";
 import React from "react";
 
 import {
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Home() {
   const router = useRouter();
-
-  // Data for the grid menu to keep the JSX clean
-  const menuItems = [
-    {
-      id: 1,
-      name: "Health Services",
-      icon: "stethoscope",
-      type: "mci",
-      bgColor: "#E0E7FF",
-      iconColor: "#3B82F6",
-    },
-    {
-      id: 2,
-      name: "Medicine\nAllocation",
-      icon: "pill",
-      type: "mci",
-      bgColor: "#D1FAE5",
-      iconColor: "#10B981",
-    },
-    {
-      id: 3,
-      name: "Senior Digital ID",
-      icon: "card-account-details-outline",
-      type: "mci",
-      bgColor: "#DBEAFE",
-      iconColor: "#2563EB",
-    },
-    {
-      id: 4,
-      name: "Discount Booklet",
-      icon: "ticket-percent-outline",
-      type: "mci",
-      bgColor: "#FFE4E6",
-      iconColor: "#E11D48",
-    },
-    {
-      id: 5,
-      name: "ID Registration",
-      icon: "calendar-account-outline",
-      type: "mci",
-      bgColor: "#FEF3C7",
-      iconColor: "#D97706",
-      isNew: true,
-    },
-    {
-      id: 6,
-      name: "Other\nGovernment IDs",
-      icon: "smart-card-outline",
-      type: "mci",
-      bgColor: "#E0F2FE",
-      iconColor: "#0284C7",
-    },
-    {
-      id: 7,
-      name: "Emergency\nContacts",
-      icon: "contacts",
-      type: "mci",
-      bgColor: "#F3E8FF",
-      iconColor: "#9333EA",
-    },
-    {
-      id: 8,
-      name: "Accessibility\nSettings",
-      icon: "cog-outline",
-      type: "mci",
-      bgColor: "#FFEDD5",
-      iconColor: "#EA580C",
-    },
-  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -97,121 +28,42 @@ export default function Home() {
             style={styles.avatar}
           />
           <View style={styles.headerTextContainer}>
-            <Text style={styles.greeting}>Good Day,</Text>
-            <Text style={styles.userName}>Maria Santos</Text>
+            <Text style={styles.greeting}>Magandang Araw,</Text>
+            <Text style={styles.userName}>Maria S. Santos</Text>
             <View style={styles.idBadge}>
               <Ionicons name="shield-checkmark" size={14} color="#FBBF24" />
               <Text style={styles.idText}>Senior Citizen ID: SC-458210</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.bellButton}>
-            <Ionicons name="notifications" size={28} color="#2563EB" />
+            <Ionicons name="notifications" size={28} color="#2356E1" />
             <View style={styles.notificationDot} />
           </TouchableOpacity>
         </View>
 
-        {/* SOS EMERGENCY BUTTON */}
-        <TouchableOpacity style={styles.sosCard} activeOpacity={0.8}>
-          <View style={styles.sosIconWrapper}>
+        {/* REMINDER CARD */}
+        <View style={styles.reminderCard}>
+          <View style={styles.reminderContent}>
+            <Text style={styles.cardSubtitle}>Reminder:</Text>
+            <Text style={styles.reminderTitle}>
+              Take Blood Pressure Medicine
+            </Text>
+            <Text style={styles.reminderTime}>8:00 PM</Text>
+          </View>
+          {/* Approximate illustration placeholder using icons */}
+          <View style={styles.reminderIllustration}>
             <MaterialCommunityIcons
-              name="alarm-light"
-              size={32}
-              color="#E11D48"
+              name="card-bulleted"
+              size={50}
+              color="#2356E1"
+            />
+            <MaterialCommunityIcons
+              name="pill"
+              size={24}
+              color="#2356E1"
+              style={{ position: "absolute", bottom: -5, left: -5 }}
             />
           </View>
-          <View style={styles.sosTextWrapper}>
-            <Text style={styles.sosTitle}>SOS EMERGENCY</Text>
-            <Text style={styles.sosSubtitle}>Tap in case of emergency</Text>
-          </View>
-          <View style={styles.sosChevron}>
-            <Ionicons name="chevron-forward" size={20} color="#E11D48" />
-          </View>
-        </TouchableOpacity>
-
-        {/* ASK ASSISTANT CARD */}
-        <View style={styles.assistantCard}>
-          <MaterialCommunityIcons
-            name="robot-outline"
-            size={40}
-            color="#2563EB"
-          />
-          <View style={styles.assistantTextWrapper}>
-            <Text style={styles.assistantTitle}>Ask Assistant</Text>
-            <Text style={styles.assistantSubtitle}>
-              How can I help you today?
-            </Text>
-          </View>
-          <View style={styles.assistantActions}>
-            <TouchableOpacity style={styles.micButton}>
-              <Ionicons name="mic" size={20} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.chatButton}>
-              <Ionicons name="chatbubble-ellipses" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* QUICK NAV CARD */}
-        <View style={styles.quickNavCard}>
-          <Text style={styles.quickNavTitle}>Quick Actions</Text>
-          <View style={styles.quickNavButtons}>
-            <TouchableOpacity
-              style={styles.quickNavButton}
-              onPress={() => router.push("/appointment")}
-            >
-              <MaterialCommunityIcons
-                name="calendar-check"
-                size={22}
-                color="#2563EB"
-              />
-              <Text style={styles.quickNavButtonText}>Appointments</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.quickNavButton}
-              onPress={() => router.push("/medicine")}
-            >
-              <MaterialCommunityIcons
-                name="pill"
-                size={22}
-                color="#10B981"
-              />
-              <Text style={styles.quickNavButtonText}>Medicine</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* GRID MENU */}
-        <View style={styles.gridContainer}>
-          {menuItems.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.gridItem}>
-              <View
-                style={[
-                  styles.gridIconContainer,
-                  { backgroundColor: item.bgColor },
-                ]}
-              >
-                {item.type === "mci" ? (
-                  <MaterialCommunityIcons
-                    name={item.icon as any}
-                    size={28}
-                    color={item.iconColor}
-                  />
-                ) : (
-                  <Ionicons
-                    name={item.icon as any}
-                    size={28}
-                    color={item.iconColor}
-                  />
-                )}
-                {item.isNew && (
-                  <View style={styles.newBadge}>
-                    <Text style={styles.newBadgeText}>New</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.gridItemText}>{item.name}</Text>
-            </TouchableOpacity>
-          ))}
         </View>
 
         {/* BARANGAY ANNOUNCEMENT */}
@@ -237,30 +89,101 @@ export default function Home() {
           </View>
         </View>
 
-        {/* REMINDER CARD */}
-        <View style={styles.reminderCard}>
-          <View style={styles.reminderContent}>
-            <Text style={styles.cardSubtitle}>Reminder:</Text>
-            <Text style={styles.reminderTitle}>
-              Take Blood Pressure Medicine
+        {/* ASK ASSISTANT CARD */}
+        <View style={styles.assistantCard}>
+          <MaterialCommunityIcons
+            name="robot-outline"
+            size={40}
+            color="#2563EB"
+          />
+          <View style={styles.assistantTextWrapper}>
+            <Text style={styles.assistantTitle}>Ask Assistant</Text>
+            <Text style={styles.assistantSubtitle}>
+              How can I help you today?
             </Text>
-            <Text style={styles.reminderTime}>8:00 PM</Text>
           </View>
-          {/* Approximate illustration placeholder using icons */}
-          <View style={styles.reminderIllustration}>
-            <MaterialCommunityIcons
-              name="card-bulleted"
-              size={50}
-              color="#60A5FA"
-            />
-            <MaterialCommunityIcons
-              name="pill"
-              size={24}
-              color="#10B981"
-              style={{ position: "absolute", bottom: -5, left: -5 }}
-            />
+          <View style={styles.assistantActions}>
+            <TouchableOpacity style={styles.micButton}>
+              <Ionicons name="mic" size={20} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.chatButton}>
+              <Ionicons name="chatbubble-ellipses" size={20} color="white" />
+            </TouchableOpacity>
           </View>
         </View>
+        
+        {/* SOS EMERGENCY BUTTON */}
+        <TouchableOpacity style={styles.sosCard} activeOpacity={0.8}>
+          <View style={styles.sosIconWrapper}>
+            <MaterialCommunityIcons
+              name="alarm-light"
+              size={32}
+              color="#FFFFFF"
+            />
+          </View>
+          <View style={styles.sosTextWrapper}>
+            <Text style={styles.sosTitle}>SOS EMERGENCY</Text>
+            <Text style={styles.sosSubtitle}>Tap in case of emergency</Text>
+          </View>
+          <View style={styles.sosChevron}>
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
+        {/* APPOINTMENT CARD */}
+        <TouchableOpacity style={styles.appCard} activeOpacity={0.8}>
+          <View style={styles.appIconWrapper}>
+            <MaterialCommunityIcons
+                name="calendar-check"
+                size={22}
+                color="#FFFFFF"
+              />
+          </View>
+          <View style={styles.appTextWrapper}>
+            <Text style={styles.appTitle}>SET APPOINTMENT</Text>
+            <Text style={styles.appSubtitle}>Tap to schedule an appointment</Text>
+          </View>
+          <View style={styles.appChevron}>
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
+        {/* MEDICINES */}
+        <TouchableOpacity style={styles.medCard} activeOpacity={0.8}>
+          <View style={styles.medIconWrapper}>
+            <MaterialCommunityIcons
+                name="pill"
+                size={22}
+                color="#FFFFFF"
+              />
+          </View>
+          <View style={styles.medTextWrapper}>
+            <Text style={styles.medTitle}>MEDICINES</Text>
+            <Text style={styles.medSubtitle}>Tap to manage medications</Text>
+          </View>
+          <View style={styles.medChevron}>
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
+        {/* GOVERNMENT DOCUMENTS */}
+        <TouchableOpacity style={styles.gdocCard} activeOpacity={0.8}>
+          <View style={styles.gdocIconWrapper}>
+            <MaterialCommunityIcons
+                name="file-document"
+                size={22}
+                color="#FFFFFF"
+              />
+          </View>
+          <View style={styles.gdocTextWrapper}>
+            <Text style={styles.gdocTitle}>GOVERNMENT DOCUMENTS</Text>
+            <Text style={styles.gdocSubtitle}>Tap to register documents</Text>
+          </View>
+          <View style={styles.gdocChevron}>
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
 
         {/* Bottom padding to account for the custom bottom tab bar from previous setup */}
         <View style={{ height: 90 }} />
@@ -331,47 +254,87 @@ const styles = StyleSheet.create({
     right: 6,
     width: 10,
     height: 10,
-    backgroundColor: "#EF4444",
+    backgroundColor: "#CE2029",
     borderRadius: 5,
     borderWidth: 1.5,
     borderColor: "#F4F6F9",
   },
-  // SOS
-  sosCard: {
+  // REMINDER CARD
+  reminderCard: {
     flexDirection: "row",
+    backgroundColor: "#F4D35E",
+    borderRadius: 16,
+    padding: 16,
     alignItems: "center",
-    backgroundColor: "#EF4444",
+    marginBottom: 20,
+  },
+  reminderContent: {
+    flex: 1,
+  },
+  reminderTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000000",
+    marginVertical: 4,
+  },
+  reminderTime: {
+    fontSize: 16,
+    color: "#000000",
+  },
+  reminderIllustration: {
+    width: 60,
+    height: 60,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  // ANNOUNCEMENT CARD
+  announcementCard: {
+    backgroundColor: "#F4D35E",
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    elevation: 3,
-    shadowColor: "#EF4444",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
   },
-  sosIconWrapper: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    padding: 8,
-    borderRadius: 12,
+  announcementHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
-  sosTextWrapper: {
+  announcementTextWrapper: {
     flex: 1,
     marginLeft: 12,
   },
-  sosTitle: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  sosSubtitle: {
-    color: "rgba(255,255,255,0.8)",
+  cardSubtitle: {
     fontSize: 13,
+    color: "black",
+    marginBottom: 4,
   },
-  sosChevron: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    padding: 4,
-    borderRadius: 20,
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "black",
+    marginBottom: 8,
+  },
+  cardDesc: {
+    fontSize: 13,
+    color: "black",
+    marginBottom: 2,
+  },
+  timeBadgeWrapper: {
+    alignItems: "flex-end",
+  },
+  timeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF3C7",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  timeBadgeText: {
+    fontSize: 15,
+    color: "black",
+    marginLeft: 4,
+    fontWeight: "500",
   },
   // ASSISTANT
   assistantCard: {
@@ -406,170 +369,161 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   micButton: {
-    backgroundColor: "#3B82F6",
+    backgroundColor: "#2356E1",
     padding: 10,
     borderRadius: 12,
   },
   chatButton: {
-    backgroundColor: "#FBBF24",
+    backgroundColor: "#FEA23A",
     padding: 10,
     borderRadius: 12,
   },
-  // QUICK NAV
-  quickNavCard: {
-    backgroundColor: "white",
-    padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  quickNavTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 12,
-  },
-  quickNavButtons: {
+  // SOS
+  sosCard: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#CE2029",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: "#CE2029",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
-  quickNavButton: {
-    flex: 1,
-    padding: 10,
+  sosIconWrapper: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 8,
     borderRadius: 12,
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 8,
   },
-  quickNavButtonText: {
-    marginTop: 4,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#1F2937",
-  },
-  // GRID
-  gridContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  gridItem: {
-    width: "23%", // Fits 4 items per row comfortably
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  gridIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-    position: "relative",
-  },
-  newBadge: {
-    position: "absolute",
-    top: -4,
-    right: -8,
-    backgroundColor: "#EF4444",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: "white",
-  },
-  newBadgeText: {
-    color: "white",
-    fontSize: 9,
-    fontWeight: "bold",
-  },
-  gridItemText: {
-    fontSize: 11,
-    color: "#4B5563",
-    textAlign: "center",
-    lineHeight: 14,
-  },
-  // ANNOUNCEMENT CARD
-  announcementCard: {
-    backgroundColor: "#FFF7ED", // Light orange tint
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  announcementHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-  announcementTextWrapper: {
+  sosTextWrapper: {
     flex: 1,
     marginLeft: 12,
   },
-  cardSubtitle: {
-    fontSize: 13,
-    color: "#4B5563",
-    marginBottom: 4,
-  },
-  cardTitle: {
-    fontSize: 16,
+  sosTitle: {
+    color: "white",
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#1F2937",
-    marginBottom: 8,
   },
-  cardDesc: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginBottom: 2,
+  sosSubtitle: {
+    color: "white",
+    fontSize: 15,
   },
-  timeBadgeWrapper: {
-    alignItems: "flex-end",
+  sosChevron: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 4,
+    borderRadius: 20,
   },
-  timeBadge: {
+  // APPOINTMENT
+  appCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FEF3C7",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  timeBadgeText: {
-    fontSize: 12,
-    color: "#D97706",
-    marginLeft: 4,
-    fontWeight: "500",
-  },
-  // REMINDER CARD
-  reminderCard: {
-    flexDirection: "row",
-    backgroundColor: "#EFF6FF", // Light blue tint
+    backgroundColor: "#6488EA",
     borderRadius: 16,
     padding: 16,
-    alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: "#6488EA",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
-  reminderContent: {
+  appIconWrapper: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 8,
+    borderRadius: 12,
+  },
+  appTextWrapper: {
     flex: 1,
+    marginLeft: 12,
   },
-  reminderTitle: {
-    fontSize: 16,
+  appTitle: {
+    color: "white",
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#1E3A8A",
-    marginVertical: 4,
   },
-  reminderTime: {
-    fontSize: 13,
-    color: "#6B7280",
+  appSubtitle: {
+    color: "white",
+    fontSize: 15,
   },
-  reminderIllustration: {
-    width: 60,
-    height: 60,
-    justifyContent: "center",
+  appChevron: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 4,
+    borderRadius: 20,
+  },
+  // MEDICINES
+  medCard: {
+    flexDirection: "row",
     alignItems: "center",
-    position: "relative",
+    backgroundColor: "#6488EA",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: "#6488EA",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  medIconWrapper: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 8,
+    borderRadius: 12,
+  },
+  medTextWrapper: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  medTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  medSubtitle: {
+    color: "white",
+    fontSize: 15,
+  },
+  medChevron: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 4,
+    borderRadius: 20,
+  },
+  // GOVERNMENT DOCUMENTS
+  gdocCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#6488EA",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: "#6488EA",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  gdocIconWrapper: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 8,
+    borderRadius: 12,
+  },
+  gdocTextWrapper: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  gdocTitle: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  gdocSubtitle: {
+    color: "white",
+    fontSize: 15,
+  },
+  gdocChevron: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+    padding: 4,
+    borderRadius: 20,
   },
 });
