@@ -1,6 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React from "react";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
 
 import {
   Image,
@@ -11,9 +12,63 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Medicine } from "../../interfaces/interfaces";
 
 export default function Home() {
   const router = useRouter();
+  const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNextMedicine();
+    }, [])
+  );
+
+  const loadNextMedicine = async () => {
+    try {
+      const stored = await AsyncStorage.getItem("medicines");
+      if (!stored) {
+        setNextMedicine(null);
+        return;
+      }
+
+      const medicines: Medicine[] = JSON.parse(stored);
+      if (medicines.length === 0) {
+        setNextMedicine(null);
+        return;
+      }
+
+      // Calculate next dose time for each medicine
+      const medicinesWithNextDose = medicines.map((med) => ({
+        ...med,
+        nextDoseTime: med.lastTakenTime + med.interval * 60 * 60 * 1000,
+      }));
+
+      // Find the medicine with the earliest next dose time
+      const upcoming = medicinesWithNextDose.reduce((earliest, current) => {
+        return current.nextDoseTime < earliest.nextDoseTime ? current : earliest;
+      });
+
+      setNextMedicine(upcoming as Medicine);
+    } catch (error) {
+      console.log("Error loading next medicine:", error);
+      setNextMedicine(null);
+    }
+  };
+
+  const formatTime = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+  const getNextDoseTime = (medicine: Medicine) => {
+    const nextDoseTime = medicine.lastTakenTime + medicine.interval * 60 * 60 * 1000;
+    return formatTime(nextDoseTime);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -45,23 +100,30 @@ export default function Home() {
         <View style={styles.reminderCard}>
           <View style={styles.reminderContent}>
             <Text style={styles.cardSubtitle}>Reminder:</Text>
-            <Text style={styles.reminderTitle}>
-              Take Blood Pressure Medicine
-            </Text>
-            <Text style={styles.reminderTime}>8:00 PM</Text>
+            {nextMedicine ? (
+              <>
+                <Text style={styles.reminderTitle}>
+                  Take {nextMedicine.name}
+                </Text>
+                <Text style={styles.reminderMedicineDetails}>
+                  {nextMedicine.dosage} {nextMedicine.dosageUnit}
+                </Text>
+                <Text style={styles.reminderTime}>
+                  {getNextDoseTime(nextMedicine)}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.reminderTitle}>
+                Stay healthy! No medicine reminders today.
+              </Text>
+            )}
           </View>
           {/* Approximate illustration placeholder using icons */}
           <View style={styles.reminderIllustration}>
             <MaterialCommunityIcons
-              name="card-bulleted"
+              name={nextMedicine ? "pill" : "heart-outline"}
               size={50}
               color="#2356E1"
-            />
-            <MaterialCommunityIcons
-              name="pill"
-              size={24}
-              color="#2356E1"
-              style={{ position: "absolute", bottom: -5, left: -5 }}
             />
           </View>
         </View>
@@ -302,6 +364,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#000000",
     marginVertical: 4,
+  },
+  reminderMedicineDetails: {
+    fontSize: 14,
+    color: "#374151",
+    marginVertical: 2,
   },
   reminderTime: {
     fontSize: 16,
