@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    Pressable,
-    StyleSheet,
-    Text,
-    View
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const HOLD_DURATION_MS = 5000;
 const BUTTON_SIZE = 300;
@@ -127,46 +128,52 @@ export default function EmergencyScreen() {
   const isProgressVisible = isHolding || hasCompleted;
 
   return (
-    <View style={styles.container}>
-        <Text style={styles.headerTitle}>Emergency Button</Text>
-        <Text style={styles.subheaderTitle}>( HOLD FOR 5 SECONDS TO CALL RESCUE )</Text>
-      <View style={styles.buttonWrapper}>
-        <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.ring,
-          { transform: [{ rotate }], opacity: isProgressVisible ? 1 : 0 },
-        ]}
-        />
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+          <Text style={styles.headerTitle}>Emergency Button</Text>
+          <Text style={styles.subheaderTitle}>( HOLD FOR 5 SECONDS TO CALL RESCUE )</Text>
+        <View style={styles.buttonWrapper}>
+          <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.ring,
+            { transform: [{ rotate }], opacity: isProgressVisible ? 1 : 0 },
+          ]}
+          />
 
-        <Pressable
-          onPressIn={startHoldAnimation}
-          onPressOut={stopHoldAnimation}
-          style={styles.button}
-          android_ripple={{ color: 'rgba(255,255,255,0.2)', radius: BUTTON_SIZE / 2 }}
-        >
-          <Text style={styles.buttonText}>
-            {isHolding ? `${secondsLeft}s` : 'tap and hold'}
+          <Pressable
+            onPressIn={startHoldAnimation}
+            onPressOut={stopHoldAnimation}
+            style={styles.button}
+            android_ripple={{ color: 'rgba(255,255,255,0.2)', radius: BUTTON_SIZE / 2 }}
+          >
+            <Text style={styles.buttonText}>
+              {isHolding ? `${secondsLeft}s` : 'tap and hold'}
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.infoCard}>
+          <Text style={styles.infoText}>Name: {hasCompleted ? profileName ?? 'Unknown' : '---'}</Text>
+          <Text style={styles.infoText}>
+            Location:{' '}
+            {hasCompleted
+              ? location
+                ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+                : 'Unavailable'
+              : '---'}
           </Text>
-        </Pressable>
+        </View>
       </View>
-
-      <View style={styles.infoCard}>
-        <Text style={styles.infoText}>Name: {hasCompleted ? profileName ?? 'Unknown' : '---'}</Text>
-        <Text style={styles.infoText}>
-          Location:{' '}
-          {hasCompleted
-            ? location
-              ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
-              : 'Unavailable'
-            : '---'}
-        </Text>
-      </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#F4F6F9",
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
