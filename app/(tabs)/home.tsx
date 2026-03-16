@@ -113,7 +113,11 @@ export default function Home() {
         </View>
         
         {/* SOS EMERGENCY BUTTON */}
-        <TouchableOpacity style={styles.sosCard} activeOpacity={0.8}>
+        <TouchableOpacity 
+          style={styles.sosCard} 
+          activeOpacity={0.8}
+          onPress={() => router.push("/emergency")}
+        >
           <View style={styles.sosIconWrapper}>
             <MaterialCommunityIcons
               name="alarm-light"
@@ -121,10 +125,12 @@ export default function Home() {
               color="#FFFFFF"
             />
           </View>
+
           <View style={styles.sosTextWrapper}>
             <Text style={styles.sosTitle}>SOS EMERGENCY</Text>
             <Text style={styles.sosSubtitle}>Tap in case of emergency</Text>
           </View>
+
           <View style={styles.sosChevron}>
             <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
           </View>
@@ -157,7 +163,11 @@ export default function Home() {
         </TouchableOpacity>
 
         {/* MEDICINES */}
-        <TouchableOpacity style={styles.medCard} activeOpacity={0.8}>
+        <TouchableOpacity 
+          style={styles.medCard} 
+          activeOpacity={0.8}
+          onPress={() => router.push("/medicine")}
+        >
           <View style={styles.medIconWrapper}>
             <MaterialCommunityIcons
                 name="pill"
@@ -165,17 +175,23 @@ export default function Home() {
                 color="#FFFFFF"
               />
           </View>
+
           <View style={styles.medTextWrapper}>
             <Text style={styles.medTitle}>MEDICINES</Text>
             <Text style={styles.medSubtitle}>Tap to manage medications</Text>
           </View>
+
           <View style={styles.medChevron}>
             <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
           </View>
         </TouchableOpacity>
 
         {/* GOVERNMENT DOCUMENTS */}
-        <TouchableOpacity style={styles.gdocCard} activeOpacity={0.8}>
+        <TouchableOpacity 
+        style={styles.gdocCard} 
+        activeOpacity={0.8}
+        onPress={() => router.push("/govdocs")}
+        >
           <View style={styles.gdocIconWrapper}>
             <MaterialCommunityIcons
                 name="file-document"
@@ -183,10 +199,12 @@ export default function Home() {
                 color="#FFFFFF"
               />
           </View>
+
           <View style={styles.gdocTextWrapper}>
             <Text style={styles.gdocTitle}>GOVERNMENT DOCUMENTS</Text>
             <Text style={styles.gdocSubtitle}>Tap to register documents</Text>
           </View>
+
           <View style={styles.gdocChevron}>
             <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
           </View>
