@@ -131,18 +131,26 @@ export default function Home() {
         </TouchableOpacity>
 
         {/* APPOINTMENT CARD */}
-        <TouchableOpacity style={styles.appCard} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.appCard}
+          activeOpacity={0.8}
+          onPress={() => router.push("/appointment")}
+        >
           <View style={styles.appIconWrapper}>
             <MaterialCommunityIcons
-                name="calendar-check"
-                size={22}
-                color="#FFFFFF"
-              />
+              name="calendar-check"
+              size={22}
+              color="#FFFFFF"
+            />
           </View>
+
           <View style={styles.appTextWrapper}>
             <Text style={styles.appTitle}>SET APPOINTMENT</Text>
-            <Text style={styles.appSubtitle}>Tap to schedule an appointment</Text>
+            <Text style={styles.appSubtitle}>
+              Tap to schedule an appointment
+            </Text>
           </View>
+
           <View style={styles.appChevron}>
             <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
           </View>
