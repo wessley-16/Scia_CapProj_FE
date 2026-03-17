@@ -1,17 +1,18 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View
 } from 'react-native';
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const HOLD_DURATION_MS = 5000;
-const BUTTON_SIZE = 300;
-const RING_SIZE = 320;
+const BUTTON_SIZE = 220;
+const RING_SIZE = 240;
 const RING_STROKE = 6;
 
 export default function EmergencyScreen() {
@@ -20,6 +21,8 @@ export default function EmergencyScreen() {
     null
   );
   const [isFetchingLocation, setIsFetchingLocation] = useState<boolean>(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationPermission, setLocationPermission] = useState<string | null>(null);
   const [hasCompleted, setHasCompleted] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(HOLD_DURATION_MS / 1000);
@@ -29,11 +32,25 @@ export default function EmergencyScreen() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    // Placeholder: replace with real profile fetch logic.
-    setProfileName('Your Name');
+    const loadProfileName = async () => {
+      try {
+        const savedName = await AsyncStorage.getItem('userName');
+        if (savedName) {
+          setProfileName(savedName);
+        } else {
+          setProfileName('Maria S. Santos');
+        }
+      } catch {
+        setProfileName('Maria S. Santos');
+      }
+    };
+
+    loadProfileName();
 
     // Auto-fetch phone GPS location when screen opens.
-    fetchLocation();
+    if (!location) {
+      fetchLocation();
+    }
 
     return () => {
       if (countdownRef.current) {
@@ -42,6 +59,16 @@ export default function EmergencyScreen() {
       animationRef.current?.stop();
     };
   }, []);
+
+  const requestPermission = async () => {
+    if (locationPermission === 'granted') {
+      return true;
+    }
+
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    setLocationPermission(status);
+    return status === 'granted';
+  };
 
   const resetProgress = () => {
     progress.setValue(0);
@@ -73,23 +100,28 @@ export default function EmergencyScreen() {
 
   const fetchLocation = async () => {
     setIsFetchingLocation(true);
-    try {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocation({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-          });
-          setIsFetchingLocation(false);
-        },
-        () => {
-          setLocation(null);
-          setIsFetchingLocation(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 1000 }
-      );
-    } catch {
+    setLocationError(null);
+
+    const hasPermission = await requestPermission();
+    if (!hasPermission) {
+      setLocationError('Location permission denied. Please allow location to use this feature.');
       setLocation(null);
+      setIsFetchingLocation(false);
+      return;
+    }
+
+    try {
+      const currentPosition = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+      });
+      setLocation({
+        latitude: currentPosition.coords.latitude,
+        longitude: currentPosition.coords.longitude,
+      });
+      setIsFetchingLocation(false);
+    } catch (error) {
+      setLocation(null);
+      setLocationError('Unable to fetch location. Please ensure location services are enabled.');
       setIsFetchingLocation(false);
     }
   };
@@ -109,7 +141,6 @@ export default function EmergencyScreen() {
       if (finished) {
         setHasCompleted(true);
         setSecondsLeft(0);
-        fetchLocation();
       }
     });
   };
@@ -139,8 +170,12 @@ export default function EmergencyScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-          <Text style={styles.headerTitle}>Emergency Button</Text>
-          <Text style={styles.subheaderTitle}>( HOLD FOR 5 SECONDS TO CALL RESCUE )</Text>
+        <View style={styles.bigHeader}>
+          <Text style={styles.bigHeaderText}>EMERGENCY</Text>
+        </View>
+        <Text style={styles.headerTitle}>Emergency Button</Text>
+        <Text style={styles.subheaderTitle}>Hold for 5 seconds to call rescue</Text>
+
         <View style={styles.buttonWrapper}>
           <Animated.View
           pointerEvents="none"
@@ -170,15 +205,10 @@ export default function EmergencyScreen() {
               ? 'Fetching location...'
               : location
               ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+              : locationError
+              ? locationError
               : 'Unavailable'}
           </Text>
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={fetchLocation}
-            accessibilityLabel="Refresh location"
-          >
-            <Text style={styles.refreshButtonText}>Refresh Location</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>
@@ -192,52 +222,79 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
     padding: 16,
     backgroundColor: '#f8f8f8',
   },
-  headerTitle: {
+  bigHeader: {
+    width: '100%',
+    maxWidth: 500,
+    height: 120,
+    backgroundColor: '#2563EB',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  bigHeaderText: {
+    color: '#ffffff',
     fontSize: 32,
+    fontWeight: 'bold',
+    letterSpacing: 3,
+  },
+  headerTitle: {
+    fontSize: 28,
     fontWeight: "bold",
     color: "black",
-    marginBottom: 10,
+    marginBottom: 6,
   },
   subheaderTitle: {
-    fontSize: 20,
-    color: "black",
-    marginBottom: 40,
+    fontSize: 16,
+    color: "#475569",
+    marginBottom: 24,
   },
   buttonWrapper: {
-    width: RING_SIZE,
-    height: RING_SIZE,
+    width: 240,
+    height: 240,
     justifyContent: 'center',
     alignItems: 'center',
   },
   ring: {
     position: 'absolute',
-    width: RING_SIZE,
-    height: RING_SIZE,
-    borderRadius: RING_SIZE / 2,
-    borderWidth: RING_STROKE,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    borderWidth: 6,
     borderTopColor: '#CE2029',
     borderRightColor: 'transparent',
     borderBottomColor: 'transparent',
     borderLeftColor: 'transparent',
   },
   button: {
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     backgroundColor: '#CE2029',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#000000',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
   },
   buttonText: {
     color: '#ffffff',
-    fontSize: 52,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     textTransform: 'uppercase',
+    letterSpacing: 1,
+    textAlign: 'center',
   },
   infoCard: {
     marginTop: 24,
@@ -258,6 +315,37 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#111827',
     marginBottom: 8,
+  },
+  topHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+  },
+  avatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#2563EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  profileInfo: {
+    marginLeft: 12,
+  },
+  profileTitle: {
+    fontSize: 14,
+    color: '#475569',
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
   },
   refreshButton: {
     marginTop: 8,
