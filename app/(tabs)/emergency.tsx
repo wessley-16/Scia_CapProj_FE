@@ -8,6 +8,7 @@ import {
   Text,
   View
 } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const HOLD_DURATION_MS = 5000;
@@ -17,7 +18,13 @@ const RING_STROKE = 6;
 
 export default function EmergencyScreen() {
   const [profileName, setProfileName] = useState<string | null>(null);
+  const [barangay, setBarangay] = useState<string>('Unknown Barangay');
+  const [street, setStreet] = useState<string>('Unknown Street');
+  const [fullAddress, setFullAddress] = useState<string>('Unknown Address');
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(
+    null
+  );
+  const [emergencyLocation, setEmergencyLocation] = useState<{ latitude: number; longitude: number } | null>(
     null
   );
   const [isFetchingLocation, setIsFetchingLocation] = useState<boolean>(true);
@@ -35,10 +42,25 @@ export default function EmergencyScreen() {
     const loadProfileName = async () => {
       try {
         const savedName = await AsyncStorage.getItem('userName');
+        const savedBarangay = await AsyncStorage.getItem('userBarangay');
+        const savedStreet = await AsyncStorage.getItem('userStreet');
+        const savedFullAddress = await AsyncStorage.getItem('userFullAddress');
+
         if (savedName) {
           setProfileName(savedName);
         } else {
           setProfileName('Maria S. Santos');
+        }
+        if (savedBarangay) {
+          setBarangay(savedBarangay);
+        }
+        if (savedStreet) {
+          setStreet(savedStreet);
+        }
+        if (savedFullAddress) {
+          setFullAddress(savedFullAddress);
+        } else if (savedStreet && savedBarangay) {
+          setFullAddress(`${savedStreet}, ${savedBarangay}`);
         }
       } catch {
         setProfileName('Maria S. Santos');
@@ -114,10 +136,14 @@ export default function EmergencyScreen() {
       const currentPosition = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Highest,
       });
-      setLocation({
+      const currentCoords = {
         latitude: currentPosition.coords.latitude,
         longitude: currentPosition.coords.longitude,
-      });
+      };
+      setLocation(currentCoords);
+      if (!emergencyLocation) {
+        setEmergencyLocation(currentCoords);
+      }
       setIsFetchingLocation(false);
     } catch (error) {
       setLocation(null);
@@ -197,10 +223,40 @@ export default function EmergencyScreen() {
           </Pressable>
         </View>
 
+        <View style={styles.mapContainer}>
+          {location ? (
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={styles.map}
+              region={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.01,
+                longitudeDelta: 0.01,
+              }}
+              showsUserLocation
+              showsMyLocationButton
+            >
+              <Marker
+                coordinate={emergencyLocation ?? location}
+                title="Emergency Pin"
+                description="This is the emergency location"
+                pinColor="red"
+              />
+            </MapView>
+          ) : (
+            <View style={styles.noMapView}>
+              <Text style={styles.infoText}>
+                {isFetchingLocation ? 'Fetching location map...' : 'Location unavailable for map'}
+              </Text>
+            </View>
+          )}
+        </View>
+
         <View style={styles.infoCard}>
           <Text style={styles.infoText}>Name: {profileName ?? 'Unknown'}</Text>
           <Text style={styles.infoText}>
-            Location:{' '}
+            Coordinates:{' '}
             {isFetchingLocation
               ? 'Fetching location...'
               : location
@@ -209,6 +265,9 @@ export default function EmergencyScreen() {
               ? locationError
               : 'Unavailable'}
           </Text>
+          <Text style={styles.infoText}>Barangay: {barangay}</Text>
+          <Text style={styles.infoText}>Street: {street}</Text>
+          <Text style={[styles.infoText, styles.fullAddressText]}>Full Address: {fullAddress}</Text>
         </View>
       </View>
     </SafeAreaView>
@@ -225,11 +284,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     alignItems: 'center',
     padding: 16,
+    paddingBottom: 100,
     backgroundColor: '#f8f8f8',
   },
   bigHeader: {
     width: '100%',
-    maxWidth: 500,
     height: 120,
     backgroundColor: '#2563EB',
     borderBottomLeftRadius: 24,
@@ -316,6 +375,10 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 8,
   },
+  fullAddressText: {
+    fontWeight: '700',
+    color: '#0F172A',
+  },
   topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -341,6 +404,25 @@ const styles = StyleSheet.create({
   profileTitle: {
     fontSize: 14,
     color: '#475569',
+  },
+  mapContainer: {
+    width: '100%',
+    height: 300,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    marginBottom: 16,
+    marginTop: 12,
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  noMapView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
   },
   profileName: {
     fontSize: 18,
