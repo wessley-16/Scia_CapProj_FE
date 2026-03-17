@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import Entypo from '@expo/vector-icons/Entypo';
+import Entypo from "@expo/vector-icons/Entypo";
 import { Tabs, useRouter } from "expo-router";
 import React, { useRef } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -82,7 +82,7 @@ const CustomTabBar = ({
         onPress={onScanPress}
         style={styles.scanButton}
       >
-        <Entypo name="mic" size={24} color="black" />
+        <Entypo name="mic" size={32} color="#2356E1" />
       </TouchableOpacity>
     </View>
   );
@@ -119,7 +119,7 @@ export default function Layout() {
             name="voice"
             options={{ href: null, tabBarStyle: { display: "none" } }}
           />
-          
+
           <Tabs.Screen name="account" />
         </Tabs>
       </Host>
@@ -133,50 +133,52 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: "#2356E1", // Matched with Tab Bar Color to cover Safe Area
   },
   tabBar: {
     flexDirection: "row",
-    height: 75,
+    height: 70,
     width: "100%",
-    alignItems: "flex-end",
+    alignItems: "center", // Align items to center vertically, centerSlot will handle its own alignment
     borderTopWidth: 1,
     borderColor: "#4672ec",
     backgroundColor: "#2356E1",
-    paddingBottom: 8,
   },
   tabItem: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 8,
-    minHeight: 70,
+    height: "100%",
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
     marginTop: 4,
     fontFamily: "Inter-Medium",
     fontWeight: "600",
   },
   centerSlot: {
     width: 80,
+    height: "100%",
     alignItems: "center",
     justifyContent: "flex-end",
+    paddingBottom: 8,
   },
   scanLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#e4e4e4",
-    marginTop: 40,
     fontFamily: "Inter-Medium",
+    textAlign: "center",
+    width: "100%",
   },
   scanButton: {
     position: "absolute",
-    top: -22,
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 5,
-    borderColor: "#2356E1",
+    top: -30, // Adjusted to float better
+    width: 64, // Slightly smaller for better proportion
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 4,
+    borderColor: "#2356E1", // Matches background so it looks like a cutout if using white
+    // Actually, user had white bg and blue border.
     backgroundColor: "white",
     alignItems: "center",
     justifyContent: "center",
