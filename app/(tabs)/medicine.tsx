@@ -1,30 +1,130 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AntDesign from "@expo/vector-icons/AntDesign";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
-import React, { useEffect, useState } from 'react';
+import * as Notifications from "expo-notifications";
+import { useFocusEffect, useRouter } from "expo-router";
+import * as Constants from "expo-constants";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import {
+  Alert,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Medicine } from "../../interfaces/interfaces";
+
+// Configure notifications behavior
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 export default function medicine() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(
+    null,
+  );
+
+  // Form State
   const [medicineName, setMedicineName] = useState("");
+  const [description, setDescription] = useState("");
   const [dosage, setDosage] = useState("");
   const [dosageUnit, setDosageUnit] = useState<"ml" | "mg" | "capsule">("mg");
   const [interval, setInterval] = useState("8");
 
+  const router = useRouter();
+  const notificationListener = useRef<any>();
+  const responseListener = useRef<any>();
+
+  useFocusEffect(
+    useCallback(() => {
+      loadMedicines();
+    }, []),
+  );
+
   useEffect(() => {
-    loadMedicines();
+    registerForPushNotificationsAsync();
+
+    notificationListener.current =
+      Notifications.addNotificationReceivedListener((notification) => {
+        // console.log(notification);
+      });
+
+    responseListener.current =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        // console.log(response);
+      });
+
+    return () => {
+      // Clean up subscriptions
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(
+          notificationListener.current,
+        );
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
   }, []);
+
+  const registerForPushNotificationsAsync = async () => {
+    try {
+      if (Platform.OS === "android") {
+        await Notifications.setNotificationChannelAsync("default", {
+          name: "default",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7C",
+        });
+      }
+
+      if (Constants.appOwnership === "expo") {
+        // In Expo Go, we can't request full push permissions easily without error on Android sometimes
+        // But local notifications should work without the full push dance if we just ask quietly.
+        // However, scheduleNotificationAsync requires permissions on Android 13+.
+        // We'll wrap this in a try-catch to be safe.
+      }
+
+      let existingStatus;
+      try {
+        const settings = await Notifications.getPermissionsAsync();
+        existingStatus = settings.status;
+      } catch (e) {
+        existingStatus = "undetermined";
+      }
+
+      let finalStatus = existingStatus;
+      if (existingStatus !== "granted") {
+        try {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        } catch (err) {
+          console.log("Error requesting permissions:", err);
+        }
+      }
+      if (finalStatus !== "granted") {
+        // Alert.alert('Permission needed', 'Failed to get push token for push notification!');
+        return;
+      }
+    } catch (error) {
+      console.log("Notification permissions error (likely Expo Go):", error);
+    }
+  };
 
   const loadMedicines = async () => {
     try {
@@ -44,40 +144,183 @@ export default function medicine() {
     }
   };
 
-  const addMedicine = () => {
+  const scheduleNotification = async (name: string, intervalHours: number) => {
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Time to take your medicine!",
+          body: `Don't forget to take ${name}.`,
+          sound: true,
+        },
+        trigger: {
+          seconds: intervalHours * 3600, // Convert hours to seconds
+          repeats: true,
+        } as any, // Type assertion for trigger
+      });
+      return id;
+    } catch (error) {
+      console.log("Error scheduling notification:", error);
+      return undefined;
+    }
+  };
+
+  const addMedicine = async () => {
     if (!medicineName || !dosage || !interval) {
-      alert("Please fill in all fields");
+      Alert.alert("Missing Fields", "Please fill in all fields");
       return;
     }
+
+    const intervalNum = parseInt(interval);
+    const notificationId = await scheduleNotification(
+      medicineName,
+      intervalNum,
+    );
 
     const newMedicine: Medicine = {
       id: Date.now().toString(),
       name: medicineName,
+      description: description,
       dosage,
       dosageUnit,
-      interval: parseInt(interval),
+      interval: intervalNum,
+      startTime: Date.now(),
       lastTakenTime: Date.now(),
       createdAt: Date.now(),
+      notificationId: notificationId,
     };
 
     const updatedMedicines = [...medicines, newMedicine];
-    saveMedicines(updatedMedicines);
+    await saveMedicines(updatedMedicines);
 
-    setMedicineName("");
-    setDosage("");
-    setDosageUnit("mg");
-    setInterval("8");
+    resetForm();
     setModalVisible(false);
   };
 
-  const deleteMedicine = (id: string) => {
+  const deleteMedicine = async (id: string, notifId?: string) => {
+    if (notifId) {
+      await Notifications.cancelScheduledNotificationAsync(notifId);
+    }
     const updatedMedicines = medicines.filter((med) => med.id !== id);
-    saveMedicines(updatedMedicines);
+    await saveMedicines(updatedMedicines);
+    if (selectedMedicine?.id === id) {
+      setDetailsModalVisible(false);
+    }
+  };
+
+  const resetForm = () => {
+    setMedicineName("");
+    setDescription("");
+    setDosage("");
+    setDosageUnit("mg");
+    setInterval("8");
+  };
+
+  const handleMedicineClick = (medicine: Medicine) => {
+    setSelectedMedicine(medicine);
+    setDetailsModalVisible(true);
+  };
+
+  const takeMedicineNow = async () => {
+    if (!selectedMedicine) return;
+
+    // Update last taken time
+    const updatedMed = {
+      ...selectedMedicine,
+      lastTakenTime: Date.now(),
+    };
+
+    // Reschedule notification if needed (cancel old, start new timer from now)
+    if (selectedMedicine.notificationId) {
+      await Notifications.cancelScheduledNotificationAsync(
+        selectedMedicine.notificationId,
+      );
+    }
+    const newNotifId = await scheduleNotification(
+      updatedMed.name,
+      updatedMed.interval,
+    );
+    updatedMed.notificationId = newNotifId;
+
+    // Update list
+    const updatedList = medicines.map((m) =>
+      m.id === updatedMed.id ? updatedMed : m,
+    );
+    await saveMedicines(updatedList);
+
+    setSelectedMedicine(updatedMed);
+    Alert.alert("Success", "Medicine marked as taken!");
   };
 
   const formatDosage = (dosage: string, unit: string) => {
-    const unitSymbol = unit === "capsule" ? (dosage === "1" ? "capsule" : "capsules") : unit;
+    const unitSymbol =
+      unit === "capsule" ? (dosage === "1" ? "capsule" : "capsules") : unit;
     return `${dosage} ${unitSymbol}`;
+  };
+
+  // Helper to calculate next dose
+  const getNextDoseTime = (med: Medicine) => {
+    // 1. If we have explicit notification times (FIXED SCHEDULE)
+    if (med.notificationTimes && med.notificationTimes.length > 0) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+
+      // Sort times just in case
+      const sortedTimes = [...med.notificationTimes].sort(
+        (a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute),
+      );
+
+      // Find next time today
+      let next = sortedTimes.find(
+        (t) =>
+          t.hour > currentHour ||
+          (t.hour === currentHour && t.minute > currentMinute),
+      );
+
+      // If no more times today, take the first one tomorrow
+      if (!next) {
+        next = sortedTimes[0];
+      }
+
+      // Format time
+      const h = next.hour.toString().padStart(2, "0");
+      const m = next.minute.toString().padStart(2, "0");
+      return `${h}:${m}`;
+    }
+
+    // 2. Fallback to interval-based calculation
+    const nextTime = med.lastTakenTime + med.interval * 60 * 60 * 1000;
+    const now = Date.now();
+    const diff = nextTime - now;
+
+    if (diff <= 0) return "Now (Overdue)";
+
+    // Format nicely
+    const date = new Date(nextTime);
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+
+    // Calculate remaining hours/minutes
+    const hoursRemaining = Math.floor(diff / (1000 * 60 * 60));
+    const minutesRemaining = Math.floor(
+      (diff % (1000 * 60 * 60)) / (1000 * 60),
+    );
+
+    return `${hours}:${minutes} (in ${hoursRemaining}h ${minutesRemaining}m)`;
+  };
+
+  const getDurationText = (med: Medicine) => {
+    if (!med.endDate) return "Indefinite (Maintenance)";
+
+    // Calculate days remaining
+    const end = new Date(med.endDate).getTime();
+    const now = Date.now();
+    const diff = end - now;
+
+    if (diff < 0) return "Schedule Ended";
+
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return `${days} days left (Until ${new Date(med.endDate).toLocaleDateString()})`;
   };
 
   return (
@@ -99,28 +342,55 @@ export default function medicine() {
 
         {medicines.length === 0 ? (
           <View style={styles.emptyState}>
-            <MaterialCommunityIcons
-              name="pill"
-              size={60}
-              color="#D1D5DB"
-            />
+            <MaterialCommunityIcons name="pill" size={60} color="#D1D5DB" />
             <Text style={styles.emptyStateText}>No medicines added yet</Text>
-            <Text style={styles.emptyStateSubText}>Add your first medicine to get started</Text>
+            <Text style={styles.emptyStateSubText}>
+              Add your first medicine to get started
+            </Text>
           </View>
         ) : (
           medicines.map((medicine) => (
-            <View key={medicine.id} style={styles.medicineCard}>
+            <TouchableOpacity
+              key={medicine.id}
+              style={styles.medicineCard}
+              onPress={() => handleMedicineClick(medicine)}
+            >
               <View style={styles.medicineContent}>
                 <View style={styles.medicineLeft}>
                   <Text style={styles.medicineName}>{medicine.name}</Text>
                   <Text style={styles.medicineDetails}>
-                    {formatDosage(medicine.dosage, medicine.dosageUnit)} • Every {medicine.interval}h
+                    {formatDosage(medicine.dosage, medicine.dosageUnit)}
+                  </Text>
+                  <Text style={styles.nextDoseText}>
+                    Next: {getNextDoseTime(medicine)}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.medicineDetails,
+                      { fontSize: 12, marginTop: 4, color: "#666" },
+                    ]}
+                  >
+                    {getDurationText(medicine)}
                   </Text>
                 </View>
               </View>
               <TouchableOpacity
                 style={styles.deleteButton}
-                onPress={() => deleteMedicine(medicine.id)}
+                onPress={() =>
+                  Alert.alert(
+                    "Delete Medicine",
+                    "Are you sure you want to delete this medicine?",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: () =>
+                          deleteMedicine(medicine.id, medicine.notificationId),
+                      },
+                    ],
+                  )
+                }
               >
                 <MaterialCommunityIcons
                   name="trash-can-outline"
@@ -128,73 +398,193 @@ export default function medicine() {
                   color="#EF4444"
                 />
               </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
 
+      {/* ADD MEDICINE MODAL */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Add Medicine</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.modalTitle}>Add Medicine</Text>
 
-            <Text style={styles.label}>Medicine Name</Text>
-            <TextInput
-              placeholder="e.g., Blood Pressure Medicine"
-              value={medicineName}
-              onChangeText={setMedicineName}
-              style={styles.input}
-            />
+              <Text style={styles.label}>Medicine Name</Text>
+              <TextInput
+                placeholder="e.g., Blood Pressure Medicine"
+                value={medicineName}
+                onChangeText={setMedicineName}
+                style={styles.input}
+              />
 
-            <Text style={styles.label}>Dosage</Text>
-            <TextInput
-              placeholder="e.g., 1, 500"
-              value={dosage}
-              onChangeText={setDosage}
-              keyboardType="decimal-pad"
-              style={styles.input}
-            />
+              <Text style={styles.label}>Description / Purpose (Optional)</Text>
+              <TextInput
+                placeholder="e.g., Take after meals"
+                value={description}
+                onChangeText={setDescription}
+                style={styles.input}
+              />
 
-            <Text style={styles.label}>Unit</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={dosageUnit}
-                onValueChange={(itemValue) => setDosageUnit(itemValue)}
-                style={styles.picker}
+              <Text style={styles.label}>Dosage</Text>
+              <TextInput
+                placeholder="e.g., 1, 500"
+                value={dosage}
+                onChangeText={setDosage}
+                keyboardType="decimal-pad"
+                style={styles.input}
+              />
+
+              <Text style={styles.label}>Unit</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={dosageUnit}
+                  onValueChange={(itemValue) => setDosageUnit(itemValue)}
+                  style={styles.picker}
+                >
+                  <Picker.Item label="mg (milligrams)" value="mg" />
+                  <Picker.Item label="ml (milliliters)" value="ml" />
+                  <Picker.Item label="Capsule" value="capsule" />
+                </Picker>
+              </View>
+
+              <Text style={styles.label}>Interval (hours)</Text>
+              <TextInput
+                placeholder="e.g., 8"
+                value={interval}
+                onChangeText={setInterval}
+                keyboardType="number-pad"
+                style={styles.input}
+              />
+
+              <TouchableOpacity style={styles.saveButton} onPress={addMedicine}>
+                <Text style={styles.saveButtonText}>Save & Schedule</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => {
+                  setModalVisible(false);
+                  resetForm();
+                }}
               >
-                <Picker.Item label="mg (milligrams)" value="mg" />
-                <Picker.Item label="ml (milliliters)" value="ml" />
-                <Picker.Item label="Capsule" value="capsule" />
-              </Picker>
-            </View>
-
-            <Text style={styles.label}>Time Interval (hours between doses)</Text>
-            <TextInput
-              placeholder="e.g., 8"
-              value={interval}
-              onChangeText={setInterval}
-              keyboardType="number-pad"
-              style={styles.input}
-            />
-
-            <TouchableOpacity style={styles.saveButton} onPress={addMedicine}>
-              <Text style={styles.saveButtonText}>Add Medicine</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
+
+      {/* DETAILS MODAL */}
+      <Modal visible={detailsModalVisible} animationType="fade" transparent>
+        <View style={styles.modalBackground}>
+          <View style={styles.modalContainer}>
+            {selectedMedicine && (
+              <>
+                <Text style={styles.modalTitle}>{selectedMedicine.name}</Text>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Description:</Text>
+                  <Text style={styles.detailValue}>
+                    {selectedMedicine.description || "No description provided"}
+                  </Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Dosage:</Text>
+                  <Text style={styles.detailValue}>
+                    {formatDosage(
+                      selectedMedicine.dosage,
+                      selectedMedicine.dosageUnit,
+                    )}
+                  </Text>
+                </View>
+
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Schedule:</Text>
+                  <Text style={styles.detailValue}>
+                    Every {selectedMedicine.interval} hours
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.detailRow,
+                    {
+                      marginTop: 10,
+                      backgroundColor: "#EFF6FF",
+                      padding: 10,
+                      borderRadius: 8,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.detailLabel, { color: "#2563EB" }]}>
+                    Next Dose:
+                  </Text>
+                  <Text
+                    style={[
+                      styles.detailValue,
+                      { fontWeight: "bold", color: "#1E40AF" },
+                    ]}
+                  >
+                    {getNextDoseTime(selectedMedicine)}
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.saveButton,
+                    { marginTop: 24, backgroundColor: "#10B981" },
+                  ]}
+                  onPress={takeMedicineNow}
+                >
+                  <Text style={styles.saveButtonText}>Mark as Taken Now</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setDetailsModalVisible(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <View style={styles.floatingButton}>
+        <TouchableOpacity
+          style={styles.cameraButton}
+          activeOpacity={0.8}
+          onPress={() => router.push("/screen/camera")}
+        >
+          <AntDesign name="camera" size={28} color="white" />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  floatingButton: {
+    position: "absolute",
+    bottom: 100,
+    right: 20,
+  },
+  cameraButton: {
+    backgroundColor: "#2356E1",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 10,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: "#F4F6F9",
@@ -237,6 +627,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     elevation: 2,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   medicineContent: {
     flex: 1,
@@ -246,14 +638,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   medicineName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#1F2937",
-    marginBottom: 6,
+    marginBottom: 4,
   },
   medicineDetails: {
-    fontSize: 16,
-    color: "black",
+    fontSize: 14,
+    color: "#4B5563",
+    marginBottom: 4,
+  },
+  nextDoseText: {
+    fontSize: 12,
+    color: "#2563EB",
+    fontWeight: "600",
+    marginTop: 2,
   },
   deleteButton: {
     padding: 8,
@@ -277,7 +676,7 @@ const styles = StyleSheet.create({
   modalBackground: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)", // Darker overlay for better focus
   },
   modalContainer: {
     backgroundColor: "white",
@@ -285,12 +684,14 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
+    maxHeight: "90%", // Limit height on smaller screens
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
     marginBottom: 20,
     color: "#1F2937",
+    textAlign: "center",
   },
   label: {
     fontSize: 14,
@@ -305,6 +706,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
     fontSize: 16,
+    backgroundColor: "#F9FAFB", // Light gray background for inputs
   },
   pickerContainer: {
     borderWidth: 1,
@@ -312,6 +714,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 16,
     overflow: "hidden",
+    backgroundColor: "#F9FAFB",
   },
   picker: {
     height: 50,
@@ -338,4 +741,18 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
-})
+  detailRow: {
+    marginBottom: 12,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 2,
+    fontWeight: "500",
+  },
+  detailValue: {
+    fontSize: 18,
+    color: "#1F2937",
+    fontWeight: "500",
+  },
+});
