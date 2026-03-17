@@ -13,11 +13,14 @@ export default function account() {
       >
         {/* SCID SECTION */}
           <View style={styles.header}>
+            <Text style={styles.headerTitle}>Account Page</Text>
+
             <View style={styles.bellButton}>
               <Ionicons name="notifications" size={28} color="#2356E1" />
               <View style={styles.notificationDot} />
             </View>
           </View>
+
           <View style={styles.profileContainer}>
             <View style={styles.detailsContainer}>
               <Text style={styles.label}>Name:</Text>
@@ -72,7 +75,13 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#1F2937",
     marginBottom: 20,
   },
   bellButton: {

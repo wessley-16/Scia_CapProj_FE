@@ -1,7 +1,18 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const openLink = (url: string) => {
+  Alert.alert(
+    "Open Website",
+    "You will be redirected to an external website.",
+    [
+      { text: "Cancel", style: "cancel" },
+      { text: "Continue", onPress: () => Linking.openURL(url) }
+    ]
+  );
+};
 
 export default function govdocs() {
   return (
@@ -17,6 +28,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
+            onPress={() => openLink("https://www.ncsc.gov.ph")}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -36,6 +48,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
+            onPress={() => openLink("https://www.dswd.gov.ph")}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -55,6 +68,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
+            onPress={() => openLink("https://valenzuela.gov.ph/office-of-senior-citizens-affairs/")}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -65,7 +79,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>Office for Senior Citizens Affair (OSCA)</Text>
+              <Text style={styles.linkText}>Valenzuela Office for Senior Citizens Affair (OSCA)</Text>
             </View>
             
           </TouchableOpacity>
@@ -74,6 +88,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
+            onPress={() => openLink("https://www.philhealth.gov.ph")}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -93,6 +108,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
+            onPress={() => openLink("https://doh.gov.ph")}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -112,6 +128,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
+            onPress={() => openLink("https://www.sss.gov.ph")}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -131,6 +148,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
+            onPress={() => openLink("https://www.gsis.gov.ph")}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -150,6 +168,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
+            onPress={() => openLink("https://psa.gov.ph")}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
