@@ -1,48 +1,99 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
+  Modal,
+  ScrollView,
   StyleSheet,
   Text,
-  View,
-  Modal,
   TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+type AppointmentStatus = "scheduled" | "done" | "cancelled";
 
 type AppointmentType = {
   date: string;
   hospital: string;
   time: string;
   type: string;
+  status: AppointmentStatus;
 };
 
 export default function Appointment() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [hospital, setHospital] = useState<string>("");
-  const [time, setTime] = useState<string>("");
+  const [hour, setHour] = useState<string>("");
+  const [minute, setMinute] = useState<string>("");
+  const [amPm, setAmPm] = useState<"AM" | "PM">("AM");
   const [type, setType] = useState<string>("");
   const [appointments, setAppointments] = useState<AppointmentType[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string>("");
 
   const addAppointment = () => {
+    if (!selectedDate || !hospital.trim() || !hour.trim() || !minute.trim() || !type.trim()) {
+      setErrorMessage("Please fill all details: hospital, time, type, and date.");
+      return;
+    }
+
+    const hourValue = parseInt(hour, 10);
+    const minuteValue = parseInt(minute, 10);
+
+    if (isNaN(hourValue) || isNaN(minuteValue) || hourValue < 1 || hourValue > 12 || minuteValue < 0 || minuteValue > 59) {
+      setErrorMessage("Time must be valid numbers (hour 1-12, minute 0-59).");
+      return;
+    }
+
+    const formattedTime = `${hourValue.toString().padStart(2, "0")}:${minuteValue
+      .toString()
+      .padStart(2, "0")} ${amPm}`;
+
     const newAppointment: AppointmentType = {
       date: selectedDate,
-      hospital,
-      time,
-      type,
+      hospital: hospital.trim(),
+      time: formattedTime,
+      type: type.trim(),
+      status: "scheduled",
     };
 
     setAppointments([...appointments, newAppointment]);
     setHospital("");
-    setTime("");
+    setHour("");
+    setMinute("");
+    setAmPm("AM");
     setType("");
+    setErrorMessage("");
     setModalVisible(false);
+  };
+
+  const getMarkedDates = () => {
+    const marked: { [date: string]: any } = {};
+
+    appointments.forEach((appointment) => {
+      marked[appointment.date] = {
+        ...marked[appointment.date],
+        marked: true,
+        dotColor: "#2563EB",
+      };
+    });
+
+    if (selectedDate) {
+      marked[selectedDate] = {
+        ...marked[selectedDate],
+        selected: true,
+        selectedColor: "#2563EB",
+        selectedTextColor: "white",
+      };
+    }
+
+    return marked;
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
         <Text style={styles.headerTitle}>Schedule Appointment</Text>
 
         <View style={styles.calendarWrapper}>
@@ -50,14 +101,9 @@ export default function Appointment() {
             minDate={new Date().toISOString().split("T")[0]}
             onDayPress={(day: any) => {
               setSelectedDate(day.dateString);
+              setErrorMessage("");
             }}
-            markedDates={{
-              [selectedDate]: {
-                selected: true,
-                selectedColor: "#2563EB",
-                selectedTextColor: "white",
-              },
-            }}
+            markedDates={getMarkedDates()}
           />
         </View>
 
@@ -70,18 +116,58 @@ export default function Appointment() {
 
         <TouchableOpacity
           style={styles.addButton}
-          onPress={() => setModalVisible(true)}
+          onPress={() => {
+            setModalVisible(true);
+            setErrorMessage("");
+          }}
         >
           <Text style={styles.addButtonText}>Book Appointment</Text>
         </TouchableOpacity>
 
         {appointments.map((item, index) => (
-          <View key={index} style={styles.appointmentCard}>
-            <Text style={styles.appointmentText}>{item.type}</Text>
+          <View
+            key={`${item.date}-${index}-${item.status}`}
+            style={[
+              styles.appointmentCard,
+              item.status === "done" && styles.appointmentDone,
+              item.status === "cancelled" && styles.appointmentCancelled,
+            ]}
+          >
+            <View style={styles.appointmentHeader}>
+              <Text style={[styles.appointmentText, item.status === "done" && styles.appointmentTextDone]}>
+                {item.type}
+              </Text>
+              {item.status === "done" ? <Text style={styles.doneIcon}>✓</Text> : null}
+            </View>
+
             <Text style={styles.appointmentSub}>
               {item.hospital} • {item.time}
             </Text>
             <Text style={styles.appointmentDate}>{item.date}</Text>
+
+            <View style={styles.appointmentButtons}>
+              <TouchableOpacity
+                style={[styles.smallButton, styles.doneButton]}
+                onPress={() => {
+                  const updated = [...appointments];
+                  updated[index] = { ...updated[index], status: "done" };
+                  setAppointments(updated);
+                }}
+              >
+                <Text style={styles.smallButtonText}>Done</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.smallButton, styles.cancelApptButton]}
+                onPress={() => {
+                  const updated = [...appointments];
+                  updated[index] = { ...updated[index], status: "cancelled" };
+                  setAppointments(updated);
+                }}
+              >
+                <Text style={styles.smallButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ))}
 
@@ -97,12 +183,39 @@ export default function Appointment() {
                 style={styles.input}
               />
 
-              <TextInput
-                placeholder="Time (e.g. 2:30 PM)"
-                value={time}
-                onChangeText={setTime}
-                style={styles.input}
-              />
+              <View style={styles.timeRow}>
+                <TextInput
+                  placeholder="HH"
+                  value={hour}
+                  onChangeText={(text) => setHour(text.replace(/[^0-9]/g, ""))}
+                  style={[styles.input, styles.timeInput]}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <Text style={styles.timeSeparator}>:</Text>
+                <TextInput
+                  placeholder="MM"
+                  value={minute}
+                  onChangeText={(text) => setMinute(text.replace(/[^0-9]/g, ""))}
+                  style={[styles.input, styles.timeInput]}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <View style={styles.amPmWrapper}>
+                  <TouchableOpacity
+                    style={[styles.amPmButton, amPm === "AM" && styles.amPmButtonActive]}
+                    onPress={() => setAmPm("AM")}
+                  >
+                    <Text style={[styles.amPmText, amPm === "AM" && styles.amPmTextActive]}>AM</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.amPmButton, amPm === "PM" && styles.amPmButtonActive]}
+                    onPress={() => setAmPm("PM")}
+                  >
+                    <Text style={[styles.amPmText, amPm === "PM" && styles.amPmTextActive]}>PM</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               <TextInput
                 placeholder="Type (Check-up, Consultation, Lab Test)"
@@ -110,6 +223,12 @@ export default function Appointment() {
                 onChangeText={setType}
                 style={styles.input}
               />
+
+              {errorMessage ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{errorMessage}</Text>
+                </View>
+              ) : null}
 
               <TouchableOpacity style={styles.saveButton} onPress={addAppointment}>
                 <Text style={styles.saveButtonText}>Save Appointment</Text>
@@ -124,7 +243,7 @@ export default function Appointment() {
             </View>
           </View>
         </Modal>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -201,6 +320,51 @@ const styles = StyleSheet.create({
     color: "#2563EB",
     fontWeight: "bold",
   },
+  appointmentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  doneIcon: {
+    fontSize: 20,
+    color: "#10B981",
+    fontWeight: "bold",
+  },
+  appointmentDone: {
+    borderColor: "#10B981",
+    borderWidth: 1,
+    backgroundColor: "#ECFDF5",
+  },
+  appointmentCancelled: {
+    borderColor: "#F87171",
+    borderWidth: 1,
+    backgroundColor: "#FEF2F2",
+  },
+  appointmentTextDone: {
+    textDecorationLine: "line-through",
+    color: "#6B7280",
+  },
+  appointmentButtons: {
+    flexDirection: "row",
+    marginTop: 10,
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+  smallButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  doneButton: {
+    backgroundColor: "#10B981",
+  },
+  cancelApptButton: {
+    backgroundColor: "#EF4444",
+  },
+  smallButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
   modalBackground: {
     flex: 1,
     justifyContent: "center",
@@ -240,6 +404,62 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: "#EF4444",
+    fontWeight: "bold",
+  },
+  contentContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 180,
+  },
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  timeInput: {
+    flex: 1,
+    textAlign: "center",
+  },
+  timeSeparator: {
+    marginHorizontal: 8,
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  amPmWrapper: {
+    flexDirection: "row",
+    marginLeft: 10,
+  },
+  amPmButton: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginLeft: 4,
+    backgroundColor: "#F9FAFB",
+  },
+  amPmButtonActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  amPmText: {
+    color: "#374151",
+    fontWeight: "bold",
+  },
+  amPmTextActive: {
+    color: "white",
+  },
+  errorContainer: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderWidth: 1,
+    borderColor: "#EF4444",
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    alignItems: "center",
+  },
+  errorText: {
+    color: "#B91C1C",
     fontWeight: "bold",
   },
 });
