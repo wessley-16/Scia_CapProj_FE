@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View
@@ -144,6 +145,40 @@ export default function EmergencyScreen() {
       if (!emergencyLocation) {
         setEmergencyLocation(currentCoords);
       }
+
+      // Reverse-geocode the coordinates to address text for street/barangay/full address.
+      try {
+        const geocoded = await Location.reverseGeocodeAsync(currentCoords);
+        if (geocoded.length > 0) {
+          const firstPlace = geocoded[0] as any;
+          const resolvedStreet = firstPlace.street || firstPlace.name || street || 'Unknown Street';
+          const resolvedBarangay =
+            firstPlace.subregion ||
+            firstPlace.subLocality ||
+            firstPlace.suburb ||
+            firstPlace.district ||
+            firstPlace.name ||
+            barangay ||
+            'Unknown Barangay';
+          const resolvedCity = firstPlace.city || firstPlace.region || firstPlace.country || 'Unknown City';
+
+          setStreet(resolvedStreet);
+          setBarangay(resolvedBarangay);
+
+          const safeAddress = [resolvedStreet, resolvedBarangay, resolvedCity]
+            .filter(Boolean)
+            .join(', ');
+          setFullAddress(safeAddress || 'Unknown Address');
+
+          // Persist in AsyncStorage for next run.
+          await AsyncStorage.setItem('userStreet', resolvedStreet);
+          await AsyncStorage.setItem('userBarangay', resolvedBarangay);
+          await AsyncStorage.setItem('userFullAddress', safeAddress);
+        }
+      } catch (geocodeError) {
+        // If geocoding fails, keep default values or existing ones.
+      }
+
       setIsFetchingLocation(false);
     } catch (error) {
       setLocation(null);
@@ -195,8 +230,9 @@ export default function EmergencyScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.bigHeader}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.container}>
+          <View style={styles.bigHeader}>
           <Text style={styles.bigHeaderText}>EMERGENCY</Text>
         </View>
         <Text style={styles.headerTitle}>Emergency Button</Text>
@@ -270,6 +306,7 @@ export default function EmergencyScreen() {
           <Text style={[styles.infoText, styles.fullAddressText]}>Full Address: {fullAddress}</Text>
         </View>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -279,12 +316,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F4F6F9",
   },
+  scrollContainer: {
+    flexGrow: 1,
+    paddingBottom: 140,
+  },
   container: {
     flex: 1,
     justifyContent: 'flex-start',
     alignItems: 'center',
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 24,
     backgroundColor: '#f8f8f8',
   },
   bigHeader: {
@@ -407,7 +448,7 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     width: '100%',
-    height: 300,
+    height: 260,
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
