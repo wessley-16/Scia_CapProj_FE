@@ -6,10 +6,16 @@ interface Message {
 }
 
 export const useChatbot = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Change your useState to look like this:
+  const [messages, setMessages] = useState<Message[]>([
+    { 
+      role: "ai", 
+      text: "Magandang araw! Ako ang iyong Valenzuela Senior Assistant. Paano kita matutulungan ngayon?" 
+    }
+  ]);
   const [loading, setLoading] = useState(false);
 
-  const API_URL = "http://YOUR_BACKEND_IP:3000/api/chat";
+  const API_URL = "http://192.168.254.125:3000/api/chat";
   // ⚠️ Replace with:
   // - "http://localhost:3000/api/chat" (web)
   // - "http://192.168.x.x:3000/api/chat" (real device)
