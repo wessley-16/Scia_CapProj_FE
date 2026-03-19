@@ -17,10 +17,57 @@ const BUTTON_SIZE = 220;
 const RING_SIZE = 240;
 const RING_STROKE = 6;
 
+const valenzuelaBarangays = [
+  { name: 'Bagbaguin', lat: 14.7046, lng: 120.9946 },
+  { name: 'Bignay', lat: 14.7068, lng: 120.9925 },
+  { name: 'Bisig', lat: 14.7170, lng: 120.9810 },
+  { name: 'Canumay East', lat: 14.6935, lng: 120.9795 },
+  { name: 'Canumay West', lat: 14.6929, lng: 120.9764 },
+  { name: 'Casisang', lat: 14.7240, lng: 120.9945 },
+  { name: 'Col. Jose W. Diokno', lat: 14.7063, lng: 120.9908 },
+  { name: 'Gen. T. de Leon', lat: 14.7057, lng: 120.9863 },
+  { name: 'Genova', lat: 14.7028, lng: 120.9749 },
+  { name: 'Isla', lat: 14.6931, lng: 120.9972 },
+  { name: 'Karuhatan', lat: 14.7029, lng: 120.9984 },
+  { name: 'Lawang Bato', lat: 14.7058, lng: 120.9981 },
+  { name: 'Lingunan', lat: 14.7033, lng: 120.9841 },
+  { name: 'Loma de Gato', lat: 14.7154, lng: 120.9875 },
+  { name: 'Malinta', lat: 14.7014, lng: 120.9769 },
+  { name: 'Mapulang Lupa', lat: 14.7074, lng: 120.9973 },
+  { name: 'Marulas', lat: 14.7164, lng: 120.9911 },
+  { name: 'Maysan', lat: 14.7198, lng: 120.9969 },
+  { name: 'Northbay Blvd North', lat: 14.7301, lng: 120.9761 },
+  { name: 'Northbay Blvd South', lat: 14.7245, lng: 120.9778 },
+  { name: 'Panghulo', lat: 14.7228, lng: 120.9969 },
+  { name: 'Pariancillo Villa', lat: 14.7005, lng: 120.9877 },
+  { name: 'Paso de Blas', lat: 14.7302, lng: 120.9910 },
+  { name: 'Poblacion', lat: 14.7007, lng: 120.9859 },
+  { name: 'Polo', lat: 14.7256, lng: 120.9824 },
+  { name: 'Punturin', lat: 14.7284, lng: 120.9866 },
+  { name: 'Reservoir Hills', lat: 14.7201, lng: 120.9994 },
+  { name: 'Tagalag', lat: 14.7308, lng: 120.9872 },
+  { name: 'Ugong', lat: 14.7200, lng: 120.9947 },
+  { name: 'Veinte Reales', lat: 14.7061, lng: 120.9882 },
+  { name: 'Wawang Pulo', lat: 14.7177, lng: 120.9854 },
+  { name: 'Alfonso', lat: 14.7012, lng: 120.9874 },
+];
+
+const getBarangayFromCoords = (lat: number, lng: number): string => {
+  if (isNaN(lat) || isNaN(lng)) return 'Unknown Barangay';
+  let closest = { name: 'Unknown Barangay', dist: Number.MAX_VALUE };
+  for (const b of valenzuelaBarangays) {
+    const d = Math.hypot(lat - b.lat, lng - b.lng);
+    if (d < closest.dist) closest = { name: b.name, dist: d };
+  }
+  // if far from known barangay, keep Unknown
+  return closest.dist < 0.03 ? closest.name : 'Unknown Barangay';
+};
+
 export default function EmergencyScreen() {
   const [profileName, setProfileName] = useState<string | null>(null);
   const [barangay, setBarangay] = useState<string>('Unknown Barangay');
   const [street, setStreet] = useState<string>('Unknown Street');
+  const [city, setCity] = useState<string>('Unknown City');
   const [fullAddress, setFullAddress] = useState<string>('Unknown Address');
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(
     null
@@ -45,6 +92,7 @@ export default function EmergencyScreen() {
         const savedName = await AsyncStorage.getItem('userName');
         const savedBarangay = await AsyncStorage.getItem('userBarangay');
         const savedStreet = await AsyncStorage.getItem('userStreet');
+        const savedCity = await AsyncStorage.getItem('userCity');
         const savedFullAddress = await AsyncStorage.getItem('userFullAddress');
 
         if (savedName) {
@@ -58,10 +106,13 @@ export default function EmergencyScreen() {
         if (savedStreet) {
           setStreet(savedStreet);
         }
+        if (savedCity) {
+          setCity(savedCity);
+        }
         if (savedFullAddress) {
           setFullAddress(savedFullAddress);
-        } else if (savedStreet && savedBarangay) {
-          setFullAddress(`${savedStreet}, ${savedBarangay}`);
+        } else if (savedStreet && savedBarangay && savedCity) {
+          setFullAddress(`${savedStreet}, ${savedBarangay}, ${savedCity}`);
         }
       } catch {
         setProfileName('Maria S. Santos');
@@ -147,23 +198,27 @@ export default function EmergencyScreen() {
       }
 
       // Reverse-geocode the coordinates to address text for street/barangay/full address.
+      const detectedBarangay = getBarangayFromCoords(currentCoords.latitude, currentCoords.longitude);
+      setBarangay(detectedBarangay);
+
       try {
         const geocoded = await Location.reverseGeocodeAsync(currentCoords);
         if (geocoded.length > 0) {
           const firstPlace = geocoded[0] as any;
           const resolvedStreet = firstPlace.street || firstPlace.name || street || 'Unknown Street';
           const resolvedBarangay =
-            firstPlace.subregion ||
+            detectedBarangay ||
             firstPlace.subLocality ||
             firstPlace.suburb ||
+            firstPlace.subregion ||
             firstPlace.district ||
             firstPlace.name ||
-            barangay ||
             'Unknown Barangay';
-          const resolvedCity = firstPlace.city || firstPlace.region || firstPlace.country || 'Unknown City';
+          const resolvedCity = firstPlace.city || firstPlace.region || firstPlace.country || 'Valenzuela';
 
           setStreet(resolvedStreet);
           setBarangay(resolvedBarangay);
+          setCity(resolvedCity);
 
           const safeAddress = [resolvedStreet, resolvedBarangay, resolvedCity]
             .filter(Boolean)
@@ -173,6 +228,7 @@ export default function EmergencyScreen() {
           // Persist in AsyncStorage for next run.
           await AsyncStorage.setItem('userStreet', resolvedStreet);
           await AsyncStorage.setItem('userBarangay', resolvedBarangay);
+          await AsyncStorage.setItem('userCity', resolvedCity);
           await AsyncStorage.setItem('userFullAddress', safeAddress);
         }
       } catch (geocodeError) {
@@ -303,6 +359,7 @@ export default function EmergencyScreen() {
           </Text>
           <Text style={styles.infoText}>Barangay: {barangay}</Text>
           <Text style={styles.infoText}>Street: {street}</Text>
+          <Text style={styles.infoText}>City: {city}</Text>
           <Text style={[styles.infoText, styles.fullAddressText]}>Full Address: {fullAddress}</Text>
         </View>
       </View>
