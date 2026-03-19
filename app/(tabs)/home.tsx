@@ -18,13 +18,7 @@ export default function Home() {
   const router = useRouter();
   const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadNextMedicine();
-    }, [])
-  );
-
-  const loadNextMedicine = async () => {
+  const loadNextMedicine = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem("medicines");
       if (!stored) {
@@ -38,13 +32,11 @@ export default function Home() {
         return;
       }
 
-      // Calculate next dose time for each medicine
       const medicinesWithNextDose = medicines.map((med) => ({
         ...med,
         nextDoseTime: med.lastTakenTime + med.interval * 60 * 60 * 1000,
       }));
 
-      // Find the medicine with the earliest next dose time
       const upcoming = medicinesWithNextDose.reduce((earliest, current) => {
         return current.nextDoseTime < earliest.nextDoseTime ? current : earliest;
       });
@@ -54,7 +46,13 @@ export default function Home() {
       console.log("Error loading next medicine:", error);
       setNextMedicine(null);
     }
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNextMedicine();
+    }, [loadNextMedicine])
+  );
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
