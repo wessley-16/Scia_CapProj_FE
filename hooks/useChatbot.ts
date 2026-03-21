@@ -1,67 +1,50 @@
 import { useState } from "react";
 
-interface Message {
-  role: "user" | "ai";
+// Define the message type
+export type ChatMessage = {
+  role: "user" | "assistant";
   text: string;
-}
+};
 
 export const useChatbot = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const API_URL = "http://YOUR_BACKEND_IP:3000/api/chat";
-  // ⚠️ Replace with:
-  // - "http://localhost:3000/api/chat" (web)
-  // - "http://192.168.x.x:3000/api/chat" (real device)
+  const addMessage = (role: ChatMessage["role"], text: string) => {
+    setMessages((prev) => [...prev, { role, text }]);
+  };
 
-  const sendMessage = async (text: string) => {
-    if (!text.trim()) return;
+  const sendMessage = async (message: string) => {
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) return;
 
-    const userMessage: Message = { role: "user", text };
-
-    setMessages((prev) => [...prev, userMessage]);
+    // Add user's message
+    addMessage("user", trimmedMessage);
     setLoading(true);
 
     try {
-      const response = await fetch(API_URL, {
+      const response = await fetch("http://192.168.1.100:3000/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message: text }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmedMessage }),
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-      const aiMessage: Message = {
-        role: "ai",
-        text: data.reply || "No response from AI",
-      };
+      const data: { reply?: string } = await response.json();
 
-      setMessages((prev) => [...prev, aiMessage]);
-    } catch (error) {
-      console.error("Chat error:", error);
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "ai",
-          text: "⚠️ Failed to connect to server",
-        },
-      ]);
+      // Safely append AI reply
+      const reply = data?.reply ?? "No reply from AI.";
+      addMessage("assistant", reply);
+    } catch (err) {
+      console.error("Chatbot error:", err);
+      addMessage("assistant", "Error connecting to AI.");
     } finally {
       setLoading(false);
     }
   };
 
-  const clearChat = () => {
-    setMessages([]);
-  };
-
-  return {
-    messages,
-    loading,
-    sendMessage,
-    clearChat,
-  };
+  return { messages, loading, sendMessage };
 };

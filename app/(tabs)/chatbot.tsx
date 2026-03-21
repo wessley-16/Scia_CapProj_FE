@@ -1,17 +1,17 @@
-import { useChatbot } from "@/hooks/useChatbot";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useRef, useState } from "react";
 import {
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useChatbot } from "@/hooks/useChatbot";
 
 export default function ChatScreen() {
   const { messages, sendMessage, loading } = useChatbot();
@@ -20,11 +20,9 @@ export default function ChatScreen() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
     await sendMessage(input);
     setInput("");
 
-    // auto scroll
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -34,9 +32,13 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 60}
       >
-        {/* CHAT LIST */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>Chat Assistant</Text>
+        </View>
+
         <FlatList
           ref={flatListRef}
           data={messages}
@@ -46,33 +48,37 @@ export default function ChatScreen() {
             <View
               style={[
                 styles.messageRow,
-                item.role === "user"
-                  ? styles.userRow
-                  : styles.aiRow,
+                item.role === "user" ? styles.userRow : styles.aiRow,
               ]}
             >
               <View
                 style={[
                   styles.bubble,
-                  item.role === "user"
-                    ? styles.userBubble
-                    : styles.aiBubble,
+                  item.role === "user" ? styles.userBubble : styles.aiBubble,
                 ]}
               >
-                <Text style={styles.text}>{item.text}</Text>
+                <Text
+                  style={[
+                    styles.text,
+                    item.role === "user" ? styles.userText : styles.aiText,
+                  ]}
+                >
+                  {item.text}
+                </Text>
               </View>
             </View>
           )}
+          onContentSizeChange={() =>
+            flatListRef.current?.scrollToEnd({ animated: true })
+          }
         />
 
-        {/* TYPING INDICATOR */}
         {loading && (
           <View style={styles.typingContainer}>
             <Text style={styles.typingText}>Assistant is typing...</Text>
           </View>
         )}
 
-        {/* INPUT BAR */}
         <View style={styles.inputWrapper}>
           <TextInput
             value={input}
@@ -81,7 +87,6 @@ export default function ChatScreen() {
             style={styles.input}
             multiline
           />
-
           <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
             <Ionicons name="send" size={20} color="#fff" />
           </TouchableOpacity>
@@ -92,59 +97,30 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F6F9",
-  },
-
-  chatContainer: {
+  container: { flex: 1, backgroundColor: "#F4F6F9" },
+  headerContainer: {
     padding: 16,
-    paddingBottom: 80,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
   },
+  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#111827" },
 
-  messageRow: {
-    marginBottom: 12,
-    flexDirection: "row",
-  },
+  chatContainer: { padding: 16, paddingBottom: 120 },
+  messageRow: { marginBottom: 12, flexDirection: "row" },
+  userRow: { justifyContent: "flex-end" },
+  aiRow: { justifyContent: "flex-start" },
 
-  userRow: {
-    justifyContent: "flex-end",
-  },
+  bubble: { maxWidth: "80%", padding: 12, borderRadius: 16 },
+  userBubble: { backgroundColor: "#2356E1", borderBottomRightRadius: 4 },
+  aiBubble: { backgroundColor: "#FFFFFF", borderBottomLeftRadius: 4 },
 
-  aiRow: {
-    justifyContent: "flex-start",
-  },
+  text: { fontSize: 15 },
+  userText: { color: "#fff" },
+  aiText: { color: "#111827" },
 
-  bubble: {
-    maxWidth: "80%",
-    padding: 12,
-    borderRadius: 16,
-  },
-
-  userBubble: {
-    backgroundColor: "#2356E1", // your blue
-    borderBottomRightRadius: 4,
-  },
-
-  aiBubble: {
-    backgroundColor: "#FFFFFF",
-    borderBottomLeftRadius: 4,
-  },
-
-  text: {
-    fontSize: 15,
-    color: "#111827",
-  },
-
-  typingContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-
-  typingText: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
+  typingContainer: { paddingHorizontal: 16, paddingBottom: 8 },
+  typingText: { fontSize: 13, color: "#6B7280" },
 
   inputWrapper: {
     flexDirection: "row",
@@ -154,7 +130,6 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     backgroundColor: "#fff",
   },
-
   input: {
     flex: 1,
     backgroundColor: "#F9FAFB",
@@ -164,11 +139,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     maxHeight: 100,
   },
-
-  sendBtn: {
-    marginLeft: 8,
-    backgroundColor: "#2356E1",
-    padding: 12,
-    borderRadius: 12,
-  },
+  sendBtn: { marginLeft: 8, backgroundColor: "#2356E1", padding: 12, borderRadius: 12 },
 });
