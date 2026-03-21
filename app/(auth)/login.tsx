@@ -15,14 +15,14 @@ import {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [idnum, setNscidNum] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
     // 1. Basic validation
-    if (!email || !password) {
-      Alert.alert("Error", "Please enter both email and password.");
+    if (!idnum || !password) {
+      Alert.alert("Error", "Please enter both NSCID number and password.");
       return;
     }
 
@@ -30,13 +30,13 @@ export default function LoginScreen() {
 
     try {
       // ⚠️ CRITICAL: Replace "192.168.1.XXX" with your laptop's actual IPv4 address!
-      const BACKEND_URL = "http://192.168.254.125:3000/api/auth/login";
+      const BACKEND_URL = "http://10.174.101.153:3000/api/auth/login";
 
       // 2. Send the login request to your Node.js server
       const response = await fetch(BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ idnum, password }),
       });
 
       const data = await response.json();
@@ -72,10 +72,10 @@ export default function LoginScreen() {
 
         <TextInput
           style={styles.input}
-          placeholder="Email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
+          placeholder="NSCID Number"
+          value={idnum}
+          onChangeText={setNscidNum}
+          keyboardType="numeric"
           autoCapitalize="none"
         />
 
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
     elevation: 3, 
   },
   title: {
-    fontSize: 24,
+    fontSize: 36,
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
@@ -131,6 +131,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
     padding: 15,
+    fontSize: 20,
     borderRadius: 8,
     marginBottom: 15,
     backgroundColor: "#fafafa",
@@ -148,6 +149,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "white",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 20,
   },
 });

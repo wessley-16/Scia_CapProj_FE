@@ -14,11 +14,11 @@ export default function Index() {
         backgroundColor: "#F7F9FC",
       }}
     >
-      <Text style={{ fontSize: 32, fontWeight: "800", marginBottom: 12 }}>
-        Welcome to SciaCare
+      <Text style={{ fontSize: 40, fontWeight: "800", marginBottom: 12 }}>
+        WELCOME TO SCIA
       </Text>
-      <Text style={{ fontSize: 16, textAlign: "center", color: "#546e7a", marginBottom: 32 }}>
-        Your health assistant for appointments, medicine management, and voice commands.
+      <Text style={{ fontSize: 20, textAlign: "center", color: "#000000", marginBottom: 32 }}>
+        Your AI-powered mobile assistant for senior citizen welfare in Valenzuela City.
       </Text>
 
       <TouchableOpacity
@@ -28,12 +28,12 @@ export default function Index() {
           paddingVertical: 14,
           marginBottom: 12,
           borderRadius: 10,
-          backgroundColor: "#1fcc79",
+          backgroundColor: "#2563EB",
           alignItems: "center",
         }}
       >
-        <Text style={{ color: "white", fontSize: 16, fontWeight: "700" }}>
-          Get Started
+        <Text style={{ color: "white", fontSize: 24, fontWeight: "700" }}>
+          LogIn your Account
         </Text>
       </TouchableOpacity>
 
@@ -44,18 +44,18 @@ export default function Index() {
           paddingVertical: 14,
           borderRadius: 10,
           borderWidth: 1,
-          borderColor: "#1fcc79",
+          borderColor: "#2563EB",
           alignItems: "center",
         }}
       >
-        <Text style={{ color: "#1fcc79", fontSize: 16, fontWeight: "700" }}>
-          Create an Account
+        <Text style={{ color: "#2563EB", fontSize: 24, fontWeight: "700" }}>
+          Sign Up an Account
         </Text>
       </TouchableOpacity>
 
       <Text
         onPress={() => router.push("/(tabs)/home")}
-        style={{ marginTop: 20, color: "#1fcc79", fontSize: 15 }}
+        style={{ marginTop: 20, color: "#2563EB", fontSize: 24 }}
       >
         Continue as Guest
       </Text>

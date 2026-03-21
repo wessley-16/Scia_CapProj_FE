@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 
 import {
@@ -16,6 +16,7 @@ import { Medicine } from "../../interfaces/interfaces";
 
 export default function Home() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
 
   const loadNextMedicine = useCallback(async () => {
@@ -76,16 +77,16 @@ export default function Home() {
       >
         {/* HEADER SECTION */}
         <TouchableOpacity style={styles.header} onPress={() => router.push("/account")}>
-          <Image
-            source={{ uri: "https://randomuser.me/api/portraits/women/68.jpg" }} // Placeholder avatar
+          <Image 
+            source={{ uri: typeof params.image === 'string' ? params.image : params.image?.[0] || '' }}
             style={styles.avatar}
           />
           <View style={styles.headerTextContainer}>
             <Text style={styles.greeting}>Magandang Araw,</Text>
-            <Text style={styles.userName}>Maria S. Santos</Text>
+            <Text style={styles.value}>{params.name}</Text>
             <View style={styles.idBadge}>
               <Ionicons name="shield-checkmark" size={14} color="#FBBF24" />
-              <Text style={styles.idText}>Senior Citizen ID: SC-458210</Text>
+              <Text style={styles.value}>{params.idNumber}</Text>
             </View>
           </View>
           <View style={styles.bellButton}>
@@ -314,6 +315,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-Medium", // Assuming you are using Inter
   },
   userName: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1F2937",
+    fontFamily: "Inter-Bold",
+  },
+  value: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#1F2937",

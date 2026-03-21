@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams } from "expo-router";
 import React from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const params = useLocalSearchParams();
 
 export default function account() {
   return (
@@ -24,27 +27,26 @@ export default function account() {
           <View style={styles.profileContainer}>
             <View style={styles.detailsContainer}>
               <Text style={styles.label}>Name:</Text>
-              <Text style={styles.value}>Maria S. Santos</Text>
+              <Text style={styles.value}>{params.name}</Text>
 
               <Text style={styles.label}>Senior Citizen ID:</Text>
-              <Text style={styles.value}>SC-458210</Text>
+              <Text style={styles.value}>{params.idNumber}</Text>
 
               <Text style={styles.label}>Address:</Text>
-              <Text style={styles.value}>123 Molave St., Malinta, Valenzuela City, Philippines</Text>
+              <Text style={styles.value}>{params.address}</Text>
 
               <Text style={styles.label}>Date of Birth:</Text>
-              <Text style={styles.value}>January 1, 1950</Text>
+              <Text style={styles.value}>{params.dob}</Text>
 
               <Text style={styles.label}>Sex:</Text>
-              <Text style={styles.value}>Female</Text>
+              <Text style={styles.value}>{params.sex}</Text>
 
               <Text style={styles.label}>Date Issued:</Text>
-              <Text style={styles.value}>January 1, 2020</Text>
+              <Text style={styles.value}>{params.issued}</Text>
             </View>
             <View style={styles.imageContainer}>
-              <Image
-                source={{ uri: "https://randomuser.me/api/portraits/women/68.jpg" }}
-                style={styles.profileImage}
+              <Image 
+                source={{ uri: typeof params.image === 'string' ? params.image : params.image?.[0] || '' }} style={styles.profileImage}
               />
             </View>
           </View>

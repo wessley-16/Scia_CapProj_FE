@@ -15,7 +15,7 @@ export const useChatbot = () => {
   ]);
   const [loading, setLoading] = useState(false);
 
-  const API_URL = "http://192.168.254.125:3000/api/chat";
+  const API_URL = "http://10.174.101.153:3000/api/chat";
   // ⚠️ Replace with:
   // - "http://localhost:3000/api/chat" (web)
   // - "http://192.168.x.x:3000/api/chat" (real device)
