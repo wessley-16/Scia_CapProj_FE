@@ -155,7 +155,11 @@ export default function Home() {
         </View>
 
         {/* ASK ASSISTANT CARD */}
-        <View style={styles.assistantCard}>
+        <TouchableOpacity 
+          style={styles.assistantCard}
+          activeOpacity={0.8}
+          onPress={() => router.push("/chatbot")} // <-- THIS IS THE MAGIC LINK!
+        >
           <MaterialCommunityIcons
             name="robot-outline"
             size={40}
@@ -168,14 +172,20 @@ export default function Home() {
             </Text>
           </View>
           <View style={styles.assistantActions}>
-            <TouchableOpacity style={styles.micButton}>
+            {/* Changed from TouchableOpacity to View so the whole card handles the click */}
+            <View style={styles.micButton}>
               <Ionicons name="mic" size={20} color="white" />
+<<<<<<< HEAD
             </TouchableOpacity>
             <TouchableOpacity style={styles.chatButton} onPress={openChat}>
+=======
+            </View>
+            <View style={styles.chatButton}>
+>>>>>>> 3a89d1da1650712fb307ca3a8f0d98f7b049b4a5
               <Ionicons name="chatbubble-ellipses" size={20} color="white" />
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </TouchableOpacity>
         
         {/* SOS EMERGENCY BUTTON */}
         <TouchableOpacity 
