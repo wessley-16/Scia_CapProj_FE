@@ -49,6 +49,11 @@ export default function Home() {
     }
   }, []);
 
+  const openChat = () => {
+    // Expo Router route for file app/(tabs)/chatbot.tsx
+    router.push("/chatbot");
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadNextMedicine();
@@ -171,8 +176,13 @@ export default function Home() {
             {/* Changed from TouchableOpacity to View so the whole card handles the click */}
             <View style={styles.micButton}>
               <Ionicons name="mic" size={20} color="white" />
+<<<<<<< HEAD
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.chatButton} onPress={openChat}>
+=======
             </View>
             <View style={styles.chatButton}>
+>>>>>>> 3a89d1da1650712fb307ca3a8f0d98f7b049b4a5
               <Ionicons name="chatbubble-ellipses" size={20} color="white" />
             </View>
           </View>
@@ -280,6 +290,15 @@ export default function Home() {
         {/* Bottom padding to account for the custom bottom tab bar from previous setup */}
         <View style={{ height: 90 }} />
       </ScrollView>
+
+      {/* ✅ FLOATING CHAT BUBBLE */}
+      <TouchableOpacity
+        style={styles.floatingChat}
+        onPress={() => router.push("/chatbot")}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="chatbubble-ellipses" size={26} color="#fff" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -591,6 +610,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)",
     padding: 4,
     borderRadius: 20,
+  },
+  /* ✅ FLOATING CHAT */
+  floatingChat: {
+    position: "absolute",
+    bottom: 90,
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#2356E1",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 6,
+    zIndex: 1000,
   },
   // GOVERNMENT DOCUMENTS
   gdocCard: {
