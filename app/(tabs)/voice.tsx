@@ -1,12 +1,48 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import { Audio } from "expo-av";
 
-export default function voice() {
-  return (
-    <View>
-      <Text>voice</Text>
-    </View>
-  )
-}
+const API_URL = "http://192.168.X.X:3000/api/voice"; //  change this
 
-const styles = StyleSheet.create({})
+export const useVoice = () => {
+  let sound: Audio.Sound | null = null;
+
+  const playVoice = async (text: string) => {
+    if (!text) return;
+
+    const response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!response.ok) return;
+
+    // 🔥 Get base64 directly from backend response
+    const arrayBuffer = await response.arrayBuffer();
+
+    const base64Audio = btoa(
+      new Uint8Array(arrayBuffer).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        ""
+      )
+    );
+
+    // ✅ Direct audio URI (NO FILE SYSTEM)
+    const audioUri = `data:audio/wav;base64,${base64Audio}`;
+
+    if (sound) {
+      await sound.unloadAsync();
+    }
+
+    const { sound: newSound } = await Audio.Sound.createAsync({
+      uri: audioUri,
+    });
+
+    sound = newSound;
+
+    await sound.playAsync();
+  };
+
+  return { playVoice };
+};
