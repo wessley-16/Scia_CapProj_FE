@@ -20,13 +20,11 @@ export default function ChatScreen() {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+
     await sendMessage(input);
     setInput("");
 
-<<<<<<< HEAD
-=======
-    // Auto scroll to the bottom when a new message is sent
->>>>>>> 3a89d1da1650712fb307ca3a8f0d98f7b049b4a5
+    // Auto scroll
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
@@ -36,24 +34,19 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-<<<<<<< HEAD
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 60}
-=======
-        // Let iOS use padding, but let Android natively handle its own keyboard
         behavior={Platform.OS === "ios" ? "padding" : undefined}
->>>>>>> 3a89d1da1650712fb307ca3a8f0d98f7b049b4a5
       >
+        {/* HEADER */}
         <View style={styles.headerContainer}>
           <Text style={styles.headerTitle}>Chat Assistant</Text>
         </View>
 
+        {/* CHAT LIST */}
         <FlatList
           ref={flatListRef}
           data={messages}
           keyExtractor={(_, i) => i.toString()}
-          // This allows you to tap the input box even if a keyboard is already open
-          keyboardShouldPersistTaps="handled" 
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.chatContainer}
           renderItem={({ item }) => (
             <View
@@ -65,20 +58,17 @@ export default function ChatScreen() {
               <View
                 style={[
                   styles.bubble,
-                  item.role === "user" ? styles.userBubble : styles.aiBubble,
+                  item.role === "user"
+                    ? styles.userBubble
+                    : styles.aiBubble,
                 ]}
               >
-<<<<<<< HEAD
                 <Text
                   style={[
                     styles.text,
-                    item.role === "user" ? styles.userText : styles.aiText,
-=======
-                <Text 
-                  style={[
-                    styles.text, 
-                    item.role === "user" ? { color: "#FFFFFF" } : { color: "#111827" }
->>>>>>> 3a89d1da1650712fb307ca3a8f0d98f7b049b4a5
+                    item.role === "user"
+                      ? styles.userText
+                      : styles.aiText,
                   ]}
                 >
                   {item.text}
@@ -91,12 +81,14 @@ export default function ChatScreen() {
           }
         />
 
+        {/* TYPING */}
         {loading && (
           <View style={styles.typingContainer}>
             <Text style={styles.typingText}>Assistant is typing...</Text>
           </View>
         )}
 
+        {/* INPUT */}
         <View style={styles.inputWrapper}>
           <TextInput
             value={input}
@@ -116,69 +108,54 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-<<<<<<< HEAD
   container: { flex: 1, backgroundColor: "#F4F6F9" },
+
   headerContainer: {
     padding: 16,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderColor: "#E5E7EB",
   },
-  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#111827" },
-
-  chatContainer: { padding: 16, paddingBottom: 120 },
-  messageRow: { marginBottom: 12, flexDirection: "row" },
-  userRow: { justifyContent: "flex-end" },
-  aiRow: { justifyContent: "flex-start" },
-
-  bubble: { maxWidth: "80%", padding: 12, borderRadius: 16 },
-  userBubble: { backgroundColor: "#2356E1", borderBottomRightRadius: 4 },
-  aiBubble: { backgroundColor: "#FFFFFF", borderBottomLeftRadius: 4 },
-
-  text: { fontSize: 15 },
-  userText: { color: "#fff" },
-  aiText: { color: "#111827" },
-
-  typingContainer: { paddingHorizontal: 16, paddingBottom: 8 },
-  typingText: { fontSize: 13, color: "#6B7280" },
-
-=======
-  container: {
-    flex: 1,
-    backgroundColor: "#F4F6F9",
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#111827",
   },
+
   chatContainer: {
     padding: 16,
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
+
   messageRow: {
     marginBottom: 12,
     flexDirection: "row",
   },
-  userRow: {
-    justifyContent: "flex-end",
-  },
-  aiRow: {
-    justifyContent: "flex-start",
-  },
+  userRow: { justifyContent: "flex-end" },
+  aiRow: { justifyContent: "flex-start" },
+
   bubble: {
     maxWidth: "80%",
     padding: 12,
     borderRadius: 16,
   },
+
   userBubble: {
-    backgroundColor: "#2356E1", // Valenzuela Blue
+    backgroundColor: "#2356E1",
     borderBottomRightRadius: 4,
   },
+
   aiBubble: {
     backgroundColor: "#FFFFFF",
     borderBottomLeftRadius: 4,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
-  text: {
-    fontSize: 15,
-  },
+
+  text: { fontSize: 15 },
+  userText: { color: "#FFFFFF" },
+  aiText: { color: "#111827" },
+
   typingContainer: {
     paddingHorizontal: 16,
     paddingBottom: 8,
@@ -188,7 +165,7 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     fontStyle: "italic",
   },
->>>>>>> 3a89d1da1650712fb307ca3a8f0d98f7b049b4a5
+
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
@@ -197,6 +174,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     backgroundColor: "#fff",
   },
+
   input: {
     flex: 1,
     backgroundColor: "#F9FAFB",
@@ -205,16 +183,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     fontSize: 15,
     maxHeight: 100,
-    color: "#000000", // Forces the typed text to be black so you can actually see it!
+    color: "#000",
   },
-<<<<<<< HEAD
-  sendBtn: { marginLeft: 8, backgroundColor: "#2356E1", padding: 12, borderRadius: 12 },
-=======
+
   sendBtn: {
     marginLeft: 8,
     backgroundColor: "#2356E1",
     padding: 12,
     borderRadius: 12,
   },
->>>>>>> 3a89d1da1650712fb307ca3a8f0d98f7b049b4a5
 });
