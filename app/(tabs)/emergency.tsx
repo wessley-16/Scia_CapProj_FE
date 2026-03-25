@@ -7,16 +7,17 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  View
+  View,
+  TextInput,
+  Alert,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Picker } from '@react-native-picker/picker';
 
 const HOLD_DURATION_MS = 5000;
-const BUTTON_SIZE = 220;
-const RING_SIZE = 240;
-const RING_STROKE = 6;
 
+// List of Valenzuela barangays
 const valenzuelaBarangays = [
   { name: 'Bagbaguin', lat: 14.7046, lng: 120.9946 },
   { name: 'Bignay', lat: 14.7068, lng: 120.9925 },
@@ -59,222 +60,100 @@ const getBarangayFromCoords = (lat: number, lng: number): string => {
     const d = Math.hypot(lat - b.lat, lng - b.lng);
     if (d < closest.dist) closest = { name: b.name, dist: d };
   }
-  // if far from known barangay, keep Unknown
   return closest.dist < 0.03 ? closest.name : 'Unknown Barangay';
 };
 
 export default function EmergencyScreen() {
-  const [profileName, setProfileName] = useState<string | null>(null);
-  const [barangay, setBarangay] = useState<string>('Unknown Barangay');
-  const [street, setStreet] = useState<string>('Unknown Street');
-  const [city, setCity] = useState<string>('Unknown City');
-  const [fullAddress, setFullAddress] = useState<string>('Unknown Address');
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(
-    null
-  );
-  const [emergencyLocation, setEmergencyLocation] = useState<{ latitude: number; longitude: number } | null>(
-    null
-  );
-  const [isFetchingLocation, setIsFetchingLocation] = useState<boolean>(true);
-  const [locationError, setLocationError] = useState<string | null>(null);
-  const [locationPermission, setLocationPermission] = useState<string | null>(null);
-  const [hasCompleted, setHasCompleted] = useState(false);
+  const [profileName, setProfileName] = useState('Maria S. Santos');
+  const [location, setLocation] = useState<any>(null);
+  const [fullAddress, setFullAddress] = useState('Unknown Address');
+  const [barangay, setBarangay] = useState('Unknown Barangay');
+
+  const [selectedEmergency, setSelectedEmergency] = useState('Fall');
+  const [otherEmergency, setOtherEmergency] = useState('');
+
   const [isHolding, setIsHolding] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(HOLD_DURATION_MS / 1000);
+  const [secondsLeft, setSecondsLeft] = useState(5);
 
   const progress = useRef(new Animated.Value(0)).current;
-  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const notificationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const loadProfileName = async () => {
-      try {
-        const savedName = await AsyncStorage.getItem('userName');
-        const savedBarangay = await AsyncStorage.getItem('userBarangay');
-        const savedStreet = await AsyncStorage.getItem('userStreet');
-        const savedCity = await AsyncStorage.getItem('userCity');
-        const savedFullAddress = await AsyncStorage.getItem('userFullAddress');
-
-        if (savedName) {
-          setProfileName(savedName);
-        } else {
-          setProfileName('Maria S. Santos');
-        }
-        if (savedBarangay) {
-          setBarangay(savedBarangay);
-        }
-        if (savedStreet) {
-          setStreet(savedStreet);
-        }
-        if (savedCity) {
-          setCity(savedCity);
-        }
-        if (savedFullAddress) {
-          setFullAddress(savedFullAddress);
-        } else if (savedStreet && savedBarangay && savedCity) {
-          setFullAddress(`${savedStreet}, ${savedBarangay}, ${savedCity}`);
-        }
-      } catch {
-        setProfileName('Maria S. Santos');
-      }
-    };
-
-    loadProfileName();
-
-    // Auto-fetch phone GPS location when screen opens.
-    if (!location) {
-      fetchLocation();
-    }
-
+    fetchLocation();
     return () => {
-      if (countdownRef.current) {
-        clearInterval(countdownRef.current);
-      }
-      animationRef.current?.stop();
+      if (countdownInterval.current) clearInterval(countdownInterval.current);
+      if (notificationTimeout.current) clearTimeout(notificationTimeout.current);
     };
   }, []);
 
-  const requestPermission = async () => {
-    if (locationPermission === 'granted') {
-      return true;
-    }
-
+  const fetchLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    setLocationPermission(status);
-    return status === 'granted';
-  };
-
-  const resetProgress = () => {
-    progress.setValue(0);
-    setIsHolding(false);
-    setHasCompleted(false);
-    setSecondsLeft(HOLD_DURATION_MS / 1000);
-  };
-
-  const startCountdown = () => {
-    setSecondsLeft(HOLD_DURATION_MS / 1000);
-
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'Enable location to use this feature.');
+      return;
     }
 
-    countdownRef.current = setInterval(() => {
+    const loc = await Location.getCurrentPositionAsync({});
+    setLocation({
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
+    });
+
+    try {
+      const geo = await Location.reverseGeocodeAsync(loc.coords);
+      if (geo.length > 0) {
+        const place: any = geo[0];
+        const address = `${place.street || ''}, ${getBarangayFromCoords(
+          loc.coords.latitude,
+          loc.coords.longitude
+        )}, ${place.city || ''}`;
+        setFullAddress(address);
+        setBarangay(getBarangayFromCoords(loc.coords.latitude, loc.coords.longitude));
+      }
+    } catch {
+      setFullAddress('Unable to fetch address');
+    }
+  };
+
+  const startHold = () => {
+    setIsHolding(true);
+    setSecondsLeft(5);
+
+    countdownInterval.current = setInterval(() => {
       setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          if (countdownRef.current) {
-            clearInterval(countdownRef.current);
-            countdownRef.current = null;
-          }
+        if (prev === 1) {
+          clearInterval(countdownInterval.current!);
+          countdownInterval.current = null;
+          triggerSOS();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  };
 
-  const fetchLocation = async () => {
-    setIsFetchingLocation(true);
-    setLocationError(null);
-
-    const hasPermission = await requestPermission();
-    if (!hasPermission) {
-      setLocationError('Location permission denied. Please allow location to use this feature.');
-      setLocation(null);
-      setIsFetchingLocation(false);
-      return;
-    }
-
-    try {
-      const currentPosition = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Highest,
-      });
-      const currentCoords = {
-        latitude: currentPosition.coords.latitude,
-        longitude: currentPosition.coords.longitude,
-      };
-      setLocation(currentCoords);
-      if (!emergencyLocation) {
-        setEmergencyLocation(currentCoords);
-      }
-
-      // Reverse-geocode the coordinates to address text for street/barangay/full address.
-      const detectedBarangay = getBarangayFromCoords(currentCoords.latitude, currentCoords.longitude);
-      setBarangay(detectedBarangay);
-
-      try {
-        const geocoded = await Location.reverseGeocodeAsync(currentCoords);
-        if (geocoded.length > 0) {
-          const firstPlace = geocoded[0] as any;
-          const resolvedStreet = firstPlace.street || firstPlace.name || street || 'Unknown Street';
-          const resolvedBarangay =
-            detectedBarangay ||
-            firstPlace.subLocality ||
-            firstPlace.suburb ||
-            firstPlace.subregion ||
-            firstPlace.district ||
-            firstPlace.name ||
-            'Unknown Barangay';
-          const resolvedCity = firstPlace.city || firstPlace.region || firstPlace.country || 'Valenzuela';
-
-          setStreet(resolvedStreet);
-          setBarangay(resolvedBarangay);
-          setCity(resolvedCity);
-
-          const safeAddress = [resolvedStreet, resolvedBarangay, resolvedCity]
-            .filter(Boolean)
-            .join(', ');
-          setFullAddress(safeAddress || 'Unknown Address');
-
-          // Persist in AsyncStorage for next run.
-          await AsyncStorage.setItem('userStreet', resolvedStreet);
-          await AsyncStorage.setItem('userBarangay', resolvedBarangay);
-          await AsyncStorage.setItem('userCity', resolvedCity);
-          await AsyncStorage.setItem('userFullAddress', safeAddress);
-        }
-      } catch (geocodeError) {
-        // If geocoding fails, keep default values or existing ones.
-      }
-
-      setIsFetchingLocation(false);
-    } catch (error) {
-      setLocation(null);
-      setLocationError('Unable to fetch location. Please ensure location services are enabled.');
-      setIsFetchingLocation(false);
-    }
-  };
-
-  const startHoldAnimation = () => {
-    setIsHolding(true);
-    setHasCompleted(false);
-    startCountdown();
-
-    animationRef.current = Animated.timing(progress, {
+    Animated.timing(progress, {
       toValue: 1,
       duration: HOLD_DURATION_MS,
       useNativeDriver: true,
-    });
-
-    animationRef.current.start(({ finished }) => {
-      if (finished) {
-        setHasCompleted(true);
-        setSecondsLeft(0);
-      }
-    });
+    }).start();
   };
 
-  const stopHoldAnimation = () => {
+  const stopHold = () => {
     setIsHolding(false);
-
-    if (countdownRef.current) {
-      clearInterval(countdownRef.current);
-      countdownRef.current = null;
+    progress.setValue(0);
+    setSecondsLeft(5);
+    if (countdownInterval.current) {
+      clearInterval(countdownInterval.current);
+      countdownInterval.current = null;
     }
+  };
 
-    if (animationRef.current) {
-      animationRef.current.stop();
-    }
-
-    resetProgress();
+  const triggerSOS = () => {
+    Alert.alert('SOS Sent', 'Your emergency alert has been sent!');
+    notificationTimeout.current = setTimeout(() => {
+      Alert.alert('Responder Update', 'A responder is coming to your location!');
+    }, 30000);
   };
 
   const rotate = progress.interpolate({
@@ -282,41 +161,28 @@ export default function EmergencyScreen() {
     outputRange: ['0deg', '360deg'],
   });
 
-  const isProgressVisible = isHolding || hasCompleted;
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <View style={styles.container}>
-          <View style={styles.bigHeader}>
-          <Text style={styles.bigHeaderText}>EMERGENCY</Text>
-        </View>
-        <Text style={styles.headerTitle}>Emergency Button</Text>
-        <Text style={styles.subheaderTitle}>Hold for 5 seconds to call rescue</Text>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.header}>🚨 EMERGENCY</Text>
 
-        <View style={styles.buttonWrapper}>
-          <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.ring,
-            { transform: [{ rotate }], opacity: isProgressVisible ? 1 : 0 },
-          ]}
-          />
-
+        {/* SOS BUTTON */}
+        <View style={styles.sosWrapper}>
+          <Animated.View style={[styles.ring, { transform: [{ rotate }] }]} />
           <Pressable
-            onPressIn={startHoldAnimation}
-            onPressOut={stopHoldAnimation}
-            style={styles.button}
-            android_ripple={{ color: 'rgba(255,255,255,0.2)', radius: BUTTON_SIZE / 2 }}
+            onPressIn={startHold}
+            onPressOut={stopHold}
+            style={styles.sosButton}
           >
-            <Text style={styles.buttonText}>
-              {isHolding ? `${secondsLeft}s` : 'tap and hold'}
+            <Text style={styles.sosText}>
+              {isHolding ? `${secondsLeft}` : "HOLD"}
             </Text>
           </Pressable>
         </View>
 
-        <View style={styles.mapContainer}>
-          {location ? (
+        {/* MAP */}
+        <View style={styles.mapWrapper}>
+          {location && (
             <MapView
               provider={PROVIDER_GOOGLE}
               style={styles.map}
@@ -326,217 +192,73 @@ export default function EmergencyScreen() {
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}
-              showsUserLocation
-              showsMyLocationButton
             >
-              <Marker
-                coordinate={emergencyLocation ?? location}
-                title="Emergency Pin"
-                description="This is the emergency location"
-                pinColor="red"
-              />
+              <Marker coordinate={location} title="You are here" pinColor="red" />
             </MapView>
-          ) : (
-            <View style={styles.noMapView}>
-              <Text style={styles.infoText}>
-                {isFetchingLocation ? 'Fetching location map...' : 'Location unavailable for map'}
-              </Text>
-            </View>
           )}
         </View>
 
-        <View style={styles.infoCard}>
-          <Text style={styles.infoText}>Name: {profileName ?? 'Unknown'}</Text>
-          <Text style={styles.infoText}>
-            Coordinates:{' '}
-            {isFetchingLocation
-              ? 'Fetching location...'
-              : location
-              ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
-              : locationError
-              ? locationError
-              : 'Unavailable'}
-          </Text>
-          <Text style={styles.infoText}>Barangay: {barangay}</Text>
-          <Text style={styles.infoText}>Street: {street}</Text>
-          <Text style={styles.infoText}>City: {city}</Text>
-          <Text style={[styles.infoText, styles.fullAddressText]}>Full Address: {fullAddress}</Text>
+        {/* DROPDOWN */}
+        <Text style={styles.label}>Type of Emergency</Text>
+        <View style={styles.dropdown}>
+          <Picker
+            selectedValue={selectedEmergency}
+            onValueChange={(itemValue) => setSelectedEmergency(itemValue)}
+          >
+            <Picker.Item label="Fall" value="Fall" />
+            <Picker.Item label="Stroke" value="Stroke" />
+            <Picker.Item label="Heart Attack" value="Heart Attack" />
+            <Picker.Item label="Breathing Problem" value="Breathing Problem" />
+            <Picker.Item label="Fracture" value="Fracture" />
+            <Picker.Item label="Seizure" value="Seizure" />
+            <Picker.Item label="Burn" value="Burn" />
+            <Picker.Item label="Bleeding" value="Bleeding" />
+            <Picker.Item label="Unconscious" value="Unconscious" />
+            <Picker.Item label="Other" value="Other" />
+          </Picker>
         </View>
-      </View>
+
+        {selectedEmergency === 'Other' && (
+          <TextInput
+            placeholder="Type emergency..."
+            value={otherEmergency}
+            onChangeText={setOtherEmergency}
+            style={styles.input}
+          />
+        )}
+
+        {/* INFO CARD */}
+        <View style={styles.infoCard}>
+          <Text style={styles.info}>Name: {profileName}</Text>
+          <Text style={styles.info}>Address: {fullAddress}</Text>
+          <Text style={styles.info}>
+            Coordinates: {location ? `${location.latitude}, ${location.longitude}` : 'Loading...'}
+          </Text>
+          <Text style={styles.info}>
+            Barangay: {barangay}
+          </Text>
+          <Text style={styles.info}>
+            Emergency: {selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#F4F6F9",
-  },
-  scrollContainer: {
-    flexGrow: 1,
-    paddingBottom: 140,
-  },
-  container: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    padding: 16,
-    paddingBottom: 24,
-    backgroundColor: '#f8f8f8',
-  },
-  bigHeader: {
-    width: '100%',
-    height: 120,
-    backgroundColor: '#2563EB',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  bigHeaderText: {
-    color: '#ffffff',
-    fontSize: 32,
-    fontWeight: 'bold',
-    letterSpacing: 3,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "black",
-    marginBottom: 6,
-  },
-  subheaderTitle: {
-    fontSize: 16,
-    color: "#475569",
-    marginBottom: 24,
-  },
-  buttonWrapper: {
-    width: 240,
-    height: 240,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  ring: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    borderWidth: 6,
-    borderTopColor: '#CE2029',
-    borderRightColor: 'transparent',
-    borderBottomColor: 'transparent',
-    borderLeftColor: 'transparent',
-  },
-  button: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: '#CE2029',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#000000',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    textAlign: 'center',
-  },
-  infoCard: {
-    marginTop: 24,
-    width: '95%',
-    maxWidth: 500,
-    padding: 18,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  infoText: {
-    fontSize: 18,
-    color: '#111827',
-    marginBottom: 8,
-  },
-  fullAddressText: {
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  topHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 16,
-  },
-  avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2563EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  profileInfo: {
-    marginLeft: 12,
-  },
-  profileTitle: {
-    fontSize: 14,
-    color: '#475569',
-  },
-  mapContainer: {
-    width: '100%',
-    height: 260,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-    marginBottom: 16,
-    marginTop: 12,
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  noMapView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F1F5F9',
-  },
-  profileName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  refreshButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    backgroundColor: '#2563EB',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  refreshButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
+  safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
+  scroll: { padding: 20, paddingBottom: 120 },
+  header: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#CE2029', marginBottom: 20 },
+  sosWrapper: { alignItems: 'center', marginVertical: 20 },
+  ring: { position: 'absolute', width: 240, height: 240, borderRadius: 120, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
+  sosButton: { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10 },
+  sosText: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
+  mapWrapper: { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
+  map: { flex: 1 },
+  label: { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
+  dropdown: { backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, overflow: 'hidden' },
+  input: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: '#E5E7EB' },
+  infoCard: { backgroundColor: '#fff', padding: 20, borderRadius: 18, elevation: 3, marginBottom: 30 },
+  info: { fontSize: 16, marginBottom: 8 },
 });
