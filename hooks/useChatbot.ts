@@ -1,12 +1,12 @@
 import { useState } from "react";
 
-// ✅ Consistent message type
+//  Consistent message type
 export type ChatMessage = {
   role: "user" | "assistant";
   text: string;
 };
 
-const API_URL = "http://192.168.1.100:3000/api/chat"; // 👈 change if needed
+const API_URL = "http://192.168.1.100:3000/api/chat"; //  change if needed
 
 export const useChatbot = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
