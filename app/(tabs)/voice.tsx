@@ -1,6 +1,6 @@
 import { Audio } from "expo-av";
 
-const API_URL = "http://192.168.X.X:3000/api/voice"; //  change this
+const API_URL = "http://YOUR_IP:3000/api/voice"; //  change this
 
 export const useVoice = () => {
   let sound: Audio.Sound | null = null;
