@@ -17,7 +17,6 @@
         "backgroundImage": "./assets/images/Background.png",
         "monochromeImage": "./assets/images/Monochrome.jpg"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
