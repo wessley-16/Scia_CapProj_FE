@@ -6,7 +6,7 @@ export type ChatMessage = {
   text: string;
 };
 
-const API_URL = "http://192.168.1.100:3000/api/chat"; //  change if needed
+const API_URL = "http://10.156.101.141:3000/api/chat"; //  change if needed
 
 export const useChatbot = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([
