@@ -1,19 +1,18 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View,
   TextInput,
-  Alert,
+  View,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Picker } from '@react-native-picker/picker';
 
 const HOLD_DURATION_MS = 5000;
 
@@ -250,8 +249,8 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
   scroll: { padding: 20, paddingBottom: 120 },
   header: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#CE2029', marginBottom: 20 },
-  sosWrapper: { alignItems: 'center', marginVertical: 20 },
-  ring: { position: 'absolute', width: 240, height: 240, borderRadius: 120, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
+  sosWrapper: { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
+  ring: { position: 'absolute', width: 220, height: 220, borderRadius: 110, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
   sosButton: { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10 },
   sosText: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
   mapWrapper: { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
