@@ -16,11 +16,14 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Medicine } from "../../interfaces/interfaces";
 
 export default function Home() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const tabBarHeight = useBottomTabBarHeight(); // ✅ dynamic tab height
+
   const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
 
   const loadNextMedicine = useCallback(async () => {
@@ -71,9 +74,12 @@ export default function Home() {
       : { uri: "https://via.placeholder.com/150" };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          { paddingBottom: tabBarHeight + 120 }, // ✅ prevents overlap
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* HEADER */}
@@ -157,7 +163,7 @@ export default function Home() {
           />
         </TouchableOpacity>
 
-        {/* ✅ NEW: VOICE ASSISTANT */}
+        {/* VOICE ASSISTANT */}
         <TouchableOpacity
           style={styles.assistant}
           onPress={() => router.push("/voice")}
@@ -214,8 +220,6 @@ export default function Home() {
           color="#2356E1"
           onPress={() => router.push("/govdocs")}
         />
-
-        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* FLOATING CHAT */}
@@ -260,7 +264,6 @@ const styles = StyleSheet.create({
 
   container: {
     padding: 20,
-    paddingBottom: 120,
   },
 
   header: {
@@ -368,7 +371,7 @@ const styles = StyleSheet.create({
 
   chat: {
     position: "absolute",
-    bottom: 40,
+    bottom: 80, // ✅ raised above tab bar
     right: 20,
     backgroundColor: "#2356E1",
     padding: 16,
