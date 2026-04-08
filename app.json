@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/Background.png",
         "monochromeImage": "./assets/images/Monochrome.jpg"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.scia"
     },
     "web": {
       "output": "static",
