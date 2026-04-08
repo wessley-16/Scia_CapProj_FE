@@ -1,4 +1,3 @@
-import Constants from "expo-constants";
 import { useState } from "react";
 
 //  Consistent message type
@@ -7,11 +6,7 @@ export type ChatMessage = {
   text: string;
 };
 
-// ✅ ADD THIS (same pattern as your other hook)
-const manifest = Constants.expoConfig || Constants.manifest;
-const host = manifest?.hostUri ? manifest.hostUri.split(":")[0] : "localhost";
-
-const API_URL = `http://${host}:3000/api/chat`; //  dynamic instead of hardcoded IP
+const API_URL = "http://10.156.101.141:3000/api/chat"; //  change if needed
 
 export const useChatbot = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([

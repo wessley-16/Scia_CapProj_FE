@@ -1,20 +1,19 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Picker } from '@react-native-picker/picker';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  View,
   TextInput,
-  Alert,
+  View,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Picker } from '@react-native-picker/picker';
 
 const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"; // 🔴 PUT YOUR KEY HERE
 const HOLD_DURATION_MS = 5000;
@@ -253,35 +252,13 @@ export default function EmergencyScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
-  scroll: { padding: 20 },
-  header: { fontSize: 28, textAlign: 'center', color: 'red' },
-
+  scroll: { padding: 20, paddingBottom: 120 },
+  header: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#CE2029', marginBottom: 20 },
   sosWrapper: { alignItems: 'center', marginVertical: 20 },
-  ring: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    borderWidth: 5,
-    borderTopColor: 'red',
-    borderColor: 'transparent',
-  },
-  sosButton: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: 'red',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sosText: { color: '#fff', fontSize: 26 },
-
-  mapWrapper: {
-    height: 250,
-    borderRadius: 20,
-    overflow: 'hidden',
-    marginBottom: 20,
-  },
+  ring: { position: 'absolute', width: 240, height: 240, borderRadius: 120, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
+  sosButton: { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10 },
+  sosText: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
+  mapWrapper: { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
   map: { flex: 1 },
 
   dropdown: { backgroundColor: '#fff', borderRadius: 10 },

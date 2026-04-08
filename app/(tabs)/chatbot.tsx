@@ -1,195 +1,380 @@
-import { Ionicons } from "@expo/vector-icons";
-import React, { useRef, useState } from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
+import React, { useCallback, useState } from "react";
+
+import {
+  Image,
+  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useChatbot } from "@/hooks/useChatbot";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { Medicine } from "../../interfaces/interfaces";
 
-export default function ChatScreen() {
-  const { messages, sendMessage, loading } = useChatbot();
-  const [input, setInput] = useState("");
-  const flatListRef = useRef<FlatList>(null);
+export default function Home() {
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const tabBarHeight = useBottomTabBarHeight(); // ✅ dynamic tab height
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
 
-    await sendMessage(input);
-    setInput("");
+  const loadNextMedicine = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem("medicines");
+      if (!stored) return setNextMedicine(null);
 
-    // Auto scroll
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
+      const medicines: Medicine[] = JSON.parse(stored);
+      if (medicines.length === 0) return setNextMedicine(null);
+
+      const upcoming = medicines
+        .map((med) => ({
+          ...med,
+          nextDoseTime:
+            med.lastTakenTime + med.interval * 60 * 60 * 1000,
+        }))
+        .sort((a, b) => a.nextDoseTime - b.nextDoseTime)[0];
+
+      setNextMedicine(upcoming);
+    } catch (error) {
+      console.log(error);
+      setNextMedicine(null);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNextMedicine();
+    }, [loadNextMedicine])
+  );
+
+  const formatTime = (timestamp: number) => {
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
   };
 
+  const getNextDoseTime = (medicine: Medicine) => {
+    return formatTime(
+      medicine.lastTakenTime + medicine.interval * 60 * 60 * 1000
+    );
+  };
+
+  const avatarSource =
+    typeof params.image === "string"
+      ? { uri: params.image }
+      : { uri: "https://via.placeholder.com/150" };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { paddingBottom: tabBarHeight + 120 }, // ✅ prevents overlap
+        ]}
+        showsVerticalScrollIndicator={false}
       >
         {/* HEADER */}
-        <View style={styles.headerContainer}>
-          <Text style={styles.headerTitle}>Chat Assistant</Text>
+        <View style={styles.header}>
+          <Image source={avatarSource} style={styles.avatar} />
+
+          <View style={styles.headerText}>
+            <Text style={styles.greeting}>Magandang Araw,</Text>
+            <Text style={styles.name}>
+              {params.name ?? "Juan Dela Cruz"}
+            </Text>
+
+            <View style={styles.idRow}>
+              <Ionicons
+                name="shield-checkmark"
+                size={14}
+                color="#FBBF24"
+              />
+              <Text style={styles.idText}>
+                {params.idNumber ?? "No ID"}
+              </Text>
+            </View>
+          </View>
+
+          <Ionicons name="notifications" size={26} color="#2356E1" />
         </View>
 
-        {/* CHAT LIST */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(_, i) => i.toString()}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.chatContainer}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.messageRow,
-                item.role === "user" ? styles.userRow : styles.aiRow,
-              ]}
-            >
-              <View
-                style={[
-                  styles.bubble,
-                  item.role === "user"
-                    ? styles.userBubble
-                    : styles.aiBubble,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.text,
-                    item.role === "user"
-                      ? styles.userText
-                      : styles.aiText,
-                  ]}
-                >
-                  {item.text}
+        {/* REMINDER */}
+        <View style={styles.reminder}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reminderLabel}>Reminder</Text>
+
+            {nextMedicine ? (
+              <>
+                <Text style={styles.reminderTitle}>
+                  Take {nextMedicine.name}
                 </Text>
-              </View>
-            </View>
-          )}
-          onContentSizeChange={() =>
-            flatListRef.current?.scrollToEnd({ animated: true })
-          }
+                <Text style={styles.reminderSub}>
+                  {nextMedicine.dosage} {nextMedicine.dosageUnit}
+                </Text>
+                <Text style={styles.reminderTime}>
+                  {getNextDoseTime(nextMedicine)}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.reminderTitle}>
+                No medicine reminders today
+              </Text>
+            )}
+          </View>
+
+          <MaterialCommunityIcons
+            name={nextMedicine ? "pill" : "heart-outline"}
+            size={50}
+            color="#2356E1"
+          />
+        </View>
+
+        {/* CHAT ASSISTANT */}
+        <TouchableOpacity
+          style={styles.assistant}
+          onPress={() => router.push("/chatbot")}
+        >
+          <MaterialCommunityIcons
+            name="robot-outline"
+            size={36}
+            color="#2563EB"
+          />
+
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.assistantTitle}>Ask Assistant</Text>
+            <Text style={styles.assistantSub}>
+              How can I help you today?
+            </Text>
+          </View>
+
+          <Ionicons
+            name="chatbubble-ellipses"
+            size={22}
+            color="#2356E1"
+          />
+        </TouchableOpacity>
+
+        {/* VOICE ASSISTANT */}
+        <TouchableOpacity
+          style={styles.assistant}
+          onPress={() => router.push("/voice")}
+        >
+          <MaterialCommunityIcons
+            name="microphone-outline"
+            size={36}
+            color="#2563EB"
+          />
+
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.assistantTitle}>Voice Assistant</Text>
+            <Text style={styles.assistantSub}>
+              Speak and get help instantly
+            </Text>
+          </View>
+
+          <Ionicons
+            name="volume-high"
+            size={22}
+            color="#2356E1"
+          />
+        </TouchableOpacity>
+
+        {/* BUTTONS */}
+        <ActionButton
+          title="SOS EMERGENCY"
+          subtitle="Tap for help"
+          icon="alarm-light"
+          color="#CE2029"
+          onPress={() => router.push("/emergency")}
         />
 
-        {/* TYPING */}
-        {loading && (
-          <View style={styles.typingContainer}>
-            <Text style={styles.typingText}>Assistant is typing...</Text>
-          </View>
-        )}
+        <ActionButton
+          title="SET APPOINTMENT"
+          subtitle="Book your visit"
+          icon="calendar-check"
+          color="#2356E1"
+          onPress={() => router.push("/appointment")}
+        />
 
-        {/* INPUT */}
-        <View style={styles.inputWrapper}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder="Message assistant..."
-            placeholderTextColor="#9CA3AF"
-            style={styles.input}
-            multiline
-          />
-          <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
-            <Ionicons name="send" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+        <ActionButton
+          title="MEDICINES"
+          subtitle="Manage meds"
+          icon="pill"
+          color="#2356E1"
+          onPress={() => router.push("/medicine")}
+        />
+
+        <ActionButton
+          title="DOCUMENTS"
+          subtitle="View records"
+          icon="file-document"
+          color="#2356E1"
+          onPress={() => router.push("/govdocs")}
+        />
+      </ScrollView>
+
+      {/* FLOATING CHAT */}
+      <TouchableOpacity
+        style={styles.chat}
+        onPress={() => router.push("/chatbot")}
+      >
+        <Ionicons name="chatbubble" size={26} color="#fff" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F6F9" },
+/* 🔹 BUTTON COMPONENT */
+function ActionButton({
+  title,
+  subtitle,
+  icon,
+  color,
+  onPress,
+}: any) {
+  return (
+    <TouchableOpacity
+      style={[styles.button, { backgroundColor: color }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <MaterialCommunityIcons name={icon} size={28} color="#fff" />
 
-  headerContainer: {
-    padding: 16,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
+      <View style={{ flex: 1, marginLeft: 14 }}>
+        <Text style={styles.buttonTitle}>{title}</Text>
+        <Text style={styles.buttonSub}>{subtitle}</Text>
+      </View>
+
+      <Ionicons name="chevron-forward" size={22} color="#fff" />
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: "#F4F6F9" },
+
+  container: {
+    padding: 20,
   },
-  headerTitle: {
-    fontSize: 18,
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+
+  headerText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  greeting: { fontSize: 16, color: "#6B7280" },
+
+  name: {
+    fontSize: 22,
     fontWeight: "bold",
     color: "#111827",
   },
 
-  chatContainer: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-
-  messageRow: {
-    marginBottom: 12,
-    flexDirection: "row",
-  },
-  userRow: { justifyContent: "flex-end" },
-  aiRow: { justifyContent: "flex-start" },
-
-  bubble: {
-    maxWidth: "80%",
-    padding: 12,
-    borderRadius: 16,
-  },
-
-  userBubble: {
-    backgroundColor: "#2356E1",
-    borderBottomRightRadius: 4,
-  },
-
-  aiBubble: {
-    backgroundColor: "#FFFFFF",
-    borderBottomLeftRadius: 4,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-
-  text: { fontSize: 15 },
-  userText: { color: "#FFFFFF" },
-  aiText: { color: "#111827" },
-
-  typingContainer: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  typingText: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontStyle: "italic",
-  },
-
-  inputWrapper: {
+  idRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: "#E5E7EB",
+    marginTop: 4,
+  },
+
+  idText: {
+    fontSize: 13,
+    marginLeft: 4,
+  },
+
+  reminder: {
+    flexDirection: "row",
+    backgroundColor: "#FACC15",
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 20,
+    alignItems: "center",
+  },
+
+  reminderLabel: {
+    fontSize: 14,
+  },
+
+  reminderTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
+  reminderSub: {
+    fontSize: 14,
+  },
+
+  reminderTime: {
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+
+  assistant: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#fff",
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 20,
+    elevation: 3,
   },
 
-  input: {
-    flex: 1,
-    backgroundColor: "#F9FAFB",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    fontSize: 15,
-    maxHeight: 100,
-    color: "#000",
+  assistantTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
   },
 
-  sendBtn: {
-    marginLeft: 8,
+  assistantSub: {
+    fontSize: 14,
+    color: "#6B7280",
+  },
+
+  button: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 18,
+    borderRadius: 18,
+    marginBottom: 14,
+    elevation: 4,
+  },
+
+  buttonTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
+  buttonSub: {
+    color: "#E5E7EB",
+    fontSize: 14,
+  },
+
+  chat: {
+    position: "absolute",
+    bottom: 80, // ✅ raised above tab bar
+    right: 20,
     backgroundColor: "#2356E1",
-    padding: 12,
-    borderRadius: 12,
+    padding: 16,
+    borderRadius: 30,
   },
 });
