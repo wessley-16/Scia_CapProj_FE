@@ -11,62 +11,65 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker } from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"; // 🔴 PUT YOUR KEY HERE
 const HOLD_DURATION_MS = 5000;
 
-// List of Valenzuela barangays
+// Barangays (same as yours)
 const valenzuelaBarangays = [
   { name: 'Bagbaguin', lat: 14.7046, lng: 120.9946 },
+  { name: 'Balangkas', lat: 14.6945, lng: 120.9820 },
   { name: 'Bignay', lat: 14.7068, lng: 120.9925 },
   { name: 'Bisig', lat: 14.7170, lng: 120.9810 },
   { name: 'Canumay East', lat: 14.6935, lng: 120.9795 },
   { name: 'Canumay West', lat: 14.6929, lng: 120.9764 },
-  { name: 'Casisang', lat: 14.7240, lng: 120.9945 },
-  { name: 'Col. Jose W. Diokno', lat: 14.7063, lng: 120.9908 },
+  { name: 'Coloong', lat: 14.7190, lng: 120.9802 },
+  { name: 'Dalandanan', lat: 14.7010, lng: 120.9835 },
   { name: 'Gen. T. de Leon', lat: 14.7057, lng: 120.9863 },
-  { name: 'Genova', lat: 14.7028, lng: 120.9749 },
+  { name: 'Gen. Pio Valenzuela', lat: 14.7008, lng: 120.9825 },
   { name: 'Isla', lat: 14.6931, lng: 120.9972 },
   { name: 'Karuhatan', lat: 14.7029, lng: 120.9984 },
   { name: 'Lawang Bato', lat: 14.7058, lng: 120.9981 },
   { name: 'Lingunan', lat: 14.7033, lng: 120.9841 },
-  { name: 'Loma de Gato', lat: 14.7154, lng: 120.9875 },
+  { name: 'Mabolo', lat: 14.6958, lng: 120.9900 },
+  { name: 'Malanday', lat: 14.7165, lng: 120.9830 },
   { name: 'Malinta', lat: 14.7014, lng: 120.9769 },
   { name: 'Mapulang Lupa', lat: 14.7074, lng: 120.9973 },
   { name: 'Marulas', lat: 14.7164, lng: 120.9911 },
   { name: 'Maysan', lat: 14.7198, lng: 120.9969 },
-  { name: 'Northbay Blvd North', lat: 14.7301, lng: 120.9761 },
-  { name: 'Northbay Blvd South', lat: 14.7245, lng: 120.9778 },
-  { name: 'Panghulo', lat: 14.7228, lng: 120.9969 },
+  { name: 'Palasan', lat: 14.6985, lng: 120.9905 },
+  { name: 'Parada', lat: 14.7050, lng: 120.9790 },
   { name: 'Pariancillo Villa', lat: 14.7005, lng: 120.9877 },
   { name: 'Paso de Blas', lat: 14.7302, lng: 120.9910 },
+  { name: 'Pasolo', lat: 14.7125, lng: 120.9785 },
   { name: 'Poblacion', lat: 14.7007, lng: 120.9859 },
   { name: 'Polo', lat: 14.7256, lng: 120.9824 },
   { name: 'Punturin', lat: 14.7284, lng: 120.9866 },
-  { name: 'Reservoir Hills', lat: 14.7201, lng: 120.9994 },
+  { name: 'Rincon', lat: 14.7085, lng: 120.9788 },
   { name: 'Tagalag', lat: 14.7308, lng: 120.9872 },
   { name: 'Ugong', lat: 14.7200, lng: 120.9947 },
   { name: 'Veinte Reales', lat: 14.7061, lng: 120.9882 },
   { name: 'Wawang Pulo', lat: 14.7177, lng: 120.9854 },
-  { name: 'Alfonso', lat: 14.7012, lng: 120.9874 },
 ];
 
 const getBarangayFromCoords = (lat: number, lng: number): string => {
-  if (isNaN(lat) || isNaN(lng)) return 'Unknown Barangay';
   let closest = { name: 'Unknown Barangay', dist: Number.MAX_VALUE };
   for (const b of valenzuelaBarangays) {
     const d = Math.hypot(lat - b.lat, lng - b.lng);
     if (d < closest.dist) closest = { name: b.name, dist: d };
   }
-  return closest.dist < 0.03 ? closest.name : 'Unknown Barangay';
+  return closest.name;
 };
 
 export default function EmergencyScreen() {
-  const [profileName, setProfileName] = useState('Maria S. Santos');
   const [location, setLocation] = useState<any>(null);
-  const [fullAddress, setFullAddress] = useState('Unknown Address');
-  const [barangay, setBarangay] = useState('Unknown Barangay');
+  const [destination, setDestination] = useState<any>(null);
+
+  const [fullAddress, setFullAddress] = useState('Fetching...');
+  const [barangay, setBarangay] = useState('');
 
   const [selectedEmergency, setSelectedEmergency] = useState('Fall');
   const [otherEmergency, setOtherEmergency] = useState('');
@@ -75,43 +78,54 @@ export default function EmergencyScreen() {
   const [secondsLeft, setSecondsLeft] = useState(5);
 
   const progress = useRef(new Animated.Value(0)).current;
-  const countdownInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const notificationTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownInterval = useRef<any>(null);
 
   useEffect(() => {
     fetchLocation();
-    return () => {
-      if (countdownInterval.current) clearInterval(countdownInterval.current);
-      if (notificationTimeout.current) clearTimeout(notificationTimeout.current);
-    };
   }, []);
+
+  // 🚑 Simulate responder moving toward user
+  useEffect(() => {
+    let interval: any;
+
+    if (location && destination) {
+      interval = setInterval(() => {
+        setDestination((prev: any) => ({
+          latitude: prev.latitude + (location.latitude - prev.latitude) * 0.05,
+          longitude: prev.longitude + (location.longitude - prev.longitude) * 0.05,
+        }));
+      }, 2000);
+    }
+
+    return () => clearInterval(interval);
+  }, [location, destination]);
 
   const fetchLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Enable location to use this feature.');
+      Alert.alert('Permission Denied');
       return;
     }
 
     const loc = await Location.getCurrentPositionAsync({});
-    setLocation({
+    const coords = {
       latitude: loc.coords.latitude,
       longitude: loc.coords.longitude,
+    };
+
+    setLocation(coords);
+
+    // 🚑 Set initial responder (far away)
+    setDestination({
+      latitude: coords.latitude + 0.02,
+      longitude: coords.longitude + 0.02,
     });
 
-    try {
-      const geo = await Location.reverseGeocodeAsync(loc.coords);
-      if (geo.length > 0) {
-        const place: any = geo[0];
-        const address = `${place.street || ''}, ${getBarangayFromCoords(
-          loc.coords.latitude,
-          loc.coords.longitude
-        )}, ${place.city || ''}`;
-        setFullAddress(address);
-        setBarangay(getBarangayFromCoords(loc.coords.latitude, loc.coords.longitude));
-      }
-    } catch {
-      setFullAddress('Unable to fetch address');
+    const geo = await Location.reverseGeocodeAsync(loc.coords);
+    if (geo.length > 0) {
+      const place: any = geo[0];
+      setFullAddress(`${place.street || ''}, ${place.city || ''}`);
+      setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
     }
   };
 
@@ -122,8 +136,7 @@ export default function EmergencyScreen() {
     countdownInterval.current = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev === 1) {
-          clearInterval(countdownInterval.current!);
-          countdownInterval.current = null;
+          clearInterval(countdownInterval.current);
           triggerSOS();
           return 0;
         }
@@ -142,17 +155,11 @@ export default function EmergencyScreen() {
     setIsHolding(false);
     progress.setValue(0);
     setSecondsLeft(5);
-    if (countdownInterval.current) {
-      clearInterval(countdownInterval.current);
-      countdownInterval.current = null;
-    }
+    clearInterval(countdownInterval.current);
   };
 
   const triggerSOS = () => {
-    Alert.alert('SOS Sent', 'Your emergency alert has been sent!');
-    notificationTimeout.current = setTimeout(() => {
-      Alert.alert('Responder Update', 'A responder is coming to your location!');
-    }, 30000);
+    Alert.alert('SOS Sent', 'Responder is on the way!');
   };
 
   const rotate = progress.interpolate({
@@ -168,13 +175,9 @@ export default function EmergencyScreen() {
         {/* SOS BUTTON */}
         <View style={styles.sosWrapper}>
           <Animated.View style={[styles.ring, { transform: [{ rotate }] }]} />
-          <Pressable
-            onPressIn={startHold}
-            onPressOut={stopHold}
-            style={styles.sosButton}
-          >
+          <Pressable onPressIn={startHold} onPressOut={stopHold} style={styles.sosButton}>
             <Text style={styles.sosText}>
-              {isHolding ? `${secondsLeft}` : "HOLD"}
+              {isHolding ? secondsLeft : "HOLD"}
             </Text>
           </Pressable>
         </View>
@@ -183,36 +186,43 @@ export default function EmergencyScreen() {
         <View style={styles.mapWrapper}>
           {location && (
             <MapView
-              provider={PROVIDER_GOOGLE}
               style={styles.map}
               region={{
-                latitude: location.latitude,
-                longitude: location.longitude,
+                ...location,
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}
             >
-              <Marker coordinate={location} title="You are here" pinColor="red" />
+              <Marker coordinate={location} title="You" pinColor="red" />
+
+              {destination && (
+                <Marker coordinate={destination} title="Responder" pinColor="blue" />
+              )}
+
+              {/* 🧭 ROUTE LINE */}
+              {destination && (
+                <MapViewDirections
+                  origin={destination}
+                  destination={location}
+                  apikey={GOOGLE_MAPS_API_KEY}
+                  strokeWidth={5}
+                  strokeColor="blue"
+                />
+              )}
             </MapView>
           )}
         </View>
 
         {/* DROPDOWN */}
-        <Text style={styles.label}>Type of Emergency</Text>
+        <Text style={styles.label}>Emergency Type</Text>
         <View style={styles.dropdown}>
           <Picker
             selectedValue={selectedEmergency}
-            onValueChange={(itemValue) => setSelectedEmergency(itemValue)}
+            onValueChange={(val) => setSelectedEmergency(val)}
           >
             <Picker.Item label="Fall" value="Fall" />
-            <Picker.Item label="Stroke" value="Stroke" />
             <Picker.Item label="Heart Attack" value="Heart Attack" />
-            <Picker.Item label="Breathing Problem" value="Breathing Problem" />
-            <Picker.Item label="Fracture" value="Fracture" />
-            <Picker.Item label="Seizure" value="Seizure" />
-            <Picker.Item label="Burn" value="Burn" />
-            <Picker.Item label="Bleeding" value="Bleeding" />
-            <Picker.Item label="Unconscious" value="Unconscious" />
+            <Picker.Item label="Stroke" value="Stroke" />
             <Picker.Item label="Other" value="Other" />
           </Picker>
         </View>
@@ -226,17 +236,12 @@ export default function EmergencyScreen() {
           />
         )}
 
-        {/* INFO CARD */}
+        {/* INFO */}
         <View style={styles.infoCard}>
-          <Text style={styles.info}>Name: {profileName}</Text>
-          <Text style={styles.info}>Address: {fullAddress}</Text>
-          <Text style={styles.info}>
-            Coordinates: {location ? `${location.latitude}, ${location.longitude}` : 'Loading...'}
-          </Text>
-          <Text style={styles.info}>
-            Barangay: {barangay}
-          </Text>
-          <Text style={styles.info}>
+          <Text>Name: Maria S. Santos</Text>
+          <Text>Address: {fullAddress}</Text>
+          <Text>Barangay: {barangay}</Text>
+          <Text>
             Emergency: {selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}
           </Text>
         </View>
@@ -255,9 +260,16 @@ const styles = StyleSheet.create({
   sosText: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
   mapWrapper: { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
   map: { flex: 1 },
-  label: { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
-  dropdown: { backgroundColor: '#fff', borderRadius: 12, marginBottom: 15, overflow: 'hidden' },
-  input: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 20, borderWidth: 1, borderColor: '#E5E7EB' },
-  infoCard: { backgroundColor: '#fff', padding: 20, borderRadius: 18, elevation: 3, marginBottom: 30 },
-  info: { fontSize: 16, marginBottom: 8 },
+
+  dropdown: { backgroundColor: '#fff', borderRadius: 10 },
+  input: { backgroundColor: '#fff', padding: 10, marginTop: 10 },
+
+  infoCard: { backgroundColor: '#fff', padding: 15, marginTop: 20 },
+
+  label: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+
 });

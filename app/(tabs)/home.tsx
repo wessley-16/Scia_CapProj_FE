@@ -16,26 +16,39 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Medicine } from "../../interfaces/interfaces";
 
 export default function Home() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const tabBarHeight = useBottomTabBarHeight();
+
   const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
 
+  /* ---------------- NAVIGATION ---------------- */
+  const goToChat = () => router.push("/(tabs)/chatbot");
+  const goToVoice = () => router.push("/(tabs)/voice");
+  const goToMedicine = () => router.push("/(tabs)/medicine");
+  const goToAppointment = () => router.push("/(tabs)/appointment");
+  const goToEmergency = () => router.push("/(tabs)/emergency");
+  const goToDocs = () => router.push("/(tabs)/govdocs");
+
+  /* ---------------- LOAD MEDICINE ---------------- */
   const loadNextMedicine = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem("medicines");
       if (!stored) return setNextMedicine(null);
 
       const medicines: Medicine[] = JSON.parse(stored);
-      if (medicines.length === 0) return setNextMedicine(null);
+      if (!medicines.length) return setNextMedicine(null);
 
       const upcoming = medicines
         .map((med) => ({
           ...med,
           nextDoseTime:
-            med.lastTakenTime + med.interval * 60 * 60 * 1000,
+            (med.lastTakenTime || Date.now()) +
+            med.interval * 60 * 60 * 1000,
         }))
         .sort((a, b) => a.nextDoseTime - b.nextDoseTime)[0];
 
@@ -52,6 +65,7 @@ export default function Home() {
     }, [loadNextMedicine])
   );
 
+  /* ---------------- HELPERS ---------------- */
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString([], {
       hour: "numeric",
@@ -61,7 +75,8 @@ export default function Home() {
 
   const getNextDoseTime = (medicine: Medicine) => {
     return formatTime(
-      medicine.lastTakenTime + medicine.interval * 60 * 60 * 1000
+      (medicine.lastTakenTime || Date.now()) +
+        medicine.interval * 60 * 60 * 1000
     );
   };
 
@@ -70,10 +85,14 @@ export default function Home() {
       ? { uri: params.image }
       : { uri: "https://via.placeholder.com/150" };
 
+  /* ---------------- UI ---------------- */
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[
+          styles.container,
+          { paddingBottom: tabBarHeight + 120 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* HEADER */}
@@ -132,11 +151,8 @@ export default function Home() {
           />
         </View>
 
-        {/* ASSISTANT */}
-        <TouchableOpacity
-          style={styles.assistant}
-          onPress={() => router.push("/chatbot")}
-        >
+        {/* CHAT ASSISTANT */}
+        <TouchableOpacity style={styles.assistant} onPress={goToChat}>
           <MaterialCommunityIcons
             name="robot-outline"
             size={36}
@@ -157,13 +173,31 @@ export default function Home() {
           />
         </TouchableOpacity>
 
+        {/* VOICE ASSISTANT */}
+        <TouchableOpacity style={styles.assistant} onPress={goToVoice}>
+          <MaterialCommunityIcons
+            name="microphone-outline"
+            size={36}
+            color="#2563EB"
+          />
+
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text style={styles.assistantTitle}>Voice Assistant</Text>
+            <Text style={styles.assistantSub}>
+              Speak and get help instantly
+            </Text>
+          </View>
+
+          <Ionicons name="volume-high" size={22} color="#2356E1" />
+        </TouchableOpacity>
+
         {/* BUTTONS */}
         <ActionButton
           title="SOS EMERGENCY"
           subtitle="Tap for help"
           icon="alarm-light"
           color="#CE2029"
-          onPress={() => router.push("/emergency")}
+          onPress={goToEmergency}
         />
 
         <ActionButton
@@ -171,7 +205,7 @@ export default function Home() {
           subtitle="Book your visit"
           icon="calendar-check"
           color="#2356E1"
-          onPress={() => router.push("/appointment")}
+          onPress={goToAppointment}
         />
 
         <ActionButton
@@ -179,7 +213,7 @@ export default function Home() {
           subtitle="Manage meds"
           icon="pill"
           color="#2356E1"
-          onPress={() => router.push("/medicine")}
+          onPress={goToMedicine}
         />
 
         <ActionButton
@@ -187,16 +221,17 @@ export default function Home() {
           subtitle="View records"
           icon="file-document"
           color="#2356E1"
-          onPress={() => router.push("/govdocs")}
+          onPress={goToDocs}
         />
-
-        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* FLOATING CHAT */}
       <TouchableOpacity
-        style={styles.chat}
-        onPress={() => router.push("/chatbot")}
+        style={[
+          styles.chat,
+          { bottom: tabBarHeight + 20 },
+        ]}
+        onPress={goToChat}
       >
         <Ionicons name="chatbubble" size={26} color="#fff" />
       </TouchableOpacity>
@@ -204,7 +239,7 @@ export default function Home() {
   );
 }
 
-/* 🔹 BUTTON COMPONENT */
+/* BUTTON COMPONENT */
 function ActionButton({
   title,
   subtitle,
@@ -230,13 +265,11 @@ function ActionButton({
   );
 }
 
+/* STYLES */
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F4F6F9" },
 
-  container: {
-    padding: 20,
-    paddingBottom: 120,
-  },
+  container: { padding: 20 },
 
   header: {
     flexDirection: "row",
@@ -283,18 +316,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  reminderLabel: {
-    fontSize: 14,
-  },
+  reminderLabel: { fontSize: 14 },
 
   reminderTitle: {
     fontSize: 18,
     fontWeight: "bold",
   },
 
-  reminderSub: {
-    fontSize: 14,
-  },
+  reminderSub: { fontSize: 14 },
 
   reminderTime: {
     fontSize: 20,
@@ -343,7 +372,6 @@ const styles = StyleSheet.create({
 
   chat: {
     position: "absolute",
-    bottom: 40,
     right: 20,
     backgroundColor: "#2356E1",
     padding: 16,
