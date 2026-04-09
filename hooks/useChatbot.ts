@@ -13,8 +13,8 @@ export type ChatMessage = {
   text: string;
 };
 
-const generateId = () =>
-  Date.now().toString(36) + Math.random().toString(36).slice(2);
+let _msgCounter = 0;
+const generateId = () => `msg_${Date.now()}_${(_msgCounter += 1)}`;
 
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_CONTEXT_PER_ROLE = 5;
