@@ -1,25 +1,70 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLiveVoice } from "../../hooks/useLiveVoice";
 
 export default function Voice() {
   const router = useRouter();
-  const [isListening, setIsListening] = useState(false);
-  const [transcript, setTranscript] = useState("Tap the microphone and start speaking...");
+  const [prompt, setPrompt] = useState("");
+  const {
+    status,
+    isConnected,
+    inputTranscript,
+    outputTranscript,
+    interrupted,
+    lastError,
+    diagnostic,
+    isRecording,
+    connect,
+    disconnect,
+    sendRealtimeText,
+    startMicRecording,
+    stopMicRecording,
+  } = useLiveVoice();
 
-  const toggleListening = () => {
-    setIsListening(!isListening);
-    if (!isListening) {
-      setTranscript("Listening...");
-      // Simulate stopping after a few seconds
-      setTimeout(() => {
-        setIsListening(false);
-        setTranscript("I need to schedule an appointment with Dr. Reyes.");
-      }, 3000);
-    } else {
-      setTranscript("Tap the microphone and start speaking...");
+  const isBusy = status === "connecting";
+  const isListening =
+    status === "connected" || status === "responding" || isRecording;
+
+  const liveStatusLabel = isRecording
+    ? "Recording your voice..."
+    : status === "connecting"
+      ? "Connecting to Gemini Live..."
+      : status === "connected"
+        ? "Connected"
+        : status === "responding"
+          ? "Gemini is responding..."
+          : status === "error"
+            ? "Connection error"
+            : "Not connected";
+
+  const toggleListening = async () => {
+    if (!isConnected) {
+      connect();
+      return;
+    }
+
+    if (isRecording) {
+      await stopMicRecording();
+      return;
+    }
+
+    await startMicRecording();
+  };
+
+  const handleSend = () => {
+    const ok = sendRealtimeText(prompt);
+    if (ok) {
+      setPrompt("");
     }
   };
 
@@ -27,7 +72,10 @@ export default function Voice() {
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       {/* HEADER */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Ionicons name="close" size={28} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Voice Assistant</Text>
@@ -37,34 +85,104 @@ export default function Voice() {
       <View style={styles.container}>
         {/* AI RESPONSE AREA */}
         <View style={styles.responseContainer}>
-          <MaterialCommunityIcons name="robot-outline" size={40} color="#2356E1" />
+          <MaterialCommunityIcons
+            name="robot-outline"
+            size={40}
+            color="#2356E1"
+          />
           <Text style={styles.aiGreeting}>
-            {isListening ? "I'm listening..." : "How can I help you today?"}
+            {isListening ? "Live session active" : "How can I help you today?"}
           </Text>
+          <Text style={styles.statusText}>{liveStatusLabel}</Text>
+          <View style={styles.connectionButtonsRow}>
+            <TouchableOpacity
+              style={[
+                styles.connectionButton,
+                isConnected
+                  ? styles.connectionButtonConnected
+                  : styles.connectionButtonDisconnected,
+              ]}
+              onPress={isConnected ? disconnect : connect}
+            >
+              <Text style={styles.connectionButtonText}>
+                {isConnected ? "Disconnect" : "Connect"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {interrupted && (
+            <Text style={styles.interruptedText}>
+              Response interrupted by new activity.
+            </Text>
+          )}
+          {!!lastError && <Text style={styles.errorText}>{lastError}</Text>}
+          {!!diagnostic && <Text style={styles.debugText}>{diagnostic}</Text>}
         </View>
 
         {/* TRANSCRIPT CARD */}
         <View style={styles.transcriptCard}>
-          <Text style={[styles.transcriptText, isListening && styles.activeText]}>
-            {transcript}
+          <Text style={[styles.transcriptLabel, styles.transcriptLabelUser]}>
+            Input transcript
           </Text>
+          <Text
+            style={[styles.transcriptText, isListening && styles.activeText]}
+          >
+            {inputTranscript ||
+              "Connect and start speaking or send realtime text."}
+          </Text>
+
+          <Text style={[styles.transcriptLabel, styles.transcriptLabelModel]}>
+            Model transcript
+          </Text>
+          <Text style={[styles.transcriptText, styles.modelTranscriptText]}>
+            {outputTranscript || "Gemini responses will appear here."}
+          </Text>
+        </View>
+
+        <View style={styles.promptRow}>
+          <TextInput
+            value={prompt}
+            onChangeText={setPrompt}
+            placeholder="Send realtime text to Live API..."
+            placeholderTextColor="#9CA3AF"
+            style={styles.promptInput}
+            editable={isConnected}
+            onSubmitEditing={handleSend}
+          />
+          <TouchableOpacity
+            style={[
+              styles.sendButton,
+              (!isConnected || !prompt.trim()) && styles.sendButtonDisabled,
+            ]}
+            onPress={handleSend}
+            disabled={!isConnected || !prompt.trim()}
+          >
+            <Ionicons name="send" size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         {/* MICROPHONE BUTTON */}
         <View style={styles.micContainer}>
-          {isListening && (
-            <View style={styles.rippleEffect} />
-          )}
+          {isListening && <View style={styles.rippleEffect} />}
           <TouchableOpacity
             style={[styles.micButton, isListening && styles.micButtonActive]}
             onPress={toggleListening}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons 
-              name={isListening ? "microphone" : "microphone-outline"} 
-              size={48} 
-              color="#fff" 
-            />
+            {isBusy ? (
+              <ActivityIndicator size="large" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons
+                name={
+                  isRecording
+                    ? "stop-circle-outline"
+                    : isConnected
+                      ? "microphone"
+                      : "microphone-plus"
+                }
+                size={48}
+                color="#fff"
+              />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -105,6 +223,51 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: "center",
   },
+  statusText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#4B5563",
+  },
+  connectionButtonsRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+  },
+  connectionButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  connectionButtonConnected: {
+    backgroundColor: "#DC2626",
+  },
+  connectionButtonDisconnected: {
+    backgroundColor: "#2563EB",
+  },
+  connectionButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  interruptedText: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#B45309",
+  },
+  errorText: {
+    marginTop: 6,
+    fontSize: 13,
+    color: "#B91C1C",
+    textAlign: "center",
+  },
+  debugText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#374151",
+    textAlign: "center",
+    paddingHorizontal: 12,
+  },
   transcriptCard: {
     backgroundColor: "#fff",
     padding: 24,
@@ -114,18 +277,61 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    minHeight: 120,
-    justifyContent: "center",
+    minHeight: 170,
+    justifyContent: "flex-start",
+  },
+  transcriptLabel: {
+    fontSize: 12,
+    letterSpacing: 0.3,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    marginBottom: 6,
+  },
+  transcriptLabelUser: {
+    color: "#1D4ED8",
+  },
+  transcriptLabelModel: {
+    color: "#047857",
+    marginTop: 12,
   },
   transcriptText: {
-    fontSize: 18,
+    fontSize: 16,
     color: "#6B7280",
-    textAlign: "center",
-    lineHeight: 26,
+    lineHeight: 24,
+  },
+  modelTranscriptText: {
+    color: "#111827",
   },
   activeText: {
     color: "#111827",
     fontWeight: "500",
+  },
+  promptRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  promptInput: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: "#111827",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#2563EB",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonDisabled: {
+    backgroundColor: "#9CA3AF",
   },
   micContainer: {
     alignItems: "center",
@@ -148,7 +354,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   micButtonActive: {
-    backgroundColor: "#CE2029", // Red when recording
+    backgroundColor: "#CE2029",
     shadowColor: "#CE2029",
   },
   rippleEffect: {

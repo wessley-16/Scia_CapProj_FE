@@ -32,6 +32,12 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow SCIA to access your microphone for real-time voice assistant."
+        }
       ]
     ],
     "experiments": {
