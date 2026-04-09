@@ -8,14 +8,19 @@ import {
 
 //  Consistent message type
 export type ChatMessage = {
+  id: string;
   role: "user" | "assistant";
   text: string;
 };
+
+const generateId = () =>
+  Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 const MAX_CONTEXT_MESSAGES = 10;
 const MAX_CONTEXT_PER_ROLE = 5;
 
 const INITIAL_MESSAGE: ChatMessage = {
+  id: "initial",
   role: "assistant",
   text: "Hello! How can I help you today?",
 };
@@ -78,7 +83,11 @@ const buildContextualPrompt = (
   ].join("\n\n");
 };
 
-const isValidMessagesArray = (value: unknown): value is ChatMessage[] => {
+type StoredChatMessage = Omit<ChatMessage, "id"> & { id?: string };
+
+const isValidMessagesArray = (
+  value: unknown,
+): value is StoredChatMessage[] => {
   if (!Array.isArray(value)) return false;
 
   return value.every(
@@ -109,7 +118,11 @@ export const useChatbot = () => {
         const parsed: unknown = JSON.parse(stored);
 
         if (isValidMessagesArray(parsed) && parsed.length > 0) {
-          setMessages(getTrimmedMessages(parsed));
+          const withIds: ChatMessage[] = parsed.map((msg) => ({
+            ...msg,
+            id: msg.id ?? generateId(),
+          }));
+          setMessages(getTrimmedMessages(withIds));
         }
       } catch (error) {
         console.log("Failed to load chatbot conversation:", error);
@@ -139,7 +152,9 @@ export const useChatbot = () => {
   }, [hydrated, messages]);
 
   const addMessage = useCallback((role: ChatMessage["role"], text: string) => {
-    setMessages((prev) => getTrimmedMessages([...prev, { role, text }]));
+    setMessages((prev) =>
+      getTrimmedMessages([...prev, { id: generateId(), role, text }]),
+    );
   }, []);
 
   const sendMessage = async (message: string) => {

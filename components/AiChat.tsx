@@ -62,7 +62,7 @@ const AiChat = () => {
       <FlatList
         ref={flatListRef}
         data={displayMessages}
-        keyExtractor={(_, index) => index.toString()}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => <ChatMessageBubble message={item} />}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
