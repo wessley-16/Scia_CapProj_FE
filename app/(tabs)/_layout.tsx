@@ -18,7 +18,12 @@ const CustomTabBar = ({
 
   const currentRouteName = state.routes[state.index].name;
 
-  if (currentRouteName === "upload" || currentRouteName === "scan") {
+  if (
+    currentRouteName === "upload" ||
+    currentRouteName === "scan" ||
+    currentRouteName === "chatbot" ||
+    currentRouteName === "voice"
+  ) {
     return null;
   }
 
@@ -117,6 +122,11 @@ export default function Layout() {
 
           <Tabs.Screen
             name="voice"
+            options={{ href: null, tabBarStyle: { display: "none" } }}
+          />
+
+          <Tabs.Screen
+            name="chatbot"
             options={{ href: null, tabBarStyle: { display: "none" } }}
           />
 
