@@ -38,7 +38,8 @@
         {
           "microphonePermission": "Allow SCIA to access your microphone for real-time voice assistant."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

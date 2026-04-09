@@ -4,8 +4,9 @@ import React from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+const params = useLocalSearchParams();
+
 export default function account() {
-  const params = useLocalSearchParams();
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -22,26 +23,32 @@ export default function account() {
               <View style={styles.notificationDot} />
             </View>
           </View>
-          
-          <View style={styles.detailsContainer}>
-            <Text style={styles.label}>Name:</Text>
-            <Text style={styles.value}>{params.firstName} {params.midName} {params.lastName || "N/A"}</Text>
 
-            <Text style={styles.label}>Senior Citizen ID:</Text>
-            <Text style={styles.value}>{params.idNumber || "N/A"}</Text>
+          <View style={styles.profileContainer}>
+            <View style={styles.detailsContainer}>
+              <Text style={styles.label}>Name:</Text>
+              <Text style={styles.value}>{params.name}</Text>
 
-            <Text style={styles.label}>Address:</Text>
-            <Text style={styles.value}>{params.address || "N/A"}</Text>
+              <Text style={styles.label}>Senior Citizen ID:</Text>
+              <Text style={styles.value}>{params.idNumber}</Text>
 
-            <Text style={styles.label}>Contact Number:</Text>
-            <Text style={styles.value}>{params.conNumber || "N/A"}</Text>
+              <Text style={styles.label}>Address:</Text>
+              <Text style={styles.value}>{params.address}</Text>
 
-            <Text style={styles.label}>Date of Birth:</Text>
-            <Text style={styles.value}>{params.dob || "N/A"}</Text>
+              <Text style={styles.label}>Date of Birth:</Text>
+              <Text style={styles.value}>{params.dob}</Text>
 
-            <Text style={styles.label}>Gender:</Text>
-            <Text style={styles.value}>{params.gender || "N/A"}</Text>
+              <Text style={styles.label}>Sex:</Text>
+              <Text style={styles.value}>{params.sex}</Text>
 
+              <Text style={styles.label}>Date Issued:</Text>
+              <Text style={styles.value}>{params.issued}</Text>
+            </View>
+            <View style={styles.imageContainer}>
+              <Image 
+                source={{ uri: typeof params.image === 'string' ? params.image : params.image?.[0] || '' }} style={styles.profileImage}
+              />
+            </View>
           </View>
 
           {/* QR CODE SECTION */}
@@ -93,6 +100,14 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderWidth: 1.5,
     borderColor: "#F4F6F9",
+  },
+  profileContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    borderBottomWidth: 2,
+    borderColor: "black",
+    paddingBottom: 20,
   },
   detailsContainer: {
     flex: 1,

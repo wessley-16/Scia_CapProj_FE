@@ -7,7 +7,6 @@ import {
 } from "expo-router";
 import React, { useCallback, useState } from "react";
 
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import {
   Image,
   ScrollView,
@@ -17,6 +16,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Medicine } from "../../interfaces/interfaces";
 
 export default function Home() {
@@ -100,9 +100,9 @@ export default function Home() {
           <Image source={avatarSource} style={styles.avatar} />
 
           <View style={styles.headerText}>
-            <Text style={styles.greeting}>Magandang Araw Po,</Text>
+            <Text style={styles.greeting}>Magandang Araw,</Text>
             <Text style={styles.name}>
-              {params.name ?? "Sa inyo"}
+              {params.name ?? "Juan Dela Cruz"}
             </Text>
 
             <View style={styles.idRow}>
