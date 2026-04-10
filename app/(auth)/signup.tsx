@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -217,6 +218,18 @@ export default function Signup() {
           )}
         </TouchableOpacity>
 
+        <View style={styles.noIdRow}>
+        <Text style={styles.noIdText}>Don't have an ID yet?</Text>
+
+        <TouchableOpacity
+          style={styles.noIdButton}
+          onPress={() =>
+            Linking.openURL("https://www.ncsc.gov.ph/")
+          }
+        >
+          <Text style={styles.noIdButtonText}>Go Register</Text>
+        </TouchableOpacity>
+      </View>
 
         {/* Submit */}
         <TouchableOpacity
@@ -227,7 +240,7 @@ export default function Signup() {
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={{ color: "white" }}>Register</Text>
+            <Text style={{ color: "white", fontWeight: "bold", fontSize: 18 }}>Create Account</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -247,13 +260,11 @@ const styles = StyleSheet.create({
     padding: 15, 
     justifyContent: "center" 
   },
-
   title: { 
     fontSize: 32, 
     marginBottom: 20, 
     textAlign: "center"
   },
-
   card: {
     backgroundColor: "#eee",
     padding: 15,
@@ -261,31 +272,26 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     alignItems: "center",
   },
-
   text: {
     fontSize: 24,
   },
-
   image: {
     width: 160,
     height: 120,
     marginTop: 10,
     borderRadius: 10,
   },
-
   input: {
     borderWidth: 1,
     padding: 12,
     marginBottom: 10,
     borderRadius: 8,
   },
-
   dropdowns: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 10,
   },
-
   ddInput: {
     flex: 1,
     borderWidth: 1,
@@ -294,11 +300,32 @@ const styles = StyleSheet.create({
     marginRight: 5,
     justifyContent: "center",
   },
-
   button: {
     backgroundColor: "#2563EB",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
+  },
+  noIdRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    margin: 20,
+  },
+  noIdText: {
+    fontSize: 18,
+    color: "#333",
+    textDecorationLine: "underline",
+  },
+  noIdButton: {
+    backgroundColor: "#2563EB",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  noIdButtonText: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "600",
   },
 });
