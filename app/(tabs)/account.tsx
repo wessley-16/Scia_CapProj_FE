@@ -1,13 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
 import React from "react";
-import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, ImageBackground, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+const background = require("../../assets/images/Monochrome.jpg");
 
 export default function account() {
   const params = useLocalSearchParams();
   return (
     <SafeAreaView style={styles.safeArea}>
+      <ImageBackground
+        source={background}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
@@ -53,6 +60,7 @@ export default function account() {
             />
           </View>
       </ScrollView>
+      </ImageBackground>
     </SafeAreaView>
   );
 }
@@ -62,27 +70,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F4F6F9",
   },
+
+  backgroundImage: { flex: 1 },
+
   scrollView: {
     flex: 1,
   },
+
   contentContainer: {
-    padding: 20,
+    padding: 0,
   },
+
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
+    padding: 20,
   },
+
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#1F2937",
     marginBottom: 20,
   },
+
   bellButton: {
     position: "relative",
     padding: 4,
   },
+
   notificationDot: {
     position: "absolute",
     top: 4,
@@ -94,24 +110,30 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: "#F4F6F9",
   },
+
   detailsContainer: {
     flex: 1,
     marginRight: 20,
+    padding: 20,
   },
+
   label: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#1F2937",
     marginTop: 10,
   },
+
   value: {
     fontSize: 20,
     color: "#4B5563",
     marginBottom: 10,
   },
+
   imageContainer: {
     alignItems: "center",
   },
+
   profileImage: {
     width: 150,
     height: 150,
@@ -120,16 +142,23 @@ const styles = StyleSheet.create({
     borderColor: "black",
     backgroundColor: "#D1D5DB",
   },
+
   qrCodeSection: {
     alignItems: "center",
-    marginTop: 30,
+    backgroundColor: "white",
+    borderRadius: 30,
+    marginTop: 20,
+    padding: 12,
+    elevation: 3,
   },
+
   qrCodeTitle: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#1F2937",
     marginBottom: 10,
   },
+
   qrCodeImage: {
     width: 300,
     height: 300,

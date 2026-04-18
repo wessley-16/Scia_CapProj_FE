@@ -145,27 +145,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#2356E1", // Matched with Tab Bar Color to cover Safe Area
   },
+
   tabBar: {
     flexDirection: "row",
     height: 70,
     width: "100%",
     alignItems: "center", // Align items to center vertically, centerSlot will handle its own alignment
-    borderTopWidth: 1,
-    borderColor: "#4672ec",
+    borderTopWidth: 3,
+    borderColor: "white",
     backgroundColor: "#2356E1",
   },
+
   tabItem: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     height: "100%",
   },
+
   label: {
     fontSize: 12,
     marginTop: 4,
     fontFamily: "Inter-Medium",
     fontWeight: "600",
   },
+
   centerSlot: {
     width: 80,
     height: "100%",
@@ -173,6 +177,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     paddingBottom: 8,
   },
+
   scanLabel: {
     fontSize: 12,
     color: "#e4e4e4",
@@ -180,15 +185,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
     width: "100%",
   },
+
   scanButton: {
     position: "absolute",
-    top: -30, // Adjusted to float better
-    width: 64, // Slightly smaller for better proportion
+    top: -30,
+    width: 64,
     height: 64,
     borderRadius: 32,
     borderWidth: 4,
-    borderColor: "#2356E1", // Matches background so it looks like a cutout if using white
-    // Actually, user had white bg and blue border.
+    borderColor: "#2356E1",
     backgroundColor: "white",
     alignItems: "center",
     justifyContent: "center",

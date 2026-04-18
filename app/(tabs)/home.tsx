@@ -10,6 +10,7 @@ import React, { useCallback, useState } from "react";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import {
   Image,
+  ImageBackground,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,6 +19,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Medicine } from "../../interfaces/interfaces";
+
+const background = require("../../assets/images/Foreground.png");
 
 export default function Home() {
   const router = useRouter();
@@ -88,10 +91,15 @@ export default function Home() {
   /* ---------------- UI ---------------- */
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+      <ImageBackground
+        source={background}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingBottom: tabBarHeight + 120 },
+          { paddingBottom: tabBarHeight },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -120,109 +128,123 @@ export default function Home() {
           <Ionicons name="notifications" size={26} color="#2356E1" />
         </View>
 
-        {/* REMINDER */}
-        <View style={styles.reminder}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.reminderLabel}>Reminder</Text>
+        {/* PROGRAMS */}
+        <View style={styles.programContainer}>
+          <Text style={styles.progLabel}>What : </Text>
+          <Text style={styles.progLabel}>When : </Text>
+          <Text style={styles.progLabel}>Where : </Text>
+          <Text style={styles.progLabel}></Text>
 
-            {nextMedicine ? (
-              <>
-                <Text style={styles.reminderTitle}>
-                  Take {nextMedicine.name}
-                </Text>
-                <Text style={styles.reminderSub}>
-                  {nextMedicine.dosage} {nextMedicine.dosageUnit}
-                </Text>
-                <Text style={styles.reminderTime}>
-                  {getNextDoseTime(nextMedicine)}
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.reminderTitle}>
-                No medicine reminders today
+          <View style={styles.joinFunction}>
+             {/* lalagyan nalang ng functin pag okay na admin it: onPress={() => router.push("/(tabs)/programs")}*/}
+            <TouchableOpacity style={styles.joinButton}>
+              <Text style={{ fontSize: 18, color: "white" }}>
+                Join
               </Text>
-            )}
+            </TouchableOpacity>
           </View>
-
-          <MaterialCommunityIcons
-            name={nextMedicine ? "pill" : "heart-outline"}
-            size={50}
-            color="#2356E1"
-          />
         </View>
 
-        {/* CHAT ASSISTANT */}
-        <TouchableOpacity style={styles.assistant} onPress={goToChat}>
-          <MaterialCommunityIcons
-            name="robot-outline"
-            size={36}
-            color="#2563EB"
-          />
+        <View style={styles.assistantContainer}>
+          {/* CHAT ASSISTANT */}
+          <TouchableOpacity style={styles.assistant} onPress={goToChat}>
+            <MaterialCommunityIcons
+              name="robot-outline"
+              size={36}
+              color="#2563EB"
+            />
 
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.assistantTitle}>Ask Assistant</Text>
-            <Text style={styles.assistantSub}>
-              How can I help you today?
-            </Text>
-          </View>
+            <View>
+              <Text style={styles.assistantTitle}>Chat Assistant</Text>
+              <Text style={styles.assistantSub}>
+                How can I help you today?
+              </Text>
+            </View>
+          </TouchableOpacity>
 
-          <Ionicons
-            name="chatbubble-ellipses"
-            size={22}
-            color="#2356E1"
-          />
-        </TouchableOpacity>
+          {/* VOICE ASSISTANT */}
+          <TouchableOpacity style={styles.assistant} onPress={goToVoice}>
+            <MaterialCommunityIcons
+              name="microphone-outline"
+              size={36}
+              color="#2563EB"
+            />
 
-        {/* VOICE ASSISTANT */}
-        <TouchableOpacity style={styles.assistant} onPress={goToVoice}>
-          <MaterialCommunityIcons
-            name="microphone-outline"
-            size={36}
-            color="#2563EB"
-          />
-
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.assistantTitle}>Voice Assistant</Text>
-            <Text style={styles.assistantSub}>
-              Speak and get help instantly
-            </Text>
-          </View>
-
-          <Ionicons name="volume-high" size={22} color="#2356E1" />
-        </TouchableOpacity>
+            <View>
+              <Text style={styles.assistantTitle}>Voice Assistant</Text>
+              <Text style={styles.assistantSub}>
+                Speak and get help instantly
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* BUTTONS */}
-        <ActionButton
-          title="SOS EMERGENCY"
-          subtitle="Tap for help"
-          icon="alarm-light"
-          color="#CE2029"
-          onPress={goToEmergency}
-        />
+        <View style= {styles.moduleContainer}>
+          
+          {/* REMINDER */}
+          <View style={styles.reminder}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.reminderLabel}>Reminder</Text>
 
-        <ActionButton
-          title="SET APPOINTMENT"
-          subtitle="Book your visit"
-          icon="calendar-check"
-          color="#2356E1"
-          onPress={goToAppointment}
-        />
+              {nextMedicine ? (
+                <>
+                  <Text style={styles.reminderTitle}>
+                    Take : {nextMedicine.dosage} {nextMedicine.dosageUnit} {nextMedicine.name}
+                  </Text>
+                  <Text style={styles.reminderTime}>
+                    Time : {getNextDoseTime(nextMedicine)}
+                  </Text>
+                  <Text style={styles.reminderTime}>
+                    Note : {nextMedicine.description ? `${nextMedicine.description}` : "---"}
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.reminderTitle}>
+                  No medicine reminders today
+                </Text>
+              )}
+            </View>
 
-        <ActionButton
-          title="MEDICINES"
-          subtitle="Manage meds"
-          icon="pill"
-          color="#2356E1"
-          onPress={goToMedicine}
-        />
+            <MaterialCommunityIcons
+              name={nextMedicine ? "pill" : "heart-outline"}
+              size={50}
+              color="#2356E1"
+            />
+          </View>
 
-        <ActionButton
-          title="DOCUMENTS"
-          subtitle="View records"
-          icon="file-document"
-          color="#2356E1"
-          onPress={goToDocs}
-        />
+          <ActionButton
+            title="SOS EMERGENCY"
+            subtitle="Call for help"
+            icon="alarm-light"
+            color="#CE2029"
+            onPress={goToEmergency}
+          />
+
+          <ActionButton
+            title="SET APPOINTMENT"
+            subtitle="Book your visit"
+            icon="calendar-check"
+            color="#2356E1"
+            onPress={goToAppointment}
+          />
+
+          <ActionButton
+            title="MEDICINE PILL BOX"
+            subtitle="Manage medications"
+            icon="pill"
+            color="#2356E1"
+            onPress={goToMedicine}
+          />
+
+          <ActionButton
+            title="GOVERNMENT WEBSITES"
+            subtitle="Visit official sites"
+            icon="file-document"
+            color="#2356E1"
+            onPress={goToDocs}
+          />
+        </View>
       </ScrollView>
 
       {/* FLOATING CHAT */}
@@ -235,6 +257,7 @@ export default function Home() {
       >
         <Ionicons name="chatbubble" size={26} color="#fff" />
       </TouchableOpacity>
+      </ImageBackground>
     </SafeAreaView>
   );
 }
@@ -260,7 +283,7 @@ function ActionButton({
         <Text style={styles.buttonSub}>{subtitle}</Text>
       </View>
 
-      <Ionicons name="chevron-forward" size={22} color="#fff" />
+      <Ionicons name="chevron-forward" size={28} color="#fff" />
     </TouchableOpacity>
   );
 }
@@ -269,18 +292,25 @@ function ActionButton({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F4F6F9" },
 
-  container: { padding: 20 },
+  backgroundImage: { flex: 1 },
+
+  container: { padding: 0},
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    backgroundColor: "white",
+    padding: 5,
+    borderRadius: 40,
+    marginHorizontal: 10,
+    marginTop: 10,
   },
 
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+    backgroundColor: "#cfcfcf",
   },
 
   headerText: {
@@ -288,7 +318,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
 
-  greeting: { fontSize: 16, color: "#6B7280" },
+  greeting: { fontSize: 18, color: "#000" },
 
   name: {
     fontSize: 22,
@@ -307,47 +337,64 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
+  assistantContainer: {
+    flexDirection: "row",
+    gap: 10,
+    marginHorizontal: 10,
+    marginTop: 20,
+  },
+
+  programContainer: {
+    flexDirection: "column",
+    padding: 12,
+    borderRadius: 18,
+    marginHorizontal: 10,
+    marginVertical: 50,
+  },
+
+  moduleContainer: {
+    backgroundColor: "white",
+    borderRadius: 30,
+    marginTop: 20,
+    padding: 12,
+    paddingBottom: 30,
+  },
+
   reminder: {
     flexDirection: "row",
     backgroundColor: "#FACC15",
-    padding: 18,
+    padding: 12,
     borderRadius: 18,
-    marginBottom: 20,
+    marginVertical: 7,
     alignItems: "center",
   },
 
-  reminderLabel: { fontSize: 14 },
+  reminderLabel: { fontSize: 18, fontWeight: "bold" },
 
-  reminderTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-  },
+  reminderTitle: { fontSize: 16 },
 
-  reminderSub: { fontSize: 14 },
-
-  reminderTime: {
-    fontSize: 20,
-    fontWeight: "bold",
-  },
+  reminderTime: { fontSize: 16 },
 
   assistant: {
-    flexDirection: "row",
+    flex: 1,
+    flexDirection: "column",
     alignItems: "center",
     backgroundColor: "#fff",
-    padding: 18,
+    padding: 12,
     borderRadius: 18,
-    marginBottom: 20,
     elevation: 3,
   },
 
   assistantTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
+    textAlign: "center",
   },
 
   assistantSub: {
-    fontSize: 14,
+    fontSize: 12,
     color: "#6B7280",
+    textAlign: "center",
   },
 
   button: {
@@ -355,8 +402,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 18,
     borderRadius: 18,
-    marginBottom: 14,
-    elevation: 4,
+    marginVertical: 7,
   },
 
   buttonTitle: {
@@ -373,8 +419,29 @@ const styles = StyleSheet.create({
   chat: {
     position: "absolute",
     right: 20,
+    borderWidth: 3,
+    borderColor: "white",
     backgroundColor: "#2356E1",
-    padding: 16,
+    padding: 15,
     borderRadius: 30,
+  },
+
+  progLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "white",
+    marginBottom: 6,
+  },
+
+  joinFunction: {
+    alignItems: "flex-end",
+    marginTop: 10,
+  },
+
+  joinButton: {
+    backgroundColor: "#2563EB",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
   },
 });
