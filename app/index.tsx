@@ -177,7 +177,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F7F9FC",
+    backgroundColor: "white",
   },
   inner: {
     flex: 1,
@@ -188,6 +188,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 240,
     height: 240,
+    borderRadius: 120,
     alignSelf: "center",
     marginBottom: 20,
     resizeMode: "contain",

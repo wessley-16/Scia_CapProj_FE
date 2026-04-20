@@ -1,13 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams } from "expo-router";
-import React from "react";
-import { Image, ImageBackground, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Animated, Dimensions, Image, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-const background = require("../../assets/images/Monochrome.jpg");
+  const background = require("../../assets/images/Monochrome.jpg");
 
 export default function account() {
   const params = useLocalSearchParams();
+
+  /* ---------------- NOTIFICATION ---------------- */
+  const [showNotif, setShowNotif] = useState(false);
+
+  const screenWidth = Dimensions.get("window").width;
+  const slideAnim = useState(new Animated.Value(screenWidth))[0];
+
+  const toggleNotification = () => {
+    if (showNotif) {
+      // CLOSE
+      Animated.timing(slideAnim, {
+        toValue: screenWidth,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setShowNotif(false));
+    } else {
+      setShowNotif(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
   return (
     <SafeAreaView style={styles.safeArea}>
       <ImageBackground
@@ -22,12 +46,15 @@ export default function account() {
       >
         {/* SCID SECTION */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Account Page</Text>
+            <Text style={styles.headerTitle}>Profile Page</Text>
 
-            <View style={styles.bellButton}>
-              <Ionicons name="notifications" size={28} color="#2356E1" />
-              <View style={styles.notificationDot} />
-            </View>
+            <TouchableOpacity onPress={toggleNotification}>
+                <Ionicons
+                  name={showNotif ? "close" : "notifications"}
+                  size={26}
+                  color="#2356E1"
+                />
+            </TouchableOpacity>
           </View>
           
           <View style={styles.detailsContainer}>
@@ -60,6 +87,31 @@ export default function account() {
             />
           </View>
       </ScrollView>
+
+      {showNotif && (
+        <>
+          {/* DARK OVERLAY */}
+            <TouchableOpacity
+              style={styles.overlay}
+              activeOpacity={1}
+              onPress={toggleNotification}
+            />
+      
+          {/* SLIDING PANEL */}
+          <Animated.View style={[ styles.notificationPanel,{ transform: [{ translateX: slideAnim }] },]}>
+            <TouchableOpacity
+               style={styles.notifBtn}
+               onPress={toggleNotification}
+            >
+              <Ionicons name="close" size={28} color="#2356E1" />
+             </TouchableOpacity>
+      
+             <Text style={{ fontSize: 20, fontWeight: "bold" }}>
+              Notifications
+            </Text>
+           </Animated.View>
+         </>
+       )}
       </ImageBackground>
     </SafeAreaView>
   );
@@ -94,21 +146,33 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  bellButton: {
-    position: "relative",
-    padding: 4,
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.3)",
   },
 
-  notificationDot: {
+  notificationPanel: {
     position: "absolute",
-    top: 4,
-    right: 6,
-    width: 10,
-    height: 10,
-    backgroundColor: "#CE2029",
-    borderRadius: 5,
-    borderWidth: 1.5,
-    borderColor: "#F4F6F9",
+    top: 0,
+    right: 0,
+    height: "100%",
+    width: "80%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 30,
+    padding: 20,
+    elevation: 10,
+    zIndex: 10,
+  },
+
+  notifBtn: {
+    position: "absolute",
+    top: 20,
+    right: 15,
+    zIndex: 11,
   },
 
   detailsContainer: {

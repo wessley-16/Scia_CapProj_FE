@@ -9,6 +9,8 @@ import React, { useCallback, useState } from "react";
 
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import {
+  Animated,
+  Dimensions,
   Image,
   ImageBackground,
   ScrollView,
@@ -88,6 +90,30 @@ export default function Home() {
       ? { uri: params.image }
       : { uri: "https://via.placeholder.com/150" };
 
+  /* ---------------- NOTIFICATION ---------------- */
+  const [showNotif, setShowNotif] = useState(false);
+
+  const screenWidth = Dimensions.get("window").width;
+  const slideAnim = useState(new Animated.Value(screenWidth))[0];
+
+  const toggleNotification = () => {
+    if (showNotif) {
+      // CLOSE
+      Animated.timing(slideAnim, {
+        toValue: screenWidth,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setShowNotif(false));
+    } else {
+      setShowNotif(true);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  };
+
   /* ---------------- UI ---------------- */
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
@@ -125,7 +151,13 @@ export default function Home() {
             </View>
           </View>
 
-          <Ionicons name="notifications" size={26} color="#2356E1" />
+          <TouchableOpacity onPress={toggleNotification}>
+            <Ionicons
+              name={showNotif ? "close" : "notifications"}
+              size={26}
+              color="#2356E1"
+            />
+          </TouchableOpacity>
         </View>
 
         {/* PROGRAMS */}
@@ -257,6 +289,31 @@ export default function Home() {
       >
         <Ionicons name="chatbubble" size={26} color="#fff" />
       </TouchableOpacity>
+
+      {showNotif && (
+        <>
+          {/* DARK OVERLAY */}
+            <TouchableOpacity
+              style={styles.overlay}
+              activeOpacity={1}
+              onPress={toggleNotification}
+            />
+
+          {/* SLIDING PANEL */}
+          <Animated.View style={[ styles.notificationPanel,{ transform: [{ translateX: slideAnim }] },]}>
+            <TouchableOpacity
+              style={styles.notifBtn}
+              onPress={toggleNotification}
+            >
+              <Ionicons name="close" size={28} color="#2356E1" />
+            </TouchableOpacity>
+
+            <Text style={{ fontSize: 20, fontWeight: "bold" }}>
+              Notifications
+            </Text>
+          </Animated.View>
+        </>
+      )}
       </ImageBackground>
     </SafeAreaView>
   );
@@ -349,7 +406,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 18,
     marginHorizontal: 10,
-    marginVertical: 50,
+    marginTop: 100,
   },
 
   moduleContainer: {
@@ -426,8 +483,37 @@ const styles = StyleSheet.create({
     borderRadius: 30,
   },
 
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+
+  notificationPanel: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    height: "100%",
+    width: "80%",
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 30,
+    padding: 20,
+    elevation: 10,
+    zIndex: 10,
+  },
+
+  notifBtn: {
+    position: "absolute",
+    top: 20,
+    right: 15,
+    zIndex: 11,
+  },
+
   progLabel: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: "bold",
     color: "white",
     marginBottom: 6,
