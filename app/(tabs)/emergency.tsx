@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
@@ -20,39 +21,39 @@ const HOLD_DURATION_MS = 5000;
 
 // Barangays (same as yours)
 const valenzuelaBarangays = [
-  { name: 'Bagbaguin', lat: 14.7046, lng: 120.9946 },
-  { name: 'Balangkas', lat: 14.6945, lng: 120.9820 },
-  { name: 'Bignay', lat: 14.7068, lng: 120.9925 },
-  { name: 'Bisig', lat: 14.7170, lng: 120.9810 },
-  { name: 'Canumay East', lat: 14.6935, lng: 120.9795 },
-  { name: 'Canumay West', lat: 14.6929, lng: 120.9764 },
-  { name: 'Coloong', lat: 14.7190, lng: 120.9802 },
-  { name: 'Dalandanan', lat: 14.7010, lng: 120.9835 },
-  { name: 'Gen. T. de Leon', lat: 14.7057, lng: 120.9863 },
-  { name: 'Gen. Pio Valenzuela', lat: 14.7008, lng: 120.9825 },
-  { name: 'Isla', lat: 14.6931, lng: 120.9972 },
-  { name: 'Karuhatan', lat: 14.7029, lng: 120.9984 },
-  { name: 'Lawang Bato', lat: 14.7058, lng: 120.9981 },
-  { name: 'Lingunan', lat: 14.7033, lng: 120.9841 },
-  { name: 'Mabolo', lat: 14.6958, lng: 120.9900 },
-  { name: 'Malanday', lat: 14.7165, lng: 120.9830 },
-  { name: 'Malinta', lat: 14.7014, lng: 120.9769 },
-  { name: 'Mapulang Lupa', lat: 14.7074, lng: 120.9973 },
-  { name: 'Marulas', lat: 14.7164, lng: 120.9911 },
-  { name: 'Maysan', lat: 14.7198, lng: 120.9969 },
-  { name: 'Palasan', lat: 14.6985, lng: 120.9905 },
-  { name: 'Parada', lat: 14.7050, lng: 120.9790 },
-  { name: 'Pariancillo Villa', lat: 14.7005, lng: 120.9877 },
-  { name: 'Paso de Blas', lat: 14.7302, lng: 120.9910 },
-  { name: 'Pasolo', lat: 14.7125, lng: 120.9785 },
-  { name: 'Poblacion', lat: 14.7007, lng: 120.9859 },
-  { name: 'Polo', lat: 14.7256, lng: 120.9824 },
-  { name: 'Punturin', lat: 14.7284, lng: 120.9866 },
-  { name: 'Rincon', lat: 14.7085, lng: 120.9788 },
-  { name: 'Tagalag', lat: 14.7308, lng: 120.9872 },
-  { name: 'Ugong', lat: 14.7200, lng: 120.9947 },
-  { name: 'Veinte Reales', lat: 14.7061, lng: 120.9882 },
-  { name: 'Wawang Pulo', lat: 14.7177, lng: 120.9854 },
+  { name: 'Bagbaguin', lat: 14.7365, lng: 120.9920 },
+  { name: 'Balangkas', lat: 14.7015, lng: 120.9790 },
+  { name: 'Bignay', lat: 14.7250, lng: 120.9980 },
+  { name: 'Bisig', lat: 14.7160, lng: 120.9785 },
+  { name: 'Canumay East', lat: 14.7095, lng: 120.9925 },
+  { name: 'Canumay West', lat: 14.7065, lng: 120.9880 },
+  { name: 'Coloong', lat: 14.7205, lng: 120.9780 },
+  { name: 'Dalandanan', lat: 14.7035, lng: 120.9825 },
+  { name: 'Gen. T. de Leon', lat: 14.7120, lng: 120.9870 },
+  { name: 'Gen. Pio Valenzuela', lat: 14.7040, lng: 120.9850 },
+  { name: 'Isla', lat: 14.6945, lng: 120.9950 },
+  { name: 'Karuhatan', lat: 14.7055, lng: 120.9890 },
+  { name: 'Lawang Bato', lat: 14.7155, lng: 120.9975 },
+  { name: 'Lingunan', lat: 14.7060, lng: 120.9830 },
+  { name: 'Mabolo', lat: 14.6995, lng: 120.9905 },
+  { name: 'Malanday', lat: 14.7190, lng: 120.9820 },
+  { name: 'Malinta', lat: 14.7045, lng: 120.9785 },
+  { name: 'Mapulang Lupa', lat: 14.7135, lng: 120.9965 },
+  { name: 'Marulas', lat: 14.7145, lng: 120.9915 },
+  { name: 'Maysan', lat: 14.7195, lng: 120.9950 },
+  { name: 'Palasan', lat: 14.7005, lng: 120.9915 },
+  { name: 'Parada', lat: 14.7085, lng: 120.9805 },
+  { name: 'Pariancillo Villa', lat: 14.7030, lng: 120.9865 },
+  { name: 'Paso de Blas', lat: 14.7290, lng: 120.9930 },
+  { name: 'Pasolo', lat: 14.7110, lng: 120.9795 },
+  { name: 'Poblacion', lat: 14.7080, lng: 120.9860 },
+  { name: 'Polo', lat: 14.7245, lng: 120.9835 },
+  { name: 'Punturin', lat: 14.7270, lng: 120.9875 },
+  { name: 'Rincon', lat: 14.7095, lng: 120.9795 },
+  { name: 'Tagalag', lat: 14.7320, lng: 120.9880 },
+  { name: 'Ugong', lat: 14.7205, lng: 120.9935 },
+  { name: 'Veinte Reales', lat: 14.7075, lng: 120.9895 },
+  { name: 'Wawang Pulo', lat: 14.7185, lng: 120.9845 },
 ];
 
 const getBarangayFromCoords = (lat: number, lng: number): string => {
@@ -67,6 +68,8 @@ const getBarangayFromCoords = (lat: number, lng: number): string => {
 export default function EmergencyScreen() {
   const [location, setLocation] = useState<any>(null);
   const [destination, setDestination] = useState<any>(null);
+
+  const [name, setName] = useState("");
 
   const [fullAddress, setFullAddress] = useState('Fetching...');
   const [barangay, setBarangay] = useState('');
@@ -84,7 +87,16 @@ export default function EmergencyScreen() {
     fetchLocation();
   }, []);
 
-  // 🚑 Simulate responder moving toward user
+  useEffect(() => {
+    const loadName = async () => {
+      const storedName = await AsyncStorage.getItem("userName");
+      setName(storedName || "Unknown");
+    };
+
+    loadName();
+  }, []);
+
+  // Simulate responder moving toward user
   useEffect(() => {
     let interval: any;
 
@@ -115,7 +127,7 @@ export default function EmergencyScreen() {
 
     setLocation(coords);
 
-    // 🚑 Set initial responder (far away)
+    // Set initial responder (far away)
     setDestination({
       latitude: coords.latitude + 0.02,
       longitude: coords.longitude + 0.02,
@@ -129,6 +141,7 @@ export default function EmergencyScreen() {
     }
   };
 
+  // SOS button handlers
   const startHold = () => {
     setIsHolding(true);
     setSecondsLeft(5);
@@ -158,8 +171,41 @@ export default function EmergencyScreen() {
     clearInterval(countdownInterval.current);
   };
 
-  const triggerSOS = () => {
-    Alert.alert('SOS Sent', 'Responder is on the way!');
+  const triggerSOS = async () => {
+    if (!location) {
+      Alert.alert("Location not ready yet");
+      return;
+    }
+
+    try {
+      const response = await fetch("http://10.174.101.153:3000/api/emergency/send-sms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          address: fullAddress,
+          barangay: barangay,
+          emergencyType:
+            selectedEmergency === "Other"
+              ? otherEmergency
+              : selectedEmergency,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert("SOS Sent", "Responder has been notified!");
+      } else {
+        Alert.alert("Error", data.error || "Failed to send SOS");
+      }
+    } catch (error) {
+      Alert.alert("Network Error", "Cannot connect to server.");
+    }
   };
 
   const rotate = progress.interpolate({
@@ -238,7 +284,7 @@ export default function EmergencyScreen() {
 
         {/* INFO */}
         <View style={styles.infoCard}>
-          <Text>Name: Maria S. Santos</Text>
+          <Text>Name: {name}</Text>
           <Text>Address: {fullAddress}</Text>
           <Text>Barangay: {barangay}</Text>
           <Text>

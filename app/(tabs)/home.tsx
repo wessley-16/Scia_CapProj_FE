@@ -29,7 +29,18 @@ export default function Home() {
   const params = useLocalSearchParams();
   const tabBarHeight = useBottomTabBarHeight();
 
+  const loadProfileImage = async () => {
+  const img = await AsyncStorage.getItem("profileImage");
+
+    if (img) {
+      setAvatarSource({ uri: img });
+    }
+  };
+
   const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
+  const [avatarSource, setAvatarSource] = useState<any>(
+    require("../../assets/images/default-profile.png")
+  );
 
   /* ---------------- NAVIGATION ---------------- */
   const goToChat = () => router.push("/(tabs)/chatbot");
@@ -67,7 +78,8 @@ export default function Home() {
   useFocusEffect(
     useCallback(() => {
       loadNextMedicine();
-    }, [loadNextMedicine])
+      loadProfileImage();
+    }, [])
   );
 
   /* ---------------- HELPERS ---------------- */
@@ -84,11 +96,6 @@ export default function Home() {
         medicine.interval * 60 * 60 * 1000
     );
   };
-
-  const avatarSource =
-    typeof params.image === "string"
-      ? { uri: params.image }
-      : { uri: "https://via.placeholder.com/150" };
 
   /* ---------------- NOTIFICATION ---------------- */
   const [showNotif, setShowNotif] = useState(false);
@@ -131,7 +138,7 @@ export default function Home() {
       >
         {/* HEADER */}
         <View style={styles.header}>
-          <Image source={avatarSource} style={styles.avatar} />
+          <Image source={avatarSource} style={styles.avatar} onError={() => setAvatarSource(require("../../assets/images/default-profile.png"))} />
 
           <View style={styles.headerText}>
             <Text style={styles.greeting}>Magandang Araw Po,</Text>

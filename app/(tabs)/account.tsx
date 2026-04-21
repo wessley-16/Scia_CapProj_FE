@@ -1,13 +1,31 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { File } from 'expo-file-system';
+import * as FileSystem from "expo-file-system/legacy";
+import * as ImagePicker from "expo-image-picker";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useState } from "react";
 import { Animated, Dimensions, Image, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
   const background = require("../../assets/images/Monochrome.jpg");
 
 export default function account() {
+  const [profileImage, setProfileImage] = useState<string | null>(null);
   const params = useLocalSearchParams();
+
+  const loadProfileImage = useCallback(async () => {
+    const img = await AsyncStorage.getItem("profileImage");
+    if (img) {
+      setProfileImage(img);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfileImage();
+    }, [loadProfileImage])
+  );
 
   /* ---------------- NOTIFICATION ---------------- */
   const [showNotif, setShowNotif] = useState(false);
@@ -32,6 +50,45 @@ export default function account() {
       }).start();
     }
   };
+
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      alert("Permission required to access gallery");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+
+      // Check if documentDirectory is available
+      if (!FileSystem.documentDirectory) {
+        alert("Unable to access app directory");
+        return;
+      }
+
+      // Copy the image to app's document directory for persistence
+      const filename = uri.split('/').pop();
+      const newUri = FileSystem.documentDirectory + filename;
+      const sourceFile = new File(uri);
+      const destinationFile = new File(newUri);
+      await sourceFile.copy(destinationFile);
+
+      setProfileImage(newUri);
+
+      // Save to storage
+      await AsyncStorage.setItem("profileImage", newUri);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ImageBackground
@@ -56,26 +113,44 @@ export default function account() {
                 />
             </TouchableOpacity>
           </View>
-          
-          <View style={styles.detailsContainer}>
-            <Text style={styles.label}>Name:</Text>
-            <Text style={styles.value}>{params.firstName} {params.midName} {params.lastName || "N/A"}</Text>
 
-            <Text style={styles.label}>Senior Citizen ID:</Text>
-            <Text style={styles.value}>{params.idNumber || "N/A"}</Text>
+          <View style={styles.topSection}>
+            {/* DETAILS */}
+            <View style={styles.detailsContainer}>
+              <Text style={styles.label}>Name:</Text>
+              <Text style={styles.value}>{params.firstName} {params.midName} {params.lastName || "N/A"}</Text>
 
-            <Text style={styles.label}>Address:</Text>
-            <Text style={styles.value}>{params.address || "N/A"}</Text>
+              <Text style={styles.label}>Senior Citizen ID:</Text>
+              <Text style={styles.value}>{params.idNumber || "N/A"}</Text>
 
-            <Text style={styles.label}>Contact Number:</Text>
-            <Text style={styles.value}>{params.conNumber || "N/A"}</Text>
+              <Text style={styles.label}>Address:</Text>
+              <Text style={styles.value}>{params.address || "N/A"}</Text>
 
-            <Text style={styles.label}>Date of Birth:</Text>
-            <Text style={styles.value}>{params.dob || "N/A"}</Text>
+              <Text style={styles.label}>Contact Number:</Text>
+              <Text style={styles.value}>{params.conNumber || "N/A"}</Text>
 
-            <Text style={styles.label}>Gender:</Text>
-            <Text style={styles.value}>{params.gender || "N/A"}</Text>
+              <Text style={styles.label}>Date of Birth:</Text>
+              <Text style={styles.value}>{params.dob || "N/A"}</Text>
 
+              <Text style={styles.label}>Gender:</Text>
+              <Text style={styles.value}>{params.gender || "N/A"}</Text>
+            </View>
+
+            {/* PROFILE IMAGE */}
+            <TouchableOpacity onPress={pickImage} style={styles.imageContainer}>
+              <Image
+                source={
+                  profileImage
+                    ? { uri: profileImage }
+                    : require("../../assets/images/default-profile.png") // fallback image
+                }
+                style={styles.profileImage}
+                onError={() => setProfileImage(null)}
+              />
+              <Text style={{ fontSize: 16, marginTop: 10, color: "#000" }}>
+                Change Profile Pic
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* QR CODE SECTION */}
@@ -146,6 +221,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  topSection: {
+    flexDirection: "row",
+  },
+
   overlay: {
     position: "absolute",
     top: 0,
@@ -196,15 +275,14 @@ const styles = StyleSheet.create({
 
   imageContainer: {
     alignItems: "center",
+    marginHorizontal: 20,
   },
 
   profileImage: {
     width: 150,
     height: 150,
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: "black",
-    backgroundColor: "#D1D5DB",
+    borderRadius: 75,
+    padding: 20,
   },
 
   qrCodeSection: {
