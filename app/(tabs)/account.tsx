@@ -5,7 +5,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Animated, Dimensions, Image, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Animated, Dimensions, Image, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
   const background = require("../../assets/images/Monochrome.jpg");
@@ -51,6 +51,7 @@ export default function account() {
     }
   };
 
+   /* ---------------- IMAGE PICKER ---------------- */
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -87,6 +88,36 @@ export default function account() {
       // Save to storage
       await AsyncStorage.setItem("profileImage", newUri);
     }
+  };
+
+  /* ---------------- IMAGE REMOVER ---------------- */
+  const deleteProfileImage = async () => {
+  if (!profileImage) return;
+    Alert.alert(
+      "Remove Profile Picture",
+      "Are you sure you want to delete your profile picture?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // delete file from storage
+              await FileSystem.deleteAsync(profileImage, { idempotent: true });
+
+              // remove from AsyncStorage
+              await AsyncStorage.removeItem("profileImage");
+
+              // reset state
+              setProfileImage(null);
+            } catch (error) {
+              console.log("Delete error:", error);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -137,20 +168,30 @@ export default function account() {
             </View>
 
             {/* PROFILE IMAGE */}
-            <TouchableOpacity onPress={pickImage} style={styles.imageContainer}>
-              <Image
-                source={
-                  profileImage
-                    ? { uri: profileImage }
-                    : require("../../assets/images/default-profile.png") // fallback image
-                }
-                style={styles.profileImage}
-                onError={() => setProfileImage(null)}
-              />
+            <View style={styles.imageContainer}>
+              <TouchableOpacity onPress={pickImage}>
+                <Image
+                  source={
+                    profileImage
+                      ? { uri: profileImage }
+                      : require("../../assets/images/default-profile.png")
+                  }
+                  style={styles.profileImage}
+                  onError={() => setProfileImage(null)}
+                />
+              </TouchableOpacity>
+
               <Text style={{ fontSize: 16, marginTop: 10, color: "#000" }}>
-                Change Profile Pic
+                Change Picture
               </Text>
-            </TouchableOpacity>
+
+              {/* ✅ DELETE BUTTON */}
+              {profileImage && (
+                <TouchableOpacity onPress={deleteProfileImage}>
+                  <Text style={styles.deleteText}>Remove Picture</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* QR CODE SECTION */}
@@ -283,6 +324,13 @@ const styles = StyleSheet.create({
     height: 150,
     borderRadius: 75,
     padding: 20,
+  },
+
+  deleteText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#DC2626",
+    fontWeight: "600",
   },
 
   qrCodeSection: {

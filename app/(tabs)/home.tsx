@@ -1,5 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BlurView } from "expo-blur";
 import {
   useFocusEffect,
   useLocalSearchParams,
@@ -50,6 +51,34 @@ export default function Home() {
   const goToEmergency = () => router.push("/(tabs)/emergency");
   const goToDocs = () => router.push("/(tabs)/govdocs");
 
+  /* ---------------- PROGRAM ---------------- */
+  const [isProgramOpen, setIsProgramOpen] = useState(false);
+  const animatedHeight = useState(new Animated.Value(0))[0];
+  const animatedOpacity = useState(new Animated.Value(0))[0];
+  const rotateAnim = useState(new Animated.Value(0))[0];
+
+  const toggleProgram = () => {
+    Animated.parallel([
+      Animated.timing(animatedHeight, {
+        toValue: isProgramOpen ? 0 : 150,
+        duration: 250,
+        useNativeDriver: false,
+      }),
+      Animated.timing(animatedOpacity, {
+        toValue: isProgramOpen ? 0 : 1,
+        duration: 250,
+        useNativeDriver: false,
+      }),
+      Animated.timing(rotateAnim, {
+        toValue: isProgramOpen ? 0 : 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setIsProgramOpen(!isProgramOpen);
+  };
+
   /* ---------------- LOAD MEDICINE ---------------- */
   const loadNextMedicine = useCallback(async () => {
     try {
@@ -79,7 +108,7 @@ export default function Home() {
     useCallback(() => {
       loadNextMedicine();
       loadProfileImage();
-    }, [])
+    }, [loadProfileImage, loadNextMedicine])
   );
 
   /* ---------------- HELPERS ---------------- */
@@ -168,21 +197,49 @@ export default function Home() {
         </View>
 
         {/* PROGRAMS */}
-        <View style={styles.programContainer}>
-          <Text style={styles.progLabel}>What : </Text>
-          <Text style={styles.progLabel}>When : </Text>
-          <Text style={styles.progLabel}>Where : </Text>
-          <Text style={styles.progLabel}></Text>
+        <BlurView intensity={40} tint="dark" style={styles.programContainer}>
+          {/* HEADER (clickable) */}
+          <TouchableOpacity onPress={toggleProgram} style={styles.programHeader}>
+            <Text style={styles.programTitle}>LGU Program Updates</Text>
 
-          <View style={styles.joinFunction}>
-             {/* lalagyan nalang ng functin pag okay na admin it: onPress={() => router.push("/(tabs)/programs")}*/}
-            <TouchableOpacity style={styles.joinButton}>
-              <Text style={{ fontSize: 18, color: "white" }}>
-                Join
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: rotateAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0deg", "180deg"],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Ionicons name="chevron-down" size={20} color="#fff" />
+            </Animated.View>
+          </TouchableOpacity>
+
+          {/* COLLAPSIBLE CONTENT */}
+          <Animated.View
+            style={{
+              height: animatedHeight,
+              opacity: animatedOpacity,
+              overflow: "hidden",
+            }}
+          >
+
+            <View>
+              <Text style={styles.programLabel}>What : </Text>
+              <Text style={styles.programLabel}>When : </Text>
+              <Text style={styles.programLabel}>Where : </Text>
+
+              <View style={styles.joinFunction}>
+                <TouchableOpacity style={styles.joinButton}>
+                  <Text style={{ fontSize: 18, color: "white" }}>Join</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+        </BlurView>
 
         <View style={styles.assistantContainer}>
           {/* CHAT ASSISTANT */}
@@ -410,9 +467,8 @@ const styles = StyleSheet.create({
 
   programContainer: {
     flexDirection: "column",
-    padding: 12,
-    borderRadius: 18,
-    marginHorizontal: 10,
+    padding: 16,
+    marginHorizontal: 0,
     marginTop: 100,
   },
 
@@ -519,11 +575,31 @@ const styles = StyleSheet.create({
     zIndex: 11,
   },
 
-  progLabel: {
-    fontSize: 20,
+  programHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  programTitle: {
+    fontSize: 24,
     fontWeight: "bold",
-    color: "white",
+    color: "#ffffff",
     marginBottom: 6,
+    // subtle glow for readability
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 3,
+  },
+
+  programLabel: {
+    fontSize: 20,
+    color: "#ffffff",
+    marginBottom: 6,
+    // subtle glow for readability
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 3,
   },
 
   joinFunction: {

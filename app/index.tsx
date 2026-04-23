@@ -60,32 +60,6 @@ export default function Index() {
     }
   };
 
-  /* Admin login function */
-  const ADMIN_CREDENTIALS = [
-    { username: "001", password: "osca111" },
-    { username: "023", password: "ling123" },
-    { username: "024", password: "gent124" },
-  ];
-
-  const handleAdminLogin = () => {
-    if (!idnum || !password) {
-      Alert.alert("Error", "Enter admin username and password.");
-      return;
-    }
-
-    const match = ADMIN_CREDENTIALS.find(
-      (admin) =>
-        admin.username === idnum && admin.password === password
-    );
-
-    if (match) {
-      Alert.alert("Success", "Admin login successful!");
-      router.replace("/(admin)/dashboard");
-    } else {
-      Alert.alert("Error", "Invalid admin credentials.");
-    }
-  };
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -126,10 +100,6 @@ export default function Index() {
 
         <View style={styles.extra}>
           <Text style={styles.forgot}>Forgot Password</Text>
-
-          <TouchableOpacity onPress={handleAdminLogin}>
-            <Text style={styles.adminLogin}>Log in as Admin</Text>
-          </TouchableOpacity>
         </View>
 
       </View>
@@ -224,14 +194,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   
-  adminLogin: {
-    fontSize: 16,
-    color: "#2563EB",
-    textAlign: "right",
-    marginTop: 5,
-    fontWeight: "600",
-  },
-
   forgot: {
     fontSize: 16,
     color: "#000",
