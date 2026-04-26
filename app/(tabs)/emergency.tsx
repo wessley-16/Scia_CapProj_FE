@@ -15,6 +15,7 @@ import {
 import MapView, { Marker } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSettings } from '../../context/SettingsContext';
 
 const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"; // 🔴 PUT YOUR KEY HERE
 const HOLD_DURATION_MS = 5000;
@@ -66,6 +67,7 @@ const getBarangayFromCoords = (lat: number, lng: number): string => {
 };
 
 export default function EmergencyScreen() {
+  const { fontScale, t } = useSettings();
   const [location, setLocation] = useState<any>(null);
   const [destination, setDestination] = useState<any>(null);
 
@@ -216,13 +218,13 @@ export default function EmergencyScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.header}>🚨 EMERGENCY</Text>
+        <Text style={[styles.header, { fontSize: 28 * fontScale }]}>🚨 EMERGENCY</Text>
 
         {/* SOS BUTTON */}
         <View style={styles.sosWrapper}>
           <Animated.View style={[styles.ring, { transform: [{ rotate }] }]} />
           <Pressable onPressIn={startHold} onPressOut={stopHold} style={styles.sosButton}>
-            <Text style={styles.sosText}>
+            <Text style={[styles.sosText, { fontSize: 26 * fontScale }]}>
               {isHolding ? secondsLeft : "HOLD"}
             </Text>
           </Pressable>
@@ -260,22 +262,22 @@ export default function EmergencyScreen() {
         </View>
 
         {/* DROPDOWN */}
-        <Text style={styles.label}>Emergency Type</Text>
+        <Text style={[styles.label, { fontSize: 16 * fontScale }]}>{t("emergencyType")}</Text>
         <View style={styles.dropdown}>
           <Picker
             selectedValue={selectedEmergency}
             onValueChange={(val) => setSelectedEmergency(val)}
           >
-            <Picker.Item label="Fall" value="Fall" />
-            <Picker.Item label="Heart Attack" value="Heart Attack" />
-            <Picker.Item label="Stroke" value="Stroke" />
-            <Picker.Item label="Other" value="Other" />
+            <Picker.Item label={t("fall")} value="Fall" />
+            <Picker.Item label={t("heartAttack")} value="Heart Attack" />
+            <Picker.Item label={t("stroke")} value="Stroke" />
+            <Picker.Item label={t("other")} value="Other" />
           </Picker>
         </View>
 
         {selectedEmergency === 'Other' && (
           <TextInput
-            placeholder="Type emergency..."
+            placeholder={t("typeEmergency")}
             value={otherEmergency}
             onChangeText={setOtherEmergency}
             style={styles.input}
@@ -284,11 +286,11 @@ export default function EmergencyScreen() {
 
         {/* INFO */}
         <View style={styles.infoCard}>
-          <Text>Name: {name}</Text>
-          <Text>Address: {fullAddress}</Text>
-          <Text>Barangay: {barangay}</Text>
+          <Text>{t("infoName")} {name}</Text>
+          <Text>{t("infoAddress")} {fullAddress}</Text>
+          <Text>{t("infoBarangay")} {barangay}</Text>
           <Text>
-            Emergency: {selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}
+            {t("infoEmergency")} {selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}
           </Text>
         </View>
       </ScrollView>

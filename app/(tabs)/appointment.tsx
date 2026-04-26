@@ -1,15 +1,16 @@
 import { useState } from "react";
 import {
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSettings } from "../../context/SettingsContext";
 
 type AppointmentStatus = "scheduled" | "done" | "cancelled";
 
@@ -22,6 +23,7 @@ type AppointmentType = {
 };
 
 export default function Appointment() {
+  const { fontScale, t } = useSettings();
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [hospital, setHospital] = useState<string>("");
@@ -94,7 +96,7 @@ export default function Appointment() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <Text style={styles.headerTitle}>Schedule Appointment</Text>
+        <Text style={[styles.headerTitle, { fontSize: 24 * fontScale }]}>{t("scheduleAppointment")}</Text>
 
         <View style={styles.calendarWrapper}>
           <Calendar
@@ -109,8 +111,8 @@ export default function Appointment() {
 
         {selectedDate ? (
           <View style={styles.selectedDateContainer}>
-            <Text style={styles.selectedDateLabel}>Selected Date:</Text>
-            <Text style={styles.selectedDateText}>{selectedDate}</Text>
+            <Text style={[styles.selectedDateLabel, { fontSize: 16 * fontScale }]}>{t("selectedDate")}</Text>
+            <Text style={[styles.selectedDateText, { fontSize: 16 * fontScale }]}>{selectedDate}</Text>
           </View>
         ) : null}
 
@@ -121,7 +123,7 @@ export default function Appointment() {
             setErrorMessage("");
           }}
         >
-          <Text style={styles.addButtonText}>Book Appointment</Text>
+          <Text style={[styles.addButtonText, { fontSize: 16 * fontScale }]}>{t("bookAppointment")}</Text>
         </TouchableOpacity>
 
         {appointments.map((item, index) => (
@@ -134,10 +136,10 @@ export default function Appointment() {
             ]}
           >
             <View style={styles.appointmentHeader}>
-              <Text style={[styles.appointmentText, item.status === "done" && styles.appointmentTextDone]}>
+              <Text style={[styles.appointmentText, item.status === "done" && styles.appointmentTextDone, { fontSize: 16 * fontScale }]}>
                 {item.type}
               </Text>
-              {item.status === "done" ? <Text style={styles.doneIcon}>✓</Text> : null}
+              {item.status === "done" ? <Text style={[styles.doneIcon, { fontSize: 20 * fontScale }]}>✓</Text> : null}
             </View>
 
             <Text style={styles.appointmentSub}>
@@ -154,7 +156,7 @@ export default function Appointment() {
                   setAppointments(updated);
                 }}
               >
-                <Text style={styles.smallButtonText}>Done</Text>
+                <Text style={styles.smallButtonText}>{t("done")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -165,7 +167,7 @@ export default function Appointment() {
                   setAppointments(updated);
                 }}
               >
-                <Text style={styles.smallButtonText}>Cancel</Text>
+                <Text style={styles.smallButtonText}>{t("cancel")}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -174,10 +176,10 @@ export default function Appointment() {
         <Modal visible={modalVisible} animationType="slide" transparent>
           <View style={styles.modalBackground}>
             <View style={styles.modalContainer}>
-              <Text style={styles.modalTitle}>New Appointment</Text>
+              <Text style={[styles.modalTitle, { fontSize: 18 * fontScale }]}>{t("newAppointment")}</Text>
 
               <TextInput
-                placeholder="Hospital / Clinic"
+                placeholder={t("hospitalClinic")}
                 value={hospital}
                 onChangeText={setHospital}
                 style={styles.input}
@@ -185,16 +187,16 @@ export default function Appointment() {
 
               <View style={styles.timeRow}>
                 <TextInput
-                  placeholder="HH"
+                  placeholder={t("hhPlaceholder")}
                   value={hour}
                   onChangeText={(text) => setHour(text.replace(/[^0-9]/g, ""))}
                   style={[styles.input, styles.timeInput]}
                   keyboardType="number-pad"
                   maxLength={2}
                 />
-                <Text style={styles.timeSeparator}>:</Text>
+                <Text style={[styles.timeSeparator, { fontSize: 18 * fontScale }]}>:</Text>
                 <TextInput
-                  placeholder="MM"
+                  placeholder={t("mmPlaceholder")}
                   value={minute}
                   onChangeText={(text) => setMinute(text.replace(/[^0-9]/g, ""))}
                   style={[styles.input, styles.timeInput]}
@@ -218,7 +220,7 @@ export default function Appointment() {
               </View>
 
               <TextInput
-                placeholder="Type (Check-up, Consultation, Lab Test)"
+                placeholder={t("typePlaceholder")}
                 value={type}
                 onChangeText={setType}
                 style={styles.input}
@@ -231,14 +233,14 @@ export default function Appointment() {
               ) : null}
 
               <TouchableOpacity style={styles.saveButton} onPress={addAppointment}>
-                <Text style={styles.saveButtonText}>Save Appointment</Text>
+                <Text style={styles.saveButtonText}>{t("saveAppointment")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t("cancel")}</Text>
               </TouchableOpacity>
             </View>
           </View>

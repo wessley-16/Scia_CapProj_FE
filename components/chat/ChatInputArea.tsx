@@ -1,19 +1,20 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 interface ChatInputAreaProps {
   onSend: (message: string) => void;
   loading: boolean;
   onInputFocus?: () => void;
+  fontScale: number;
 }
 
 const suggestions = ["When is my next dose?", "Side effects of Metformin"];
@@ -22,6 +23,7 @@ export default function ChatInputArea({
   onSend,
   loading,
   onInputFocus,
+  fontScale,
 }: ChatInputAreaProps) {
   const [text, setText] = useState("");
 
@@ -36,7 +38,7 @@ export default function ChatInputArea({
     <View style={styles.container}>
       <View style={styles.inputContainer}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { fontSize: 15 * fontScale }]}
           placeholder="Type your health concern..."
           placeholderTextColor="#9ca3af"
           value={text}
@@ -89,7 +91,7 @@ export default function ChatInputArea({
             }}
             disabled={loading}
           >
-            <Text style={styles.suggestionText}>"{sugg}"</Text>
+            <Text style={[styles.suggestionText, { fontSize: 13 * fontScale }]}>"{sugg}"</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>

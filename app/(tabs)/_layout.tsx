@@ -130,6 +130,11 @@ export default function Layout() {
             options={{ href: null, tabBarStyle: { display: "none" } }}
           />
 
+          <Tabs.Screen
+            name="settings"
+            options={{ href: null, tabBarStyle: { display: "none" } }}
+          />
+
           <Tabs.Screen name="account" />
         </Tabs>
       </Host>

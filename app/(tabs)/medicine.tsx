@@ -2,22 +2,23 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
+import * as Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect, useRouter } from "expo-router";
-import * as Constants from "expo-constants";
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSettings } from "../../context/SettingsContext";
 import { Medicine } from "../../interfaces/interfaces";
 
 // Configure notifications behavior
@@ -30,6 +31,7 @@ Notifications.setNotificationHandler({
 });
 
 export default function medicine() {
+  const { fontScale, t } = useSettings();
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
@@ -328,21 +330,21 @@ export default function medicine() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.headerTitle}>Medicine Pill Box</Text>
+        <Text style={[styles.headerTitle, { fontSize: 24 * fontScale }]}>Medicine Pill Box</Text>
 
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => setModalVisible(true)}
         >
           <MaterialCommunityIcons name="plus" size={28} color="white" />
-          <Text style={styles.addButtonText}>Add Medicine</Text>
+          <Text style={[styles.addButtonText, { fontSize: 16 * fontScale }]}>Add Medicine</Text>
         </TouchableOpacity>
 
         {medicines.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="pill" size={60} color="#D1D5DB" />
-            <Text style={styles.emptyStateText}>No medicines added yet</Text>
-            <Text style={styles.emptyStateSubText}>
+            <Text style={[styles.emptyStateText, { fontSize: 18 * fontScale }]}>No medicines added yet</Text>
+            <Text style={[styles.emptyStateSubText, { fontSize: 14 * fontScale }]}>
               Add your first medicine to get started
             </Text>
           </View>
@@ -355,17 +357,17 @@ export default function medicine() {
             >
               <View style={styles.medicineContent}>
                 <View style={styles.medicineLeft}>
-                  <Text style={styles.medicineName}>{medicine.name}</Text>
-                  <Text style={styles.medicineDetails}>
+                  <Text style={[styles.medicineName, { fontSize: 20 * fontScale }]}>{medicine.name}</Text>
+                  <Text style={[styles.medicineDetails, { fontSize: 14 * fontScale }]}>
                     {formatDosage(medicine.dosage, medicine.dosageUnit)}
                   </Text>
-                  <Text style={styles.nextDoseText}>
+                  <Text style={[styles.nextDoseText, { fontSize: 12 * fontScale }]}>
                     Next: {getNextDoseTime(medicine)}
                   </Text>
                   <Text
                     style={[
                       styles.medicineDetails,
-                      { fontSize: 12, marginTop: 4, color: "#666" },
+                      { fontSize: 12 * fontScale, marginTop: 4, color: "#666" },
                     ]}
                   >
                     {getDurationText(medicine)}
@@ -406,34 +408,34 @@ export default function medicine() {
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>Add Medicine</Text>
+              <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>{t("addMedicine")}</Text>
 
-              <Text style={styles.label}>Medicine Name</Text>
+              <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("medicineName")}</Text>
               <TextInput
-                placeholder="e.g., Blood Pressure Medicine"
+                placeholder={t("medicineNamePlaceholder")}
                 value={medicineName}
                 onChangeText={setMedicineName}
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Description / Purpose (Optional)</Text>
+              <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("descriptionPurpose")}</Text>
               <TextInput
-                placeholder="e.g., Take after meals"
+                placeholder={t("descriptionPlaceholder")}
                 value={description}
                 onChangeText={setDescription}
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Dosage</Text>
+              <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("dosage")}</Text>
               <TextInput
-                placeholder="e.g., 1, 500"
+                placeholder={t("dosagePlaceholder")}
                 value={dosage}
                 onChangeText={setDosage}
                 keyboardType="decimal-pad"
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Unit</Text>
+              <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("unit")}</Text>
               <View style={styles.pickerContainer}>
                 <Picker
                   selectedValue={dosageUnit}
@@ -446,9 +448,9 @@ export default function medicine() {
                 </Picker>
               </View>
 
-              <Text style={styles.label}>Interval (hours)</Text>
+              <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("intervalHours")}</Text>
               <TextInput
-                placeholder="e.g., 8"
+                placeholder={t("intervalPlaceholder")}
                 value={interval}
                 onChangeText={setInterval}
                 keyboardType="number-pad"
@@ -456,7 +458,7 @@ export default function medicine() {
               />
 
               <TouchableOpacity style={styles.saveButton} onPress={addMedicine}>
-                <Text style={styles.saveButtonText}>Save & Schedule</Text>
+                <Text style={[styles.saveButtonText, { fontSize: 16 * fontScale }]}>{t("saveSchedule")}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -466,7 +468,7 @@ export default function medicine() {
                   resetForm();
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { fontSize: 16 * fontScale }]}>Cancel</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -479,17 +481,17 @@ export default function medicine() {
           <View style={styles.modalContainer}>
             {selectedMedicine && (
               <>
-                <Text style={styles.modalTitle}>{selectedMedicine.name}</Text>
+                <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>{selectedMedicine.name}</Text>
 
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Description:</Text>
+                  <Text style={[styles.detailLabel, { fontSize: 14 * fontScale }]}>{t("descriptionLabel")}</Text>
                   <Text style={styles.detailValue}>
-                    {selectedMedicine.description || "No description provided"}
+                    {selectedMedicine.description || t("noDescriptionProvided")}
                   </Text>
                 </View>
 
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Dosage:</Text>
+                  <Text style={[styles.detailLabel, { fontSize: 14 * fontScale }]}>{t("dosageLabel")}</Text>
                   <Text style={styles.detailValue}>
                     {formatDosage(
                       selectedMedicine.dosage,
@@ -499,7 +501,7 @@ export default function medicine() {
                 </View>
 
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Schedule:</Text>
+                  <Text style={[styles.detailLabel, { fontSize: 14 * fontScale }]}>{t("scheduleLabel")}</Text>
                   <Text style={styles.detailValue}>
                     Every {selectedMedicine.interval} hours
                   </Text>
@@ -516,7 +518,7 @@ export default function medicine() {
                     },
                   ]}
                 >
-                  <Text style={[styles.detailLabel, { color: "#2563EB" }]}>
+                  <Text style={[styles.detailLabel, { fontSize: 14 * fontScale, color: "#2563EB" }]}>
                     Next Dose:
                   </Text>
                   <Text
@@ -536,14 +538,14 @@ export default function medicine() {
                   ]}
                   onPress={takeMedicineNow}
                 >
-                  <Text style={styles.saveButtonText}>Mark as Taken Now</Text>
+                  <Text style={[styles.saveButtonText, { fontSize: 16 * fontScale }]}>{t("markTakenNow")}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.cancelButton}
                   onPress={() => setDetailsModalVisible(false)}
                 >
-                  <Text style={styles.cancelButtonText}>Close</Text>
+                  <Text style={[styles.cancelButtonText, { fontSize: 16 * fontScale }]}>{t("close")}</Text>
                 </TouchableOpacity>
               </>
             )}

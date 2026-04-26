@@ -2,18 +2,20 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSettings } from "../../context/SettingsContext";
 import { useLiveVoice } from "../../hooks/useLiveVoice";
 
 export default function Voice() {
   const router = useRouter();
+  const { t } = useSettings();
   const [prompt, setPrompt] = useState("");
   const {
     status,
@@ -36,16 +38,16 @@ export default function Voice() {
     status === "connected" || status === "responding" || isRecording;
 
   const liveStatusLabel = isRecording
-    ? "Recording your voice..."
+    ? t("liveRecording")
     : status === "connecting"
-      ? "Connecting to Gemini Live..."
+      ? t("connectingStatus")
       : status === "connected"
-        ? "Connected"
+        ? t("connectedStatus")
         : status === "responding"
-          ? "Gemini is responding..."
+          ? t("respondingStatus")
           : status === "error"
-            ? "Connection error"
-            : "Not connected";
+            ? t("connectionErrorStatus")
+            : t("notConnectedStatus");
 
   const toggleListening = async () => {
     if (!isConnected) {
@@ -78,7 +80,7 @@ export default function Voice() {
         >
           <Ionicons name="close" size={28} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Voice Assistant</Text>
+        <Text style={styles.headerTitle}>{t("voiceAssistant")}</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -91,7 +93,7 @@ export default function Voice() {
             color="#2356E1"
           />
           <Text style={styles.aiGreeting}>
-            {isListening ? "Live session active" : "How can I help you today?"}
+            {isListening ? t("liveSessionActive") : t("howCanIHelp")}
           </Text>
           <Text style={styles.statusText}>{liveStatusLabel}</Text>
           <View style={styles.connectionButtonsRow}>
@@ -105,7 +107,7 @@ export default function Voice() {
               onPress={isConnected ? disconnect : connect}
             >
               <Text style={styles.connectionButtonText}>
-                {isConnected ? "Disconnect" : "Connect"}
+                {isConnected ? t("disconnect") : t("connect")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -121,20 +123,19 @@ export default function Voice() {
         {/* TRANSCRIPT CARD */}
         <View style={styles.transcriptCard}>
           <Text style={[styles.transcriptLabel, styles.transcriptLabelUser]}>
-            Input transcript
+            {t("inputTranscriptLabel")}
           </Text>
           <Text
             style={[styles.transcriptText, isListening && styles.activeText]}
           >
-            {inputTranscript ||
-              "Connect and start speaking or send realtime text."}
+            {inputTranscript || t("connectAndSpeak")}
           </Text>
 
           <Text style={[styles.transcriptLabel, styles.transcriptLabelModel]}>
-            Model transcript
+            {t("modelTranscriptLabel")}
           </Text>
           <Text style={[styles.transcriptText, styles.modelTranscriptText]}>
-            {outputTranscript || "Gemini responses will appear here."}
+            {outputTranscript || t("geminiResponses")}
           </Text>
         </View>
 
@@ -142,7 +143,7 @@ export default function Voice() {
           <TextInput
             value={prompt}
             onChangeText={setPrompt}
-            placeholder="Send realtime text to Live API..."
+            placeholder={t("sendRealtimeTextPlaceholder")}
             placeholderTextColor="#9CA3AF"
             style={styles.promptInput}
             editable={isConnected}

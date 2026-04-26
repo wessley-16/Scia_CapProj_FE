@@ -12,9 +12,10 @@ interface ActionProps {
 
 interface ChatMessageBubbleProps {
   message: ChatMessage & { time?: string; actions?: ActionProps[] };
+  fontScale: number;
 }
 
-export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
+export default function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -33,7 +34,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
               color="white"
             />
           </View>
-          <Text style={styles.headerText}>
+          <Text style={[styles.headerText, { fontSize: 10 * fontScale }]}>
             HEALTHAI ASSISTANT • {message.time || "NOW"}
           </Text>
         </View>
@@ -41,7 +42,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
 
       {isUser && (
         <View style={[styles.header, styles.headerUser]}>
-          <Text style={styles.headerText}>
+          <Text style={[styles.headerText, { fontSize: 10 * fontScale }]}>
             YOU • {message.time || "2 MIN AGO"}
           </Text>
         </View>
@@ -50,7 +51,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
       <View
         style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble]}
       >
-        <Text style={[styles.text, isUser ? styles.userText : styles.botText]}>
+        <Text style={[styles.text, isUser ? styles.userText : styles.botText, { fontSize: 15 * fontScale, lineHeight: 22 * fontScale }]}>
           {message.text}
         </Text>
 
@@ -70,7 +71,7 @@ export default function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
                 <Text
                   style={[
                     styles.actionBtnText,
-                    { color: action.textColor || "#000" },
+                    { color: action.textColor || "#000", fontSize: 12 * fontScale },
                   ]}
                 >
                   {action.label}

@@ -1,13 +1,14 @@
 import React, { useCallback, useRef } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    FlatList,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
+import { useSettings } from "../context/SettingsContext";
 import { useChatbot } from "../hooks/useChatbot";
 import ChatHeader from "./chat/ChatHeader";
 import ChatInputArea from "./chat/ChatInputArea";
@@ -15,6 +16,7 @@ import ChatMessageBubble from "./chat/ChatMessageBubble";
 
 const AiChat = () => {
   const { messages, loading, sendMessage } = useChatbot();
+  const { fontScale } = useSettings();
   const flatListRef = useRef<FlatList>(null);
 
   const scrollToBottom = useCallback((animated = true) => {
@@ -57,13 +59,13 @@ const AiChat = () => {
       keyboardVerticalOffset={0} // Set to 0 because the Header is now inside
     >
       {/* Header is now inside the KeyboardAvoidingView */}
-      <ChatHeader />
+      <ChatHeader fontScale={fontScale} />
 
       <FlatList
         ref={flatListRef}
         data={displayMessages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ChatMessageBubble message={item} />}
+        renderItem={({ item }) => <ChatMessageBubble message={item} fontScale={fontScale} />}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -71,7 +73,7 @@ const AiChat = () => {
           loading ? (
             <View style={styles.typingContainer}>
               <ActivityIndicator size="small" color="#2b5ce6" />
-              <Text style={styles.typingText}>HealthAI is typing...</Text>
+              <Text style={[styles.typingText, { fontSize: 13 * fontScale }]}>HealthAI is typing...</Text>
             </View>
           ) : null
         }
@@ -83,6 +85,7 @@ const AiChat = () => {
         onSend={sendMessage}
         loading={loading}
         onInputFocus={() => scrollToBottom()}
+        fontScale={fontScale}
       />
     </KeyboardAvoidingView>
   );

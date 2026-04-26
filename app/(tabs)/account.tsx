@@ -3,16 +3,19 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { File } from 'expo-file-system';
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
-import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Alert, Animated, Dimensions, Image, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSettings } from "../../context/SettingsContext";
 
   const background = require("../../assets/images/Monochrome.jpg");
 
 export default function account() {
+  const { fontScale, t } = useSettings();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const params = useLocalSearchParams();
+  const router = useRouter();
 
   const loadProfileImage = useCallback(async () => {
     const img = await AsyncStorage.getItem("profileImage");
@@ -134,36 +137,41 @@ export default function account() {
       >
         {/* SCID SECTION */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Profile Page</Text>
+            <Text style={[styles.headerTitle, { fontSize: 24 * fontScale }]}>{t("profilePage")}</Text>
 
-            <TouchableOpacity onPress={toggleNotification}>
+            <View style={styles.headerIcons}>
+              <TouchableOpacity onPress={() => router.push("/settings")} style={styles.iconButton}>
+                <Ionicons name="settings" size={26} color="#2356E1" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleNotification} style={styles.iconButton}>
                 <Ionicons
                   name={showNotif ? "close" : "notifications"}
                   size={26}
                   color="#2356E1"
                 />
-            </TouchableOpacity>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.topSection}>
             {/* DETAILS */}
             <View style={styles.detailsContainer}>
-              <Text style={styles.label}>Name:</Text>
+              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("nameLabel")}</Text>
               <Text style={styles.value}>{params.firstName} {params.midName} {params.lastName || "N/A"}</Text>
 
-              <Text style={styles.label}>Senior Citizen ID:</Text>
+              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("seniorCitizenId")}</Text>
               <Text style={styles.value}>{params.idNumber || "N/A"}</Text>
 
-              <Text style={styles.label}>Address:</Text>
+              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("addressLabel")}</Text>
               <Text style={styles.value}>{params.address || "N/A"}</Text>
 
-              <Text style={styles.label}>Contact Number:</Text>
+              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("contactNumber")}</Text>
               <Text style={styles.value}>{params.conNumber || "N/A"}</Text>
 
-              <Text style={styles.label}>Date of Birth:</Text>
+              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("dobLabel")}</Text>
               <Text style={styles.value}>{params.dob || "N/A"}</Text>
 
-              <Text style={styles.label}>Gender:</Text>
+              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("genderLabel")}</Text>
               <Text style={styles.value}>{params.gender || "N/A"}</Text>
             </View>
 
@@ -181,14 +189,14 @@ export default function account() {
                 />
               </TouchableOpacity>
 
-              <Text style={{ fontSize: 16, marginTop: 10, color: "#000" }}>
-                Change Picture
+              <Text style={{ fontSize: 16 * fontScale, marginTop: 10, color: "#000" }}>
+                {t("changePicture")}
               </Text>
 
               {/* ✅ DELETE BUTTON */}
               {profileImage && (
                 <TouchableOpacity onPress={deleteProfileImage}>
-                  <Text style={styles.deleteText}>Remove Picture</Text>
+                  <Text style={[styles.deleteText, { fontSize: 16 * fontScale }]}>{t("removePicture")}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -196,7 +204,7 @@ export default function account() {
 
           {/* QR CODE SECTION */}
           <View style={styles.qrCodeSection}>
-            <Text style={styles.qrCodeTitle}>Senior Citizen ID QR Code</Text>
+            <Text style={[styles.qrCodeTitle, { fontSize: 24 * fontScale }]}>{t("qrCodeTitle")}</Text>
             <Image
               source={{ uri: "https://via.placeholder.com/250x250?text=QR+Code+Placeholder" }}
               style={styles.qrCodeImage}
@@ -222,8 +230,8 @@ export default function account() {
               <Ionicons name="close" size={28} color="#2356E1" />
              </TouchableOpacity>
       
-             <Text style={{ fontSize: 20, fontWeight: "bold" }}>
-              Notifications
+             <Text style={{ fontSize: 20 * fontScale, fontWeight: "bold" }}>
+              {t("notifications")}
             </Text>
            </Animated.View>
          </>
@@ -259,7 +267,15 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     color: "#1F2937",
-    marginBottom: 20,
+  },
+
+  headerIcons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+
+  iconButton: {
+    padding: 8,
   },
 
   topSection: {

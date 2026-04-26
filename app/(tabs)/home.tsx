@@ -14,13 +14,15 @@ import {
   Dimensions,
   Image,
   ImageBackground,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSettings } from "../../context/SettingsContext";
 import { Medicine } from "../../interfaces/interfaces";
 
 const background = require("../../assets/images/Foreground.png");
@@ -29,6 +31,8 @@ export default function Home() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const tabBarHeight = useBottomTabBarHeight();
+  const { fontScale, t } = useSettings();
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadProfileImage = async () => {
   const img = await AsyncStorage.getItem("profileImage");
@@ -111,6 +115,15 @@ export default function Home() {
     }, [loadProfileImage, loadNextMedicine])
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+
+    await loadProfileImage();
+    await loadNextMedicine();
+
+    setRefreshing(false);
+  }, [loadProfileImage, loadNextMedicine]);
+
   /* ---------------- HELPERS ---------------- */
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString([], {
@@ -164,14 +177,20 @@ export default function Home() {
           { paddingBottom: tabBarHeight },
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        }
       >
         {/* HEADER */}
         <View style={styles.header}>
           <Image source={avatarSource} style={styles.avatar} onError={() => setAvatarSource(require("../../assets/images/default-profile.png"))} />
 
           <View style={styles.headerText}>
-            <Text style={styles.greeting}>Magandang Araw Po,</Text>
-            <Text style={styles.name}>
+            <Text style={[styles.greeting, { fontSize: 18 * fontScale }]}>{t("greeting")}</Text>
+            <Text style={[styles.name, { fontSize: 22 * fontScale }]}>
               {params.name ?? "Sa inyo"}
             </Text>
 
@@ -181,7 +200,7 @@ export default function Home() {
                 size={14}
                 color="#FBBF24"
               />
-              <Text style={styles.idText}>
+              <Text style={[styles.idText, { fontSize: 13 * fontScale }]}>
                 {params.idNumber ?? "No ID"}
               </Text>
             </View>
@@ -200,7 +219,7 @@ export default function Home() {
         <BlurView intensity={40} tint="dark" style={styles.programContainer}>
           {/* HEADER (clickable) */}
           <TouchableOpacity onPress={toggleProgram} style={styles.programHeader}>
-            <Text style={styles.programTitle}>LGU Program Updates</Text>
+            <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>{t("programUpdates")}</Text>
 
             <Animated.View
               style={{
@@ -228,13 +247,13 @@ export default function Home() {
           >
 
             <View>
-              <Text style={styles.programLabel}>What : </Text>
-              <Text style={styles.programLabel}>When : </Text>
-              <Text style={styles.programLabel}>Where : </Text>
+              <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>{t("whatLabel")}</Text>
+              <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>{t("whenLabel")}</Text>
+              <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>{t("whereLabel")}</Text>
 
               <View style={styles.joinFunction}>
                 <TouchableOpacity style={styles.joinButton}>
-                  <Text style={{ fontSize: 18, color: "white" }}>Join</Text>
+                  <Text style={{ fontSize: 18 * fontScale, color: "white" }}>{t("joinLabel")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -251,9 +270,9 @@ export default function Home() {
             />
 
             <View>
-              <Text style={styles.assistantTitle}>Chat Assistant</Text>
-              <Text style={styles.assistantSub}>
-                How can I help you today?
+              <Text style={[styles.assistantTitle, { fontSize: 16 * fontScale }]}>{t("chatAssistant")}</Text>
+              <Text style={[styles.assistantSub, { fontSize: 12 * fontScale }]}>
+                {t("howCanIHelp")}
               </Text>
             </View>
           </TouchableOpacity>
@@ -267,9 +286,9 @@ export default function Home() {
             />
 
             <View>
-              <Text style={styles.assistantTitle}>Voice Assistant</Text>
-              <Text style={styles.assistantSub}>
-                Speak and get help instantly
+              <Text style={[styles.assistantTitle, { fontSize: 16 * fontScale }]}>{t("voiceAssistant")}</Text>
+              <Text style={[styles.assistantSub, { fontSize: 12 * fontScale }]}>
+                {t("speakAndGetHelp")}
               </Text>
             </View>
           </TouchableOpacity>
@@ -281,23 +300,23 @@ export default function Home() {
           {/* REMINDER */}
           <View style={styles.reminder}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.reminderLabel}>Reminder</Text>
+              <Text style={[styles.reminderLabel, { fontSize: 18 * fontScale }]}>{t("reminder")}</Text>
 
               {nextMedicine ? (
                 <>
-                  <Text style={styles.reminderTitle}>
-                    Take : {nextMedicine.dosage} {nextMedicine.dosageUnit} {nextMedicine.name}
+                  <Text style={[styles.reminderTitle, { fontSize: 16 * fontScale }]}>
+                    {t("takeLabel")} {nextMedicine.dosage} {nextMedicine.dosageUnit} {nextMedicine.name}\
                   </Text>
-                  <Text style={styles.reminderTime}>
-                    Time : {getNextDoseTime(nextMedicine)}
+                  <Text style={[styles.reminderTime, { fontSize: 16 * fontScale }]}>
+                    {t("timeLabel")} {getNextDoseTime(nextMedicine)}\
                   </Text>
-                  <Text style={styles.reminderTime}>
-                    Note : {nextMedicine.description ? `${nextMedicine.description}` : "---"}
+                  <Text style={[styles.reminderTime, { fontSize: 16 * fontScale }]}>
+                    {t("noteLabel")} {nextMedicine.description ? `${nextMedicine.description}` : "---"}\
                   </Text>
                 </>
               ) : (
-                <Text style={styles.reminderTitle}>
-                  No medicine reminders today
+                <Text style={[styles.reminderTitle, { fontSize: 16 * fontScale }]}>
+                  {t("noReminders")}
                 </Text>
               )}
             </View>
@@ -310,35 +329,39 @@ export default function Home() {
           </View>
 
           <ActionButton
-            title="SOS EMERGENCY"
-            subtitle="Call for help"
+            title={t("sosEmergency")}
+            subtitle={t("callForHelp")}
             icon="alarm-light"
             color="#CE2029"
             onPress={goToEmergency}
+            fontScale={fontScale}
           />
 
           <ActionButton
-            title="SET APPOINTMENT"
-            subtitle="Book your visit"
+            title={t("setAppointment")}
+            subtitle={t("bookYourVisit")}
             icon="calendar-check"
             color="#2356E1"
             onPress={goToAppointment}
+            fontScale={fontScale}
           />
 
           <ActionButton
-            title="MEDICINE PILL BOX"
-            subtitle="Manage medications"
+            title={t("medicinePillBox")}
+            subtitle={t("manageMedications")}
             icon="pill"
             color="#2356E1"
             onPress={goToMedicine}
+            fontScale={fontScale}
           />
 
           <ActionButton
-            title="GOVERNMENT WEBSITES"
-            subtitle="Visit official sites"
+            title={t("governmentWebsites")}
+            subtitle={t("visitOfficialSites")}
             icon="file-document"
             color="#2356E1"
             onPress={goToDocs}
+            fontScale={fontScale}
           />
         </View>
       </ScrollView>
@@ -373,7 +396,7 @@ export default function Home() {
             </TouchableOpacity>
 
             <Text style={{ fontSize: 20, fontWeight: "bold" }}>
-              Notifications
+              {t("notifications")}
             </Text>
           </Animated.View>
         </>
@@ -390,6 +413,7 @@ function ActionButton({
   icon,
   color,
   onPress,
+  fontScale,
 }: any) {
   return (
     <TouchableOpacity
@@ -400,8 +424,8 @@ function ActionButton({
       <MaterialCommunityIcons name={icon} size={28} color="#fff" />
 
       <View style={{ flex: 1, marginLeft: 14 }}>
-        <Text style={styles.buttonTitle}>{title}</Text>
-        <Text style={styles.buttonSub}>{subtitle}</Text>
+        <Text style={[styles.buttonTitle, { fontSize: 18 * fontScale }]}>{title}</Text>
+        <Text style={[styles.buttonSub, { fontSize: 14 * fontScale }]}>{subtitle}</Text>
       </View>
 
       <Ionicons name="chevron-forward" size={28} color="#fff" />
