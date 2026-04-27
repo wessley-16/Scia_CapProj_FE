@@ -18,7 +18,7 @@ const logo = require("../assets/images/Logo.png");
 
 export default function Index() {
   const router = useRouter();
-
+  const [checkingSession, setCheckingSession] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
   const [idnum, setNscidNum] = useState("");
   const [password, setPassword] = useState("");
@@ -38,18 +38,21 @@ export default function Index() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idnum, password }),
+          body: JSON.stringify({
+            idNumber: idnum, password,
+          }),
         }
       );
 
       const data = await response.json();
 
       if (response.ok) {
-        await AsyncStorage.setItem("userName", data.user.fullName);
-        await AsyncStorage.setItem("userBarangay", data.user.barangay);
-        await AsyncStorage.setItem("userId", data.user.id);
+        await AsyncStorage.setItem("user", JSON.stringify(data.user));
 
-        router.replace("/home");
+        router.replace({
+          pathname: "/(tabs)/home",
+          params: data.user, // pass user data
+        });
       } else {
         Alert.alert("Login Failed", data.error || "Invalid credentials");
       }
@@ -59,6 +62,28 @@ export default function Index() {
       setIsLoading(false);
     }
   };
+
+  const checkSession = async () => {
+    try {
+      const userId = await AsyncStorage.getItem("userId");
+
+      if (userId) {
+        router.replace("/home");
+      }
+    } catch (error) {
+      console.log("Session check error:", error);
+    } finally {
+      setCheckingSession(false);
+    }
+  };
+
+  if (checkingSession) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -106,22 +131,18 @@ export default function Index() {
     )}
 
       {/* LOGIN BUTTON */}
+      {showLogin && (
       <TouchableOpacity
-        onPress={() => {
-          if (showLogin) {
-            handleLogin(); // if already open → submit
-          } else {
-            setShowLogin(true); // if closed → open form
-          }
-        }}
         style={styles.primaryBtn}
+        onPress={handleLogin}
       >
         {isLoading ? (
           <ActivityIndicator color="white" />
         ) : (
-          <Text style={styles.primaryText}>Log-in</Text>
+          <Text style={styles.primaryText}>Submit</Text>
         )}
       </TouchableOpacity>
+    )}
 
       {/* SIGN UP */}
       <TouchableOpacity

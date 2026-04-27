@@ -30,6 +30,8 @@ const background = require("../../assets/images/Foreground.png");
 export default function Home() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const name = typeof params.name === "string" ? params.name : "Sa inyo";
+  const idNumber = typeof params.idNumber === "string" ? params.idNumber : "No ID";
   const tabBarHeight = useBottomTabBarHeight();
   const { fontScale, t } = useSettings();
   const [refreshing, setRefreshing] = useState(false);
@@ -191,7 +193,7 @@ export default function Home() {
           <View style={styles.headerText}>
             <Text style={[styles.greeting, { fontSize: 18 * fontScale }]}>{t("greeting")}</Text>
             <Text style={[styles.name, { fontSize: 22 * fontScale }]}>
-              {params.name ?? "Sa inyo"}
+              {name}
             </Text>
 
             <View style={styles.idRow}>
@@ -201,7 +203,7 @@ export default function Home() {
                 color="#FBBF24"
               />
               <Text style={[styles.idText, { fontSize: 13 * fontScale }]}>
-                {params.idNumber ?? "No ID"}
+                {idNumber}
               </Text>
             </View>
           </View>

@@ -112,9 +112,7 @@ export default function Signup() {
     }
   };
 
-  // -------------------------
   // MAIN UI
-  // -------------------------
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
