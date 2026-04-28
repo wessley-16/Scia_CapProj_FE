@@ -18,7 +18,6 @@ const logo = require("../assets/images/Logo.png");
 
 export default function Index() {
   const router = useRouter();
-  const [checkingSession, setCheckingSession] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
   const [idnum, setNscidNum] = useState("");
   const [password, setPassword] = useState("");
@@ -72,18 +71,8 @@ export default function Index() {
       }
     } catch (error) {
       console.log("Session check error:", error);
-    } finally {
-      setCheckingSession(false);
     }
   };
-
-  if (checkingSession) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#2563EB" />
-      </View>
-    );
-  }
 
   return (
     <KeyboardAvoidingView
