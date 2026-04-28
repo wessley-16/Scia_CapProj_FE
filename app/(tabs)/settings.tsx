@@ -1,6 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "../../context/SettingsContext";
 
@@ -23,6 +24,30 @@ export default function SettingsScreen() {
     // All changes are automatically persisted via AsyncStorage
     // Just navigate back to account page
     router.back();
+  };
+
+  const handleLogout = () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await AsyncStorage.multiRemove([
+              "userName",
+              "userBarangay",
+              "userId",
+              "userImage",
+            ]);
+
+            router.replace("/"); // go back to login
+          } catch (error) {
+            console.log("Logout error:", error);
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -91,6 +116,12 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
           <Text style={[styles.saveButtonText, { fontSize: 16 * fontScale }]}>{t("saveChanges")}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={[styles.logoutText, { fontSize: 16 * fontScale }]}>
+            {t("logout") || "Logout"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -172,7 +203,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 16,
     marginTop: 24,
-    marginBottom: 32,
+    marginBottom: 12,
     alignItems: "center",
     shadowColor: "#000",
     shadowOpacity: 0.1,
@@ -181,6 +212,19 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: "#fff",
+    fontWeight: "700",
+  },
+
+  logoutButton: {
+    backgroundColor: "#CE2029",
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginBottom: 40,
+  },
+
+  logoutText: {
+    color: "white",
     fontWeight: "700",
   },
 });
