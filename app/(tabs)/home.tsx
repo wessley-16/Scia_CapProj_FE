@@ -80,10 +80,22 @@ export default function Home() {
     try {
       setLoadingEvents(true);
 
-      const res = await fetch("http://YOUR_IP:3000/api/events");
-      const data = await res.json();
+      const barangay = await AsyncStorage.getItem("userBarangay");
+      const district = await AsyncStorage.getItem("userDistrict");
 
-      setEvents(data);
+      const res = await fetch(
+        `http://10.142.254.160:3000/api/events?barangay=${barangay}&district=${district}`
+      );
+
+      const data = await res.json();
+      const now = new Date();
+
+      const filtered = data.filter((event: { expiration: string | number | Date; }) => {
+        if (!event.expiration) return true;
+        return new Date(event.expiration) > now;
+      });
+
+      setEvents(filtered);
     } catch (error) {
       console.log("Fetch events error:", error);
     } finally {
@@ -94,9 +106,22 @@ export default function Home() {
   /* ---------------- LOAD EVENT ---------------- */
   const loadEvents = useCallback(async () => {
     try {
-      const res = await fetch("http://YOUR_IP:3000/api/events");
+      const barangay = await AsyncStorage.getItem("userBarangay");
+      const district = await AsyncStorage.getItem("userDistrict");
+
+      const res = await fetch(
+        `http://10.142.254.160:3000/api/events?barangay=${barangay}&district=${district}`
+      );
+
       const data = await res.json();
-      setEvents(data);
+      const now = new Date();
+
+      const filtered = data.filter((event: { expiration: string | number | Date; }) => {
+        if (!event.expiration) return true;
+        return new Date(event.expiration) > now;
+      });
+
+      setEvents(filtered);
     } catch (err) {
       console.log("Failed to load events:", err);
     }
@@ -110,7 +135,7 @@ export default function Home() {
       const userId = await AsyncStorage.getItem("userId");
 
       const res = await fetch(
-        `http://YOUR_IP:3000/api/events/${eventId}/join`,
+        `http://10.142.254.160:3000/api/events/${eventId}/join`,
         {
           method: "POST",
           headers: {
@@ -183,6 +208,7 @@ export default function Home() {
 
     await loadProfileImage();
     await loadNextMedicine();
+    await fetchEvents();
 
     setRefreshing(false);
   }, [loadProfileImage, loadNextMedicine]);
@@ -351,14 +377,14 @@ export default function Home() {
                     </Text>
 
                     <View style={styles.joinFunction}>
-                      {joinedEvents.includes(event.id) ? (
+                      {joinedEvents.some(e => e.id === event.id) ? (
                         <Text style={{ color: "#22C55E", fontSize: 16 * fontScale }}>
                           Joined ✅
                         </Text>
                       ) : (
                         <TouchableOpacity
                           style={styles.joinButton}
-                          onPress={() => handleJoinEvent(event)}
+                          onPress={() => handleJoinEvent(event.id)}
                         >
                           <Text style={{ fontSize: 18 * fontScale, color: "white" }}>
                             Join

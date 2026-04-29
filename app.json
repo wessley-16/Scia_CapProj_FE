@@ -39,7 +39,8 @@
           "microphonePermission": "Allow SCIA to access your microphone for real-time voice assistant."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
