@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, UrlTile } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
@@ -20,41 +20,40 @@ import { useSettings } from '../../context/SettingsContext';
 const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"; // 🔴 PUT YOUR KEY HERE
 const HOLD_DURATION_MS = 5000;
 
-// Barangays (same as yours)
 const valenzuelaBarangays = [
-  { name: 'Bagbaguin', lat: 14.7365, lng: 120.9920 },
-  { name: 'Balangkas', lat: 14.7015, lng: 120.9790 },
-  { name: 'Bignay', lat: 14.7250, lng: 120.9980 },
-  { name: 'Bisig', lat: 14.7160, lng: 120.9785 },
-  { name: 'Canumay East', lat: 14.7095, lng: 120.9925 },
-  { name: 'Canumay West', lat: 14.7065, lng: 120.9880 },
-  { name: 'Coloong', lat: 14.7205, lng: 120.9780 },
-  { name: 'Dalandanan', lat: 14.7035, lng: 120.9825 },
-  { name: 'Gen. T. de Leon', lat: 14.7120, lng: 120.9870 },
+  { name: 'Bagbaguin',           lat: 14.7365, lng: 120.9920 },
+  { name: 'Balangkas',           lat: 14.7015, lng: 120.9790 },
+  { name: 'Bignay',              lat: 14.7250, lng: 120.9980 },
+  { name: 'Bisig',               lat: 14.7160, lng: 120.9785 },
+  { name: 'Canumay East',        lat: 14.7095, lng: 120.9925 },
+  { name: 'Canumay West',        lat: 14.7065, lng: 120.9880 },
+  { name: 'Coloong',             lat: 14.7205, lng: 120.9780 },
+  { name: 'Dalandanan',          lat: 14.7035, lng: 120.9825 },
+  { name: 'Gen. T. de Leon',     lat: 14.7120, lng: 120.9870 },
   { name: 'Gen. Pio Valenzuela', lat: 14.7040, lng: 120.9850 },
-  { name: 'Isla', lat: 14.6945, lng: 120.9950 },
-  { name: 'Karuhatan', lat: 14.7055, lng: 120.9890 },
-  { name: 'Lawang Bato', lat: 14.7155, lng: 120.9975 },
-  { name: 'Lingunan', lat: 14.7060, lng: 120.9830 },
-  { name: 'Mabolo', lat: 14.6995, lng: 120.9905 },
-  { name: 'Malanday', lat: 14.7190, lng: 120.9820 },
-  { name: 'Malinta', lat: 14.7045, lng: 120.9785 },
-  { name: 'Mapulang Lupa', lat: 14.7135, lng: 120.9965 },
-  { name: 'Marulas', lat: 14.7145, lng: 120.9915 },
-  { name: 'Maysan', lat: 14.7195, lng: 120.9950 },
-  { name: 'Palasan', lat: 14.7005, lng: 120.9915 },
-  { name: 'Parada', lat: 14.7085, lng: 120.9805 },
-  { name: 'Pariancillo Villa', lat: 14.7030, lng: 120.9865 },
-  { name: 'Paso de Blas', lat: 14.7290, lng: 120.9930 },
-  { name: 'Pasolo', lat: 14.7110, lng: 120.9795 },
-  { name: 'Poblacion', lat: 14.7080, lng: 120.9860 },
-  { name: 'Polo', lat: 14.7245, lng: 120.9835 },
-  { name: 'Punturin', lat: 14.7270, lng: 120.9875 },
-  { name: 'Rincon', lat: 14.7095, lng: 120.9795 },
-  { name: 'Tagalag', lat: 14.7320, lng: 120.9880 },
-  { name: 'Ugong', lat: 14.7205, lng: 120.9935 },
-  { name: 'Veinte Reales', lat: 14.7075, lng: 120.9895 },
-  { name: 'Wawang Pulo', lat: 14.7185, lng: 120.9845 },
+  { name: 'Isla',                lat: 14.6945, lng: 120.9950 },
+  { name: 'Karuhatan',           lat: 14.7055, lng: 120.9890 },
+  { name: 'Lawang Bato',         lat: 14.7155, lng: 120.9975 },
+  { name: 'Lingunan',            lat: 14.7060, lng: 120.9830 },
+  { name: 'Mabolo',              lat: 14.6995, lng: 120.9905 },
+  { name: 'Malanday',            lat: 14.7190, lng: 120.9820 },
+  { name: 'Malinta',             lat: 14.7045, lng: 120.9785 },
+  { name: 'Mapulang Lupa',       lat: 14.7135, lng: 120.9965 },
+  { name: 'Marulas',             lat: 14.7145, lng: 120.9915 },
+  { name: 'Maysan',              lat: 14.7195, lng: 120.9950 },
+  { name: 'Palasan',             lat: 14.7005, lng: 120.9915 },
+  { name: 'Parada',              lat: 14.7085, lng: 120.9805 },
+  { name: 'Pariancillo Villa',   lat: 14.7030, lng: 120.9865 },
+  { name: 'Paso de Blas',        lat: 14.7290, lng: 120.9930 },
+  { name: 'Pasolo',              lat: 14.7110, lng: 120.9795 },
+  { name: 'Poblacion',           lat: 14.7080, lng: 120.9860 },
+  { name: 'Polo',                lat: 14.7245, lng: 120.9835 },
+  { name: 'Punturin',            lat: 14.7270, lng: 120.9875 },
+  { name: 'Rincon',              lat: 14.7095, lng: 120.9795 },
+  { name: 'Tagalag',             lat: 14.7320, lng: 120.9880 },
+  { name: 'Ugong',               lat: 14.7205, lng: 120.9935 },
+  { name: 'Veinte Reales',       lat: 14.7075, lng: 120.9895 },
+  { name: 'Wawang Pulo',         lat: 14.7185, lng: 120.9845 },
 ];
 
 const getBarangayFromCoords = (lat: number, lng: number): string => {
@@ -97,14 +96,12 @@ export default function EmergencyScreen() {
       const storedName = await AsyncStorage.getItem("userName");
       setName(storedName || "Unknown");
     };
-
     loadName();
   }, []);
 
   // Simulate responder moving toward user
   useEffect(() => {
     let interval: any;
-
     if (location && destination) {
       interval = setInterval(() => {
         setDestination((prev: any) => ({
@@ -113,7 +110,6 @@ export default function EmergencyScreen() {
         }));
       }, 2000);
     }
-
     return () => clearInterval(interval);
   }, [location, destination]);
 
@@ -132,7 +128,7 @@ export default function EmergencyScreen() {
 
     setLocation(coords);
 
-  // Set initial responder (far away)
+    // Set initial responder (far away)
     setDestination({
       latitude: coords.latitude + 0.02,
       longitude: coords.longitude + 0.02,
@@ -251,34 +247,58 @@ export default function EmergencyScreen() {
           </Pressable>
         </View>
 
-        {/* MAP */}
+        {/* MAP — OpenStreetMap tiles (same detailed map as admin web) */}
         <View style={styles.mapWrapper}>
-          {location && (
+          {location ? (
             <MapView
               style={styles.map}
+              mapType="none"
               region={{
-                ...location,
+                latitude: location.latitude,
+                longitude: location.longitude,
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}
             >
-              <Marker coordinate={location} title="You" pinColor="red" />
+              {/* OpenStreetMap tiles — same source as admin Leaflet map */}
+              <UrlTile
+                urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maximumZ={19}
+                flipY={false}
+                tileSize={256}
+              />
 
+              {/* User location marker */}
+              <Marker
+                coordinate={location}
+                title="You"
+                pinColor="red"
+              />
+
+              {/* Responder marker */}
               {destination && (
-                <Marker coordinate={destination} title="Responder" pinColor="blue" />
+                <Marker
+                  coordinate={destination}
+                  title="Responder"
+                  pinColor="blue"
+                />
               )}
 
-              {/* 🧭 ROUTE LINE */}
+              {/* Route line */}
               {destination && (
                 <MapViewDirections
                   origin={destination}
                   destination={location}
                   apikey={GOOGLE_MAPS_API_KEY}
                   strokeWidth={5}
-                  strokeColor="blue"
+                  strokeColor="#0f52ba"
                 />
               )}
             </MapView>
+          ) : (
+            <View style={styles.mapPlaceholder}>
+              <Text style={styles.mapPlaceholderText}>Fetching location...</Text>
+            </View>
           )}
         </View>
 
@@ -320,25 +340,19 @@ export default function EmergencyScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F9FAFB' },
-  scroll: { padding: 20, paddingBottom: 120 },
-  header: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#CE2029', marginBottom: 20 },
-  sosWrapper: { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
-  ring: { position: 'absolute', width: 220, height: 220, borderRadius: 110, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
-  sosButton: { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10 },
-  sosText: { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  mapWrapper: { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
-  map: { flex: 1 },
-
-  dropdown: { backgroundColor: '#fff', borderRadius: 10 },
-  input: { backgroundColor: '#fff', padding: 10, marginTop: 10 },
-
-  infoCard: { backgroundColor: '#fff', padding: 15, marginTop: 20 },
-
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-
+  safeArea:            { flex: 1, backgroundColor: '#F9FAFB' },
+  scroll:              { padding: 20, paddingBottom: 120 },
+  header:              { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#CE2029', marginBottom: 20 },
+  sosWrapper:          { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
+  ring:                { position: 'absolute', width: 220, height: 220, borderRadius: 110, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
+  sosButton:           { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10 },
+  sosText:             { color: '#fff', fontSize: 26, fontWeight: 'bold' },
+  mapWrapper:          { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
+  map:                 { flex: 1 },
+  mapPlaceholder:      { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
+  mapPlaceholderText:  { color: '#9ca3af', fontSize: 14 },
+  dropdown:            { backgroundColor: '#fff', borderRadius: 10 },
+  input:               { backgroundColor: '#fff', padding: 10, marginTop: 10 },
+  infoCard:            { backgroundColor: '#fff', padding: 15, marginTop: 20 },
+  label:               { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
 });
