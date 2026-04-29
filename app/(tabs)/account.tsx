@@ -17,6 +17,12 @@ export default function account() {
   const params = useLocalSearchParams();
   const router = useRouter();
 
+  const [events, setEvents] = useState<any[]>([]);
+  const [joinedEvents, setJoinedEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  
+  const [notifications, setNotifications] = useState<any[]>([]);
+
   const loadProfileImage = useCallback(async () => {
     const img = await AsyncStorage.getItem("profileImage");
     if (img) {
@@ -24,35 +30,35 @@ export default function account() {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadProfileImage();
-    }, [loadProfileImage])
-  );
-
   /* ---------------- NOTIFICATION ---------------- */
-  const [showNotif, setShowNotif] = useState(false);
-
-  const screenWidth = Dimensions.get("window").width;
-  const slideAnim = useState(new Animated.Value(screenWidth))[0];
-
-  const toggleNotification = () => {
-    if (showNotif) {
-      // CLOSE
-      Animated.timing(slideAnim, {
-        toValue: screenWidth,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => setShowNotif(false));
-    } else {
-      setShowNotif(true);
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
+    const [showNotif, setShowNotif] = useState(false);
+  
+    const screenWidth = Dimensions.get("window").width;
+    const slideAnim = useState(new Animated.Value(screenWidth))[0];
+  
+    const toggleNotification = () => {
+      if (showNotif) {
+        // CLOSE
+        Animated.timing(slideAnim, {
+          toValue: screenWidth,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => setShowNotif(false));
+      } else {
+        setShowNotif(true);
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    };
+  
+    /* ---------------- LOAD NOTIFICATION ---------------- */
+    const loadNotifications = async () => {
+      const stored = await AsyncStorage.getItem("notifications");
+      setNotifications(stored ? JSON.parse(stored) : []);
+    };
 
    /* ---------------- IMAGE PICKER ---------------- */
   const pickImage = async () => {
@@ -122,6 +128,13 @@ export default function account() {
       ]
     );
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfileImage();
+      loadNotifications();
+    }, [loadProfileImage])
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -230,9 +243,75 @@ export default function account() {
               <Ionicons name="close" size={28} color="#2356E1" />
              </TouchableOpacity>
       
-             <Text style={{ fontSize: 20 * fontScale, fontWeight: "bold" }}>
-              {t("notifications")}
-            </Text>
+             <View style={{ marginTop: 50 }}>
+                <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 10 }}>
+                  {t("notifications")}
+                </Text>
+             
+                {/* EVENTS NOTIFICATIONS */}
+                <Text style={{ color: "#6B7280", marginBottom: 5 }}>
+                   Your Joined Events
+                </Text>
+             
+                {joinedEvents.length === 0 ? (
+                  <Text>No joined events yet</Text>
+                ) : (
+                  joinedEvents.map((event) => (
+                    <View
+                      key={event.id}
+                      style={{
+                        backgroundColor: "#F3F4F6",
+                        padding: 12,
+                        borderRadius: 12,
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Text style={{ fontWeight: "bold" }}>
+                        📌 {event.title}
+                      </Text>
+             
+                      <Text>
+                        🗓 {new Date(event.date).toLocaleString()}
+                      </Text>
+             
+                      <Text>
+                        📍 {event.location}
+                      </Text>
+                    </View>
+                  ))
+                )}
+             
+                {/* SYSTEM NOTIFICATIONS */}
+                <Text style={{ color: "#6B7280", marginTop: 15, marginBottom: 5 }}>
+                  System Alerts
+                </Text>
+             
+                {notifications.length === 0 ? (
+                  <Text>No alerts yet</Text>
+                  ) : (
+                    notifications.map((notif) => (
+                    <View
+                      key={notif.id}
+                      style={{
+                        backgroundColor: notif.type === "SOS" ? "#FEE2E2" : "#E0F2FE",
+                        padding: 12,
+                        borderRadius: 12,
+                        marginBottom: 10,
+                      }}
+                    >
+                    <Text style={{ fontWeight: "bold" }}>
+                       {notif.type === "SOS" ? "Emergency Alert" : "Notification"}
+                     </Text>
+             
+                     <Text>{notif.message}</Text>
+             
+                      <Text style={{ fontSize: 14, color: "gray" }}>
+                         {new Date(notif.timestamp).toLocaleString()}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
            </Animated.View>
          </>
        )}

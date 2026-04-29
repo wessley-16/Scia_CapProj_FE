@@ -1,26 +1,10 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { BlurView } from "expo-blur";
-import {
-  useFocusEffect,
-  useLocalSearchParams,
-  useRouter,
-} from "expo-router";
-import React, { useCallback, useState } from "react";
-
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import {
-  Animated,
-  Dimensions,
-  Image,
-  ImageBackground,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
-} from "react-native";
+import { BlurView } from "expo-blur";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useState } from "react";
+import { Animated, Dimensions, Image, ImageBackground, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "../../context/SettingsContext";
 import { Medicine } from "../../interfaces/interfaces";
@@ -43,6 +27,12 @@ export default function Home() {
       setAvatarSource({ uri: img });
     }
   };
+
+  const [events, setEvents] = useState<any[]>([]);
+  const [joinedEvents, setJoinedEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+
+  const [notifications, setNotifications] = useState<any[]>([]);
 
   const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
   const [avatarSource, setAvatarSource] = useState<any>(
@@ -85,6 +75,84 @@ export default function Home() {
     setIsProgramOpen(!isProgramOpen);
   };
 
+  /* ---------------- FETCH EVENTS ---------------- */
+  const fetchEvents = async () => {
+    try {
+      setLoadingEvents(true);
+
+      const res = await fetch("http://YOUR_IP:3000/api/events");
+      const data = await res.json();
+
+      setEvents(data);
+    } catch (error) {
+      console.log("Fetch events error:", error);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  /* ---------------- LOAD EVENT ---------------- */
+  const loadEvents = useCallback(async () => {
+    try {
+      const res = await fetch("http://YOUR_IP:3000/api/events");
+      const data = await res.json();
+      setEvents(data);
+    } catch (err) {
+      console.log("Failed to load events:", err);
+    }
+  }, []);
+
+  /* ---------------- JOIN EVENT ---------------- */
+  const handleJoinEvent = async (eventId: string) => {
+    try {
+      const name = await AsyncStorage.getItem("userName");
+      const address = await AsyncStorage.getItem("userBarangay");
+      const userId = await AsyncStorage.getItem("userId");
+
+      const res = await fetch(
+        `http://YOUR_IP:3000/api/events/${eventId}/join`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name,
+            address,
+            userId,
+            age: 60, // temporary (later compute from DOB)
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (res.ok) {
+        const updated = [...joinedEvents, event];
+
+        setJoinedEvents(updated);
+        await AsyncStorage.setItem("joinedEvents", JSON.stringify(updated));
+
+        alert("Joined successfully!");
+      }
+
+    } catch (err) {
+      alert("Failed to join");
+    }
+  };
+
+  /* ---------------- LOAD JOINED EVENTS ---------------- */
+  const loadJoinedEvents = async () => {
+    try {
+      const stored = await AsyncStorage.getItem("joinedEvents");
+      if (stored) {
+        setJoinedEvents(JSON.parse(stored));
+      }
+    } catch (err) {
+      console.log("Failed to load joined events");
+    }
+  };
+
   /* ---------------- LOAD MEDICINE ---------------- */
   const loadNextMedicine = useCallback(async () => {
     try {
@@ -109,13 +177,6 @@ export default function Home() {
       setNextMedicine(null);
     }
   }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadNextMedicine();
-      loadProfileImage();
-    }, [loadProfileImage, loadNextMedicine])
-  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -164,6 +225,23 @@ export default function Home() {
       }).start();
     }
   };
+
+  /* ---------------- LOAD NOTIFICATION ---------------- */
+  const loadNotifications = async () => {
+    const stored = await AsyncStorage.getItem("notifications");
+    setNotifications(stored ? JSON.parse(stored) : []);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNextMedicine();
+      loadProfileImage();
+      fetchEvents();
+      loadEvents();
+      loadJoinedEvents();
+      loadNotifications();
+    }, [loadProfileImage, loadNextMedicine, loadEvents])
+  );
 
   /* ---------------- UI ---------------- */
   return (
@@ -249,16 +327,50 @@ export default function Home() {
           >
 
             <View>
-              <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>{t("whatLabel")}</Text>
-              <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>{t("whenLabel")}</Text>
-              <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>{t("whereLabel")}</Text>
+              {events.length === 0 ? (
+                <Text style={[styles.programLabel, { fontSize: 16 * fontScale }]}>
+                  No events available
+                </Text>
+              ) : (
+                events.map((event) => (
+                  <View key={event.id} style={{ marginBottom: 15 }}>
+                    <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>
+                      What: {event.title}
+                    </Text>
 
-              <View style={styles.joinFunction}>
-                <TouchableOpacity style={styles.joinButton}>
-                  <Text style={{ fontSize: 18 * fontScale, color: "white" }}>{t("joinLabel")}</Text>
-                </TouchableOpacity>
-              </View>
+                    <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>
+                      When: {new Date(event.date).toLocaleString()}
+                    </Text>
+
+                    <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>
+                      Where: {event.location}
+                    </Text>
+
+                    <Text style={[styles.programLabel, { fontSize: 16 * fontScale }]}>
+                      {event.description}
+                    </Text>
+
+                    <View style={styles.joinFunction}>
+                      {joinedEvents.includes(event.id) ? (
+                        <Text style={{ color: "#22C55E", fontSize: 16 * fontScale }}>
+                          Joined ✅
+                        </Text>
+                      ) : (
+                        <TouchableOpacity
+                          style={styles.joinButton}
+                          onPress={() => handleJoinEvent(event)}
+                        >
+                          <Text style={{ fontSize: 18 * fontScale, color: "white" }}>
+                            Join
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
+
           </Animated.View>
         </BlurView>
 
@@ -397,9 +509,75 @@ export default function Home() {
               <Ionicons name="close" size={28} color="#2356E1" />
             </TouchableOpacity>
 
-            <Text style={{ fontSize: 20, fontWeight: "bold" }}>
-              {t("notifications")}
-            </Text>
+            <View style={{ marginTop: 50 }}>
+              <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 10 }}>
+                {t("notifications")}
+              </Text>
+
+              {/* EVENTS NOTIFICATIONS */}
+              <Text style={{ color: "#6B7280", marginBottom: 5 }}>
+                Your Joined Events
+              </Text>
+
+              {joinedEvents.length === 0 ? (
+                <Text>No joined events yet</Text>
+              ) : (
+                joinedEvents.map((event) => (
+                  <View
+                    key={event.id}
+                    style={{
+                      backgroundColor: "#F3F4F6",
+                      padding: 12,
+                      borderRadius: 12,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text style={{ fontWeight: "bold" }}>
+                      📌 {event.title}
+                    </Text>
+
+                    <Text>
+                      🗓 {new Date(event.date).toLocaleString()}
+                    </Text>
+
+                    <Text>
+                      📍 {event.location}
+                    </Text>
+                  </View>
+                ))
+              )}
+
+              {/* SYSTEM NOTIFICATIONS */}
+              <Text style={{ color: "#6B7280", marginTop: 15, marginBottom: 5 }}>
+                System Alerts
+              </Text>
+
+              {notifications.length === 0 ? (
+                <Text>No alerts yet</Text>
+              ) : (
+                notifications.map((notif) => (
+                  <View
+                    key={notif.id}
+                    style={{
+                      backgroundColor: notif.type === "SOS" ? "#FEE2E2" : "#E0F2FE",
+                      padding: 12,
+                      borderRadius: 12,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text style={{ fontWeight: "bold" }}>
+                      {notif.type === "SOS" ? "Emergency Alert" : "Notification"}
+                    </Text>
+
+                    <Text>{notif.message}</Text>
+
+                    <Text style={{ fontSize: 14, color: "gray" }}>
+                      {new Date(notif.timestamp).toLocaleString()}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
           </Animated.View>
         </>
       )}

@@ -85,6 +85,9 @@ export default function EmergencyScreen() {
   const progress = useRef(new Animated.Value(0)).current;
   const countdownInterval = useRef<any>(null);
 
+  const [lastSOS, setLastSOS] = useState<number | null>(null);
+  const [cooldownActive, setCooldownActive] = useState(false);
+
   useEffect(() => {
     fetchLocation();
   }, []);
@@ -129,7 +132,7 @@ export default function EmergencyScreen() {
 
     setLocation(coords);
 
-    // Set initial responder (far away)
+  // Set initial responder (far away)
     setDestination({
       latitude: coords.latitude + 0.02,
       longitude: coords.longitude + 0.02,
@@ -173,9 +176,13 @@ export default function EmergencyScreen() {
     clearInterval(countdownInterval.current);
   };
 
+  const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+
   const triggerSOS = async () => {
-    if (!location) {
-      Alert.alert("Location not ready yet");
+    const now = Date.now();
+
+    if (lastSOS && now - lastSOS < COOLDOWN_MS) {
+      Alert.alert("Cooldown Active", "Please wait 5 minutes before sending another SOS.");
       return;
     }
 
@@ -201,7 +208,13 @@ export default function EmergencyScreen() {
       const data = await response.json();
 
       if (response.ok) {
-        Alert.alert("SOS Sent", "Responder has been notified!");
+        setLastSOS(now);
+        setCooldownActive(true);
+
+        // Auto remove cooldown after 5 mins
+        setTimeout(() => {
+          setCooldownActive(false);
+        }, COOLDOWN_MS);
       } else {
         Alert.alert("Error", data.error || "Failed to send SOS");
       }
@@ -218,12 +231,20 @@ export default function EmergencyScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={[styles.header, { fontSize: 28 * fontScale }]}>🚨 EMERGENCY</Text>
+        <Text style={[styles.header, { fontSize: 28 * fontScale }]}>EMERGENCY</Text>
 
         {/* SOS BUTTON */}
         <View style={styles.sosWrapper}>
           <Animated.View style={[styles.ring, { transform: [{ rotate }] }]} />
-          <Pressable onPressIn={startHold} onPressOut={stopHold} style={styles.sosButton}>
+          <Pressable
+            onPressIn={startHold}
+            onPressOut={stopHold}
+            disabled={cooldownActive}
+            style={[
+              styles.sosButton,
+              { opacity: cooldownActive ? 0.75 : 1 }
+            ]}
+          >
             <Text style={[styles.sosText, { fontSize: 26 * fontScale }]}>
               {isHolding ? secondsLeft : "HOLD"}
             </Text>
