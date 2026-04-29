@@ -187,7 +187,7 @@ export default function EmergencyScreen() {
     }
 
     try {
-      const response = await fetch("http://10.174.101.153:3000/api/emergency/send-sms", {
+      const response = await fetch("http://10.174.101.153:3000/api/emergency/send-alert", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
