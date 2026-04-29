@@ -16,6 +16,8 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
+// 🔥 Firebase — replaces http://10.174.101.153:3000/api/emergency/send-alert
+import { sendSOSAlert } from '../../lib/firebase';
 
 const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"; // 🔴 PUT YOUR KEY HERE
 const HOLD_DURATION_MS = 5000;
@@ -183,39 +185,30 @@ export default function EmergencyScreen() {
     }
 
     try {
-      const response = await fetch("http://10.174.101.153:3000/api/emergency/send-alert", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: name,
-          latitude: location.latitude,
-          longitude: location.longitude,
-          address: fullAddress,
-          barangay: barangay,
-          emergencyType:
-            selectedEmergency === "Other"
-              ? otherEmergency
-              : selectedEmergency,
-        }),
+      // 🔥 Write to Firestore "emergencies" collection.
+      // Admin SOSMap listens in real-time and shows this alert immediately.
+      await sendSOSAlert({
+        name: name,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: fullAddress,
+        barangay: barangay,
+        emergencyType:
+          selectedEmergency === "Other"
+            ? otherEmergency
+            : selectedEmergency,
       });
 
-      const data = await response.json();
+      setLastSOS(now);
+      setCooldownActive(true);
 
-      if (response.ok) {
-        setLastSOS(now);
-        setCooldownActive(true);
+      // Auto remove cooldown after 5 mins
+      setTimeout(() => {
+        setCooldownActive(false);
+      }, COOLDOWN_MS);
 
-        // Auto remove cooldown after 5 mins
-        setTimeout(() => {
-          setCooldownActive(false);
-        }, COOLDOWN_MS);
-      } else {
-        Alert.alert("Error", data.error || "Failed to send SOS");
-      }
-    } catch (error) {
-      Alert.alert("Network Error", "Cannot connect to server.");
+    } catch (error: any) {
+      Alert.alert("Error", error?.message || "Failed to send SOS");
     }
   };
 

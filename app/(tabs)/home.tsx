@@ -7,6 +7,8 @@ import React, { useCallback, useState } from "react";
 import { Animated, Dimensions, Image, ImageBackground, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "../../context/SettingsContext";
+// 🔥 Firebase — replaces http://10.142.254.160:3000/api/events
+import { subscribeToEvents, Event as FirebaseEvent } from "../../lib/firebase";
 import { Medicine } from "../../interfaces/interfaces";
 
 const background = require("../../assets/images/Foreground.png");
@@ -77,54 +79,32 @@ export default function Home() {
 
   /* ---------------- FETCH EVENTS ---------------- */
   const fetchEvents = async () => {
-    try {
-      setLoadingEvents(true);
-
-      const barangay = await AsyncStorage.getItem("userBarangay");
-      const district = await AsyncStorage.getItem("userDistrict");
-
-      const res = await fetch(
-        `http://10.142.254.160:3000/api/events?barangay=${barangay}&district=${district}`
-      );
-
-      const data = await res.json();
-      const now = new Date();
-
-      const filtered = data.filter((event: { expiration: string | number | Date; }) => {
-        if (!event.expiration) return true;
-        return new Date(event.expiration) > now;
-      });
-
-      setEvents(filtered);
-    } catch (error) {
-      console.log("Fetch events error:", error);
-    } finally {
-      setLoadingEvents(false);
-    }
+    // kept for manual refresh — delegates to loadEvents which uses Firebase
+    loadEvents();
   };
 
   /* ---------------- LOAD EVENT ---------------- */
-  const loadEvents = useCallback(async () => {
-    try {
-      const barangay = await AsyncStorage.getItem("userBarangay");
-      const district = await AsyncStorage.getItem("userDistrict");
+  // 🔥 Real-time subscription to Firestore announcements
+  const loadEvents = useCallback(() => {
+    let barangay: string | null = null;
+    let district: string | null = null;
 
-      const res = await fetch(
-        `http://10.142.254.160:3000/api/events?barangay=${barangay}&district=${district}`
-      );
+    const setup = async () => {
+      barangay = await AsyncStorage.getItem("userBarangay");
+      district = await AsyncStorage.getItem("userDistrict");
 
-      const data = await res.json();
-      const now = new Date();
-
-      const filtered = data.filter((event: { expiration: string | number | Date; }) => {
-        if (!event.expiration) return true;
-        return new Date(event.expiration) > now;
+      setLoadingEvents(true);
+      // subscribeToEvents returns an unsubscribe fn; React re-renders on each snapshot
+      const unsub = subscribeToEvents(barangay, district, (newEvents) => {
+        setEvents(newEvents as any[]);
+        setLoadingEvents(false);
       });
+      return unsub;
+    };
 
-      setEvents(filtered);
-    } catch (err) {
-      console.log("Failed to load events:", err);
-    }
+    let cleanup: (() => void) | undefined;
+    setup().then((unsub) => { cleanup = unsub; });
+    return () => { if (cleanup) cleanup(); };
   }, []);
 
   /* ---------------- JOIN EVENT ---------------- */
@@ -135,6 +115,7 @@ export default function Home() {
       const userId = await AsyncStorage.getItem("userId");
 
       const res = await fetch(
+        // Join is still handled via backend for attendance tracking
         `http://10.142.254.160:3000/api/events/${eventId}/join`,
         {
           method: "POST",
