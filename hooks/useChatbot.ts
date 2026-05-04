@@ -12,7 +12,7 @@ export type ChatMessage = {
   role: "user" | "assistant";
   text: string;
 };
-
+//test
 let _msgCounter = 0;
 const generateId = () => `msg_${Date.now()}_${(_msgCounter += 1)}`;
 
