@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { ChatMessage } from "../../hooks/useChatbot";
+import { ChatMessage } from "@/hooks/useChatbot";
 
 interface ActionProps {
   label: string;

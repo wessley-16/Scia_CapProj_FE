@@ -3,7 +3,7 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSettings } from "../../context/SettingsContext";
+import { useSettings } from "@/context/SettingsContext";
 
 const fontOptions = [
   { labelKey: "small", value: 0.75 },

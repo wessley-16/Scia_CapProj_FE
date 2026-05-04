@@ -17,7 +17,7 @@ import {
   View
 } from "react-native";
 // 🔥 Firebase — replaces http://10.174.101.153:3000/api/users/register
-import { registerUser } from "../../lib/firebase";
+import { registerUser } from "@/lib/firebase";
 
 export default function Signup() {
   const router = useRouter();

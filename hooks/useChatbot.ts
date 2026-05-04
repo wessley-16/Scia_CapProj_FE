@@ -4,7 +4,7 @@ import {
   CHATBOT_API_URL,
   CHATBOT_STORAGE_KEY,
   MAX_CHATBOT_MESSAGES,
-} from "../constants/constants";
+} from "@/constants/constants";
 
 //  Consistent message type
 export type ChatMessage = {

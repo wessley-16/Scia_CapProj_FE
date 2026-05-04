@@ -5,7 +5,7 @@ import {
   LIVE_MODEL,
   LIVE_TOKEN_API_URL,
   LIVE_WS_BASE_URL,
-} from "../constants/constants";
+} from "@/constants/constants";
 
 type LiveStatus = "idle" | "connecting" | "connected" | "responding" | "error";
 

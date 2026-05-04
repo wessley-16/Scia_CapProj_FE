@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Entypo from "@expo/vector-icons/Entypo";
 import { Tabs, useRouter } from "expo-router";
 import React, { useRef } from "react";
@@ -7,11 +7,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Modalize } from "react-native-modalize";
 import { Host } from "react-native-portalize";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 const CustomTabBar = ({
   state,
   navigation,
   onScanPress,
-  onUploadPress,
 }: any) => {
   const insets = useSafeAreaInsets();
   const paddingBottom = insets.bottom > 0 ? insets.bottom : 15;
@@ -29,6 +29,7 @@ const CustomTabBar = ({
 
   const iconMap: any = {
     home: { label: "Home", icon: "home-outline", active: "home" },
+    healthcare: { label: "Healthcare", icon: "medkit-outline", active: "medkit" },
     account: { label: "Account", icon: "person-outline", active: "person" },
   };
 
@@ -38,12 +39,6 @@ const CustomTabBar = ({
     if (!item) return null;
 
     const onPress = () => {
-      if (route.name === "upload") {
-        onUploadPress();
-        navigation.navigate("upload");
-        return;
-      }
-
       navigation.navigate(route.name);
     };
 
@@ -55,7 +50,7 @@ const CustomTabBar = ({
       >
         <Ionicons
           name={isFocused ? item.active : item.icon}
-          size={28}
+          size={26}
           color={isFocused ? "white" : "#e4e4e4"}
         />
         <Text
@@ -66,8 +61,9 @@ const CustomTabBar = ({
       </TouchableOpacity>
     );
   };
-  const leftTabs = state.routes.filter((r: any) => r.name === "home");
 
+  const leftTabs = state.routes.filter((r: any) => r.name === "home");
+  const centerTabs = state.routes.filter((r: any) => r.name === "healthcare");
   const rightTabs = state.routes.filter((r: any) => r.name === "account");
 
   return (
@@ -79,6 +75,7 @@ const CustomTabBar = ({
           <Text style={styles.scanLabel}>Voice Assist</Text>
         </View>
 
+        {centerTabs.map(renderTab)}
         {rightTabs.map(renderTab)}
       </View>
 
@@ -101,10 +98,6 @@ export default function Layout() {
     router.push("/voice");
   };
 
-  const onUploadPress = () => {
-    addEventRef.current?.open();
-  };
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Host>
@@ -113,12 +106,13 @@ export default function Layout() {
             <CustomTabBar
               {...props}
               onScanPress={onScanPress}
-              onUploadPress={onUploadPress}
             />
           )}
           screenOptions={{ headerShown: false }}
         >
           <Tabs.Screen name="home" />
+
+          <Tabs.Screen name="healthcare" />
 
           <Tabs.Screen
             name="voice"
@@ -135,6 +129,27 @@ export default function Layout() {
             options={{ href: null, tabBarStyle: { display: "none" } }}
           />
 
+          {/* Hidden legacy screens — kept so existing links don't break */}
+          <Tabs.Screen
+            name="medicine"
+            options={{ href: null }}
+          />
+
+          <Tabs.Screen
+            name="appointment"
+            options={{ href: null }}
+          />
+
+          <Tabs.Screen
+            name="govdocs"
+            options={{ href: null }}
+          />
+
+          <Tabs.Screen
+            name="emergency"
+            options={{ href: null }}
+          />
+
           <Tabs.Screen name="account" />
         </Tabs>
       </Host>
@@ -148,14 +163,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: "100%",
     alignItems: "center",
-    backgroundColor: "#2356E1", // Matched with Tab Bar Color to cover Safe Area
+    backgroundColor: "#2356E1",
   },
 
   tabBar: {
     flexDirection: "row",
     height: 70,
     width: "100%",
-    alignItems: "center", // Align items to center vertically, centerSlot will handle its own alignment
+    alignItems: "center",
     borderTopWidth: 3,
     borderColor: "white",
     backgroundColor: "#2356E1",
@@ -169,9 +184,8 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    fontSize: 12,
-    marginTop: 4,
-    fontFamily: "Inter-Medium",
+    fontSize: 11,
+    marginTop: 3,
     fontWeight: "600",
   },
 
@@ -184,9 +198,8 @@ const styles = StyleSheet.create({
   },
 
   scanLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: "#e4e4e4",
-    fontFamily: "Inter-Medium",
     textAlign: "center",
     width: "100%",
   },

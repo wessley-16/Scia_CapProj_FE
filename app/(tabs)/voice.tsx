@@ -10,8 +10,8 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSettings } from "../../context/SettingsContext";
-import { useLiveVoice } from "../../hooks/useLiveVoice";
+import { useSettings } from "@/context/SettingsContext";
+import { useLiveVoice } from "@/hooks/useLiveVoice";
 
 export default function Voice() {
   const router = useRouter();

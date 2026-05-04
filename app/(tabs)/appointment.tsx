@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSettings } from "../../context/SettingsContext";
+import { useSettings } from "@/context/SettingsContext";
 
 type AppointmentStatus = "scheduled" | "done" | "cancelled";
 

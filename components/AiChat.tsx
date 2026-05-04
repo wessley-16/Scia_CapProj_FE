@@ -8,11 +8,11 @@ import {
     Text,
     View,
 } from "react-native";
-import { useSettings } from "../context/SettingsContext";
-import { useChatbot } from "../hooks/useChatbot";
-import ChatHeader from "./chat/ChatHeader";
-import ChatInputArea from "./chat/ChatInputArea";
-import ChatMessageBubble from "./chat/ChatMessageBubble";
+import { useSettings } from "@/context/SettingsContext";
+import { useChatbot } from "@/hooks/useChatbot";
+import ChatHeader from "@/components/chat/ChatHeader";
+import ChatInputArea from "@/components/chat/ChatInputArea";
+import ChatMessageBubble from "@/components/chat/ChatMessageBubble";
 
 const AiChat = () => {
   const { messages, loading, sendMessage } = useChatbot();
@@ -52,13 +52,11 @@ const AiChat = () => {
   });
 
   return (
-    // We remove the outer <View> and make KeyboardAvoidingView the absolute root
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={0} // Set to 0 because the Header is now inside
+      keyboardVerticalOffset={0}
     >
-      {/* Header is now inside the KeyboardAvoidingView */}
       <ChatHeader fontScale={fontScale} />
 
       <FlatList

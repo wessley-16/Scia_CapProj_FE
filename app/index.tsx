@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 // 🔥 Firebase — replaces http://10.174.101.153:3000/api/auth/login
-import { loginUser } from "../lib/firebase";
+import { loginUser } from "@/lib/firebase";
 
 const logo = require("../assets/images/Logo.png");
 

@@ -30,9 +30,11 @@ export const storage = getStorage(app);
 
 // ── Collection names (must match admin) ─────────────────────────────────────
 export const COLLECTIONS = {
-  USERS: "users",           // registered users (signup)
-  EVENTS: "editorial_health", // announcements from admin
-  EMERGENCIES: "emergencies", // SOS alerts → admin SOSMap
+  USERS: "users",
+  EVENTS: "editorial_health",
+  EMERGENCIES: "emergencies",
+  APPOINTMENTS: "appointments",       // Sub-admin receives these
+  ID_REQUESTS: "id_requests",         // Super-admin receives these
 };
 
 // ── USER REGISTRATION ────────────────────────────────────────────────────────
@@ -49,24 +51,16 @@ export interface UserRegistration {
   imageBase64?: string;
 }
 
-/**
- * Register a new user in Firestore.
- * The Admin UserManagement page reads from the "users" collection.
- */
 export async function registerUser(data: UserRegistration) {
   const docRef = await addDoc(collection(db, COLLECTIONS.USERS), {
     ...data,
-    status: "PENDING",       // Admin sees this as "Pending Verification"
+    status: "PENDING",
     role: "SENIOR_CITIZEN",
     createdAt: serverTimestamp(),
   });
   return { id: docRef.id, ...data };
 }
 
-/**
- * Login: look up user by idNumber + password.
- * Returns user data or throws if not found.
- */
 export async function loginUser(idNumber: string, password: string) {
   const q = query(
     collection(db, COLLECTIONS.USERS),
@@ -98,10 +92,6 @@ export interface Event {
   Status?: string;
 }
 
-/**
- * Fetch announcements from Firestore, filtered by audience.
- * Matches the admin Announcements.jsx collection "editorial_health".
- */
 export async function fetchEvents(barangay?: string | null, district?: string | null): Promise<Event[]> {
   const q = query(
     collection(db, COLLECTIONS.EVENTS),
@@ -113,13 +103,11 @@ export async function fetchEvents(barangay?: string | null, district?: string | 
   return snapshot.docs
     .map((d) => ({ id: d.id, ...d.data() } as Event))
     .filter((event) => {
-      // Filter expired events
       if (event.expiration) {
         try {
           if (new Date(event.expiration) <= now) return false;
         } catch (_) {}
       }
-      // Filter by audience
       const audience = event.Audience || event.audience || "ALL";
       if (audience === "ALL") return true;
       if (audience === "DISTRICT_1" && district === "DISTRICT_1") return true;
@@ -129,10 +117,6 @@ export async function fetchEvents(barangay?: string | null, district?: string | 
     });
 }
 
-/**
- * Real-time subscription to announcements.
- * Returns unsubscribe function.
- */
 export function subscribeToEvents(
   barangay: string | null,
   district: string | null,
@@ -174,14 +158,49 @@ export interface EmergencyAlert {
   emergencyType: string;
 }
 
-/**
- * Send SOS alert to Firestore "emergencies" collection.
- * The Admin SOSMap listens to this collection in real-time.
- */
 export async function sendSOSAlert(data: EmergencyAlert) {
   const docRef = await addDoc(collection(db, COLLECTIONS.EMERGENCIES), {
     ...data,
-    status: "pending",       // Admin sees "pending" → can Dispatch or Resolve
+    status: "pending",
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+// ── APPOINTMENTS (Sub-admin receives) ────────────────────────────────────────
+export interface AppointmentRequest {
+  seniorName: string;
+  seniorId: string;
+  date: string;
+  time: string;
+  type: string;
+  notes?: string;
+}
+
+export async function submitAppointment(data: AppointmentRequest) {
+  const docRef = await addDoc(collection(db, COLLECTIONS.APPOINTMENTS), {
+    ...data,
+    center: "3S Center Valenzuela",
+    status: "pending",           // Sub-admin sees this in their dashboard
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+// ── PHYSICAL ID REQUEST (Super-admin receives) ────────────────────────────────
+export interface IDRequest {
+  seniorName: string;
+  seniorId: string;
+  address: string;
+  contactNumber: string;
+  reason?: string;
+  imageBase64?: string;
+}
+
+export async function submitIDRequest(data: IDRequest) {
+  const docRef = await addDoc(collection(db, COLLECTIONS.ID_REQUESTS), {
+    ...data,
+    status: "pending",           // Super-admin sees this in their dashboard
     createdAt: serverTimestamp(),
   });
   return docRef.id;

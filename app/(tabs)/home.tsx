@@ -6,10 +6,10 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Animated, Dimensions, Image, ImageBackground, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSettings } from "../../context/SettingsContext";
+import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — replaces http://10.142.254.160:3000/api/events
-import { subscribeToEvents, Event as FirebaseEvent } from "../../lib/firebase";
-import { Medicine } from "../../interfaces/interfaces";
+import { subscribeToEvents, Event as FirebaseEvent } from "@/lib/firebase";
+import { Medicine } from "@/interfaces/interfaces";
 
 const background = require("../../assets/images/Foreground.png");
 
@@ -44,8 +44,8 @@ export default function Home() {
   /* ---------------- NAVIGATION ---------------- */
   const goToChat = () => router.push("/(tabs)/chatbot");
   const goToVoice = () => router.push("/(tabs)/voice");
-  const goToMedicine = () => router.push("/(tabs)/medicine");
-  const goToAppointment = () => router.push("/(tabs)/appointment");
+  const goToMedicine = () => router.push("/(tabs)/healthcare");
+  const goToAppointment = () => router.push("/(tabs)/healthcare");
   const goToEmergency = () => router.push("/(tabs)/emergency");
   const goToDocs = () => router.push("/(tabs)/govdocs");
 

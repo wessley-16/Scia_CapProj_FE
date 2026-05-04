@@ -18,8 +18,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSettings } from "../../context/SettingsContext";
-import { Medicine } from "../../interfaces/interfaces";
+import { useSettings } from "@/context/SettingsContext";
+import { Medicine } from "@/interfaces/interfaces";
 
 // Configure notifications behavior
 Notifications.setNotificationHandler({

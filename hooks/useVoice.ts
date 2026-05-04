@@ -1,5 +1,5 @@
 import { Audio } from "expo-av";
-import { VOICE_API_URL } from "../constants/constants";
+import { VOICE_API_URL } from "@/constants/constants";
 
 export const useVoice = () => {
   const playVoice = async (text: string) => {

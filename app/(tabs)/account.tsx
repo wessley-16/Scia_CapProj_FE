@@ -5,9 +5,10 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Alert, Animated, Dimensions, Image, ImageBackground, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, ImageBackground, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useSettings } from "../../context/SettingsContext";
+import { useSettings } from "@/context/SettingsContext";
+import { submitIDRequest } from "@/lib/firebase";
 
   const background = require("../../assets/images/Monochrome.jpg");
 
@@ -16,6 +17,39 @@ export default function account() {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const params = useLocalSearchParams();
   const router = useRouter();
+
+  // ── Physical ID Request state ──
+  const [idModalVisible, setIdModalVisible] = useState(false);
+  const [idReason, setIdReason] = useState("");
+  const [idSubmitting, setIdSubmitting] = useState(false);
+  const [idSubmitted, setIdSubmitted] = useState(false);
+
+  const submitIDRequestHandler = async () => {
+    setIdSubmitting(true);
+    try {
+      const seniorName = `${params.firstName || ""} ${params.lastName || ""}`.trim() || "Senior";
+      const seniorId = (params.idNumber as string) || "N/A";
+      const address = (params.address as string) || "";
+      const contactNumber = (params.conNumber as string) || "";
+      await submitIDRequest({
+        seniorName,
+        seniorId,
+        address,
+        contactNumber,
+        reason: idReason || "Replacement / First-time request",
+      });
+      setIdSubmitted(true);
+      setIdModalVisible(false);
+      Alert.alert(
+        "✅ Request Submitted",
+        "Your physical Senior Citizen ID request has been sent to the Super Admin for processing."
+      );
+    } catch (e) {
+      Alert.alert("Error", "Failed to submit request. Check your connection.");
+    } finally {
+      setIdSubmitting(false);
+    }
+  };
 
   const [events, setEvents] = useState<any[]>([]);
   const [joinedEvents, setJoinedEvents] = useState<any[]>([]);
@@ -223,7 +257,76 @@ export default function account() {
               style={styles.qrCodeImage}
             />
           </View>
+
+          {/* PHYSICAL ID REQUEST */}
+          <View style={styles.idRequestSection}>
+            <Text style={[styles.idRequestTitle, { fontSize: 17 * fontScale }]}>
+              🪪 Physical Senior Citizen ID
+            </Text>
+            <Text style={[styles.idRequestSub, { fontSize: 13 * fontScale }]}>
+              Request your physical ID card from the Valenzuela City OSCA.
+              Your request will be reviewed by the Super Admin.
+            </Text>
+            {idSubmitted ? (
+              <View style={styles.idSubmittedBadge}>
+                <Text style={{ color: "#065F46", fontWeight: "bold", fontSize: 13 * fontScale }}>
+                  ✅ Request already submitted
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.idRequestBtn}
+                onPress={() => setIdModalVisible(true)}
+              >
+                <Ionicons name="card-outline" size={20} color="white" />
+                <Text style={[styles.idRequestBtnText, { fontSize: 14 * fontScale }]}>
+                  Request Physical ID
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
       </ScrollView>
+
+      {/* PHYSICAL ID REQUEST MODAL */}
+      <Modal visible={idModalVisible} animationType="slide" transparent>
+        <View style={styles.idModalOverlay}>
+          <View style={styles.idModalBox}>
+            <Text style={[styles.idModalTitle, { fontSize: 19 * fontScale }]}>
+              📋 Physical ID Request
+            </Text>
+            <Text style={[{ fontSize: 13 * fontScale, color: "#4B5563", marginBottom: 16, textAlign: "center" }]}>
+              This request will be sent to the Super Admin for processing. Your senior citizen ID will be prepared by the Valenzuela OSCA.
+            </Text>
+            <Text style={styles.idLabel}>Reason for request (optional)</Text>
+            <TextInput
+              placeholder="e.g. First-time request, Lost ID, etc."
+              value={idReason}
+              onChangeText={setIdReason}
+              style={styles.idInput}
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.idSubmitBtn, idSubmitting && { opacity: 0.7 }]}
+              onPress={submitIDRequestHandler}
+              disabled={idSubmitting}
+            >
+              {idSubmitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={[styles.idSubmitBtnText, { fontSize: 15 * fontScale }]}>
+                  📤 Submit to Super Admin
+                </Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ marginTop: 12, alignItems: "center" }}
+              onPress={() => setIdModalVisible(false)}
+            >
+              <Text style={{ color: "#EF4444", fontWeight: "bold", fontSize: 15 * fontScale }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {showNotif && (
         <>
@@ -449,5 +552,94 @@ const styles = StyleSheet.create({
     height: 300,
     backgroundColor: "#D1D5DB",
     marginBottom: 100,
+  },
+
+  idRequestSection: {
+    margin: 20,
+    marginTop: 0,
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 20,
+    elevation: 2,
+    marginBottom: 120,
+  },
+  idRequestTitle: {
+    fontSize: 17,
+    fontWeight: "bold",
+    color: "#1F2937",
+    marginBottom: 8,
+  },
+  idRequestSub: {
+    fontSize: 13,
+    color: "#6B7280",
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  idRequestBtn: {
+    backgroundColor: "#2356E1",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  idRequestBtnText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  idSubmittedBadge: {
+    backgroundColor: "#ECFDF5",
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+  },
+  idModalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  idModalBox: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  idModalTitle: {
+    fontSize: 19,
+    fontWeight: "bold",
+    color: "#1F2937",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  idLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 6,
+  },
+  idInput: {
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    fontSize: 14,
+    backgroundColor: "#F9FAFB",
+    minHeight: 70,
+  },
+  idSubmitBtn: {
+    backgroundColor: "#2356E1",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  idSubmitBtnText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 15,
   },
 });
