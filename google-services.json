@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "244279971713",
+    "firebase_url": "https://scia-b5440-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "scia-b5440",
+    "storage_bucket": "scia-b5440.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:244279971713:android:c8f3a04684059cd593a280",
+        "android_client_info": {
+          "package_name": "com.anonymous.scia"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC0pThdE1nLlSN_8G132qKMdR9-KMAsDLk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
