@@ -29,7 +29,6 @@ const CustomTabBar = ({
 
   const iconMap: any = {
     home: { label: "Home", icon: "home-outline", active: "home" },
-    healthcare: { label: "Healthcare", icon: "medkit-outline", active: "medkit" },
     account: { label: "Account", icon: "person-outline", active: "person" },
   };
 
@@ -63,7 +62,6 @@ const CustomTabBar = ({
   };
 
   const leftTabs = state.routes.filter((r: any) => r.name === "home");
-  const centerTabs = state.routes.filter((r: any) => r.name === "healthcare");
   const rightTabs = state.routes.filter((r: any) => r.name === "account");
 
   return (
@@ -75,7 +73,6 @@ const CustomTabBar = ({
           <Text style={styles.scanLabel}>Voice Assist</Text>
         </View>
 
-        {centerTabs.map(renderTab)}
         {rightTabs.map(renderTab)}
       </View>
 
@@ -112,7 +109,10 @@ export default function Layout() {
         >
           <Tabs.Screen name="home" />
 
-          <Tabs.Screen name="healthcare" />
+          <Tabs.Screen
+            name="healthcare"
+            options={{ href: null }}
+          />
 
           <Tabs.Screen
             name="voice"
@@ -129,7 +129,6 @@ export default function Layout() {
             options={{ href: null, tabBarStyle: { display: "none" } }}
           />
 
-          {/* Hidden legacy screens — kept so existing links don't break */}
           <Tabs.Screen
             name="medicine"
             options={{ href: null }}

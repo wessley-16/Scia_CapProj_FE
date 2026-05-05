@@ -46,7 +46,7 @@ export interface UserRegistration {
   conNumber: string;
   gender: string;
   dob: string;
-  idNumber: string;
+  idNumber?: string;
   password: string;
   imageBase64?: string;
 }

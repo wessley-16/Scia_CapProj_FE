@@ -459,20 +459,11 @@ export default function Home() {
           />
 
           <ActionButton
-            title={t("setAppointment")}
-            subtitle={t("bookYourVisit")}
-            icon="calendar-check"
+            title={t("healthcare") || "Healthcare"}
+            subtitle={t("appointmentAndMeds") || "Appointments & Medications"}
+            icon="hospital-box"
             color="#2356E1"
             onPress={goToAppointment}
-            fontScale={fontScale}
-          />
-
-          <ActionButton
-            title={t("medicinePillBox")}
-            subtitle={t("manageMedications")}
-            icon="pill"
-            color="#2356E1"
-            onPress={goToMedicine}
             fontScale={fontScale}
           />
 
