@@ -519,16 +519,6 @@ export default function Healthcare() {
         </ScrollView>
       )}
 
-      {/* Camera FAB */}
-      <View style={styles.fab}>
-        <TouchableOpacity
-          style={styles.fabBtn}
-          onPress={() => router.push("/screen/camera")}
-        >
-          <AntDesign name="camera" size={26} color="white" />
-        </TouchableOpacity>
-      </View>
-
       {/* ── ADD MEDICINE MODAL ── */}
       <Modal visible={medicineModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>

@@ -28,6 +28,13 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
+// ── Helper: remove undefined fields so Firestore never rejects them ──────────
+function stripUndefined<T extends Record<string, any>>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, v]) => v !== undefined)
+  ) as T;
+}
+
 // ── Collection names (must match admin) ─────────────────────────────────────
 export const COLLECTIONS = {
   USERS: "users",
@@ -52,12 +59,12 @@ export interface UserRegistration {
 }
 
 export async function registerUser(data: UserRegistration) {
-  const docRef = await addDoc(collection(db, COLLECTIONS.USERS), {
+  const docRef = await addDoc(collection(db, COLLECTIONS.USERS), stripUndefined({
     ...data,
     status: "PENDING",
     role: "SENIOR_CITIZEN",
     createdAt: serverTimestamp(),
-  });
+  }));
   return { id: docRef.id, ...data };
 }
 
@@ -178,12 +185,12 @@ export interface AppointmentRequest {
 }
 
 export async function submitAppointment(data: AppointmentRequest) {
-  const docRef = await addDoc(collection(db, COLLECTIONS.APPOINTMENTS), {
+  const docRef = await addDoc(collection(db, COLLECTIONS.APPOINTMENTS), stripUndefined({
     ...data,
     center: "3S Center Valenzuela",
-    status: "pending",           // Sub-admin sees this in their dashboard
+    status: "pending",
     createdAt: serverTimestamp(),
-  });
+  }));
   return docRef.id;
 }
 
@@ -198,11 +205,11 @@ export interface IDRequest {
 }
 
 export async function submitIDRequest(data: IDRequest) {
-  const docRef = await addDoc(collection(db, COLLECTIONS.ID_REQUESTS), {
+  const docRef = await addDoc(collection(db, COLLECTIONS.ID_REQUESTS), stripUndefined({
     ...data,
-    status: "pending",           // Super-admin sees this in their dashboard
+    status: "pending",
     createdAt: serverTimestamp(),
-  });
+  }));
   return docRef.id;
 }
 

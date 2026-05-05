@@ -5,12 +5,11 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Dimensions, Image, ImageBackground, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { submitIDRequest } from "@/lib/firebase";
 
-  const background = require("../../assets/images/Monochrome.jpg");
 
 export default function account() {
   const { fontScale, t } = useSettings();
@@ -172,86 +171,79 @@ export default function account() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ImageBackground
-        source={background}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-      >
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* SCID SECTION */}
-          <View style={styles.header}>
-            <Text style={[styles.headerTitle, { fontSize: 24 * fontScale }]}>{t("profilePage")}</Text>
+        {/* BLUE HEADER */}
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { fontSize: 22 * fontScale }]}>{t("profilePage")}</Text>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity onPress={() => router.push("/settings")} style={styles.iconButton}>
+              <Ionicons name="settings" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleNotification} style={styles.iconButton}>
+              <Ionicons
+                name={showNotif ? "close" : "notifications"}
+                size={22}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-            <View style={styles.headerIcons}>
-              <TouchableOpacity onPress={() => router.push("/settings")} style={styles.iconButton}>
-                <Ionicons name="settings" size={26} color="#2356E1" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={toggleNotification} style={styles.iconButton}>
-                <Ionicons
-                  name={showNotif ? "close" : "notifications"}
-                  size={26}
-                  color="#2356E1"
-                />
-              </TouchableOpacity>
-            </View>
+        {/* BLUE TOP — details + avatar */}
+        <View style={styles.topSection}>
+          <View style={styles.detailsContainer}>
+            <Text style={[styles.label, { fontSize: 11 * fontScale }]}>{t("nameLabel")}</Text>
+            <Text style={[styles.value, { fontSize: 15 * fontScale }]}>{params.firstName} {params.midName} {params.lastName || "N/A"}</Text>
+
+            <Text style={[styles.label, { fontSize: 11 * fontScale }]}>{t("seniorCitizenId")}</Text>
+            <Text style={[styles.value, { fontSize: 15 * fontScale }]}>{params.idNumber || "N/A"}</Text>
+
+            <Text style={[styles.label, { fontSize: 11 * fontScale }]}>{t("addressLabel")}</Text>
+            <Text style={[styles.value, { fontSize: 15 * fontScale }]}>{params.address || "N/A"}</Text>
+
+            <Text style={[styles.label, { fontSize: 11 * fontScale }]}>{t("contactNumber")}</Text>
+            <Text style={[styles.value, { fontSize: 15 * fontScale }]}>{params.conNumber || "N/A"}</Text>
+
+            <Text style={[styles.label, { fontSize: 11 * fontScale }]}>{t("dobLabel")}</Text>
+            <Text style={[styles.value, { fontSize: 15 * fontScale }]}>{params.dob || "N/A"}</Text>
+
+            <Text style={[styles.label, { fontSize: 11 * fontScale }]}>{t("genderLabel")}</Text>
+            <Text style={[styles.value, { fontSize: 15 * fontScale }]}>{params.gender || "N/A"}</Text>
           </View>
 
-          <View style={styles.topSection}>
-            {/* DETAILS */}
-            <View style={styles.detailsContainer}>
-              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("nameLabel")}</Text>
-              <Text style={styles.value}>{params.firstName} {params.midName} {params.lastName || "N/A"}</Text>
-
-              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("seniorCitizenId")}</Text>
-              <Text style={styles.value}>{params.idNumber || "N/A"}</Text>
-
-              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("addressLabel")}</Text>
-              <Text style={styles.value}>{params.address || "N/A"}</Text>
-
-              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("contactNumber")}</Text>
-              <Text style={styles.value}>{params.conNumber || "N/A"}</Text>
-
-              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("dobLabel")}</Text>
-              <Text style={styles.value}>{params.dob || "N/A"}</Text>
-
-              <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("genderLabel")}</Text>
-              <Text style={styles.value}>{params.gender || "N/A"}</Text>
-            </View>
-
-            {/* PROFILE IMAGE */}
-            <View style={styles.imageContainer}>
-              <TouchableOpacity onPress={pickImage}>
-                <Image
-                  source={
-                    profileImage
-                      ? { uri: profileImage }
-                      : require("../../assets/images/default-profile.png")
-                  }
-                  style={styles.profileImage}
-                  onError={() => setProfileImage(null)}
-                />
+          {/* PROFILE IMAGE */}
+          <View style={styles.imageContainer}>
+            <TouchableOpacity onPress={pickImage}>
+              <Image
+                source={
+                  profileImage
+                    ? { uri: profileImage }
+                    : require("../../assets/images/default-profile.png")
+                }
+                style={styles.profileImage}
+                onError={() => setProfileImage(null)}
+              />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 12 * fontScale, marginTop: 8, color: "#F5C842", fontWeight: "600" }}>
+              {t("changePicture")}
+            </Text>
+            {profileImage && (
+              <TouchableOpacity onPress={deleteProfileImage}>
+                <Text style={[styles.deleteText, { fontSize: 12 * fontScale }]}>{t("removePicture")}</Text>
               </TouchableOpacity>
-
-              <Text style={{ fontSize: 16 * fontScale, marginTop: 10, color: "#000" }}>
-                {t("changePicture")}
-              </Text>
-
-              {/* ✅ DELETE BUTTON */}
-              {profileImage && (
-                <TouchableOpacity onPress={deleteProfileImage}>
-                  <Text style={[styles.deleteText, { fontSize: 16 * fontScale }]}>{t("removePicture")}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            )}
           </View>
+        </View>
 
+        {/* WHITE CARD BODY */}
+        <View style={styles.cardBody}>
           {/* QR CODE SECTION */}
           <View style={styles.qrCodeSection}>
-            <Text style={[styles.qrCodeTitle, { fontSize: 24 * fontScale }]}>{t("qrCodeTitle")}</Text>
+            <Text style={[styles.qrCodeTitle, { fontSize: 16 * fontScale }]}>{t("qrCodeTitle")}</Text>
             <Image
               source={{ uri: "https://via.placeholder.com/250x250?text=QR+Code+Placeholder" }}
               style={styles.qrCodeImage}
@@ -260,10 +252,10 @@ export default function account() {
 
           {/* PHYSICAL ID REQUEST */}
           <View style={styles.idRequestSection}>
-            <Text style={[styles.idRequestTitle, { fontSize: 17 * fontScale }]}>
+            <Text style={[styles.idRequestTitle, { fontSize: 15 * fontScale }]}>
               🪪 Physical Senior Citizen ID
             </Text>
-            <Text style={[styles.idRequestSub, { fontSize: 13 * fontScale }]}>
+            <Text style={[styles.idRequestSub, { fontSize: 12 * fontScale }]}>
               Request your physical ID card from the Valenzuela City OSCA.
               Your request will be reviewed by the Super Admin.
             </Text>
@@ -285,6 +277,7 @@ export default function account() {
               </TouchableOpacity>
             )}
           </View>
+        </View>
       </ScrollView>
 
       {/* PHYSICAL ID REQUEST MODAL */}
@@ -418,7 +411,7 @@ export default function account() {
            </Animated.View>
          </>
        )}
-      </ImageBackground>
+
     </SafeAreaView>
   );
 }
@@ -426,7 +419,7 @@ export default function account() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F6F9",
+    backgroundColor: "#2356E1",
   },
 
   backgroundImage: { flex: 1 },
@@ -437,18 +430,23 @@ const styles = StyleSheet.create({
 
   contentContainer: {
     padding: 0,
+    paddingBottom: 40,
   },
 
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: 20,
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: "#2356E1",
   },
 
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#1F2937",
+    color: "#FFFFFF",
   },
 
   headerIcons: {
@@ -458,10 +456,16 @@ const styles = StyleSheet.create({
 
   iconButton: {
     padding: 8,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 20,
   },
 
   topSection: {
     flexDirection: "row",
+    backgroundColor: "#2356E1",
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    alignItems: "center",
   },
 
   overlay: {
@@ -495,79 +499,97 @@ const styles = StyleSheet.create({
 
   detailsContainer: {
     flex: 1,
-    marginRight: 20,
-    padding: 20,
+    marginRight: 12,
   },
 
   label: {
-    fontSize: 20,
+    fontSize: 13,
     fontWeight: "bold",
-    color: "#1F2937",
+    color: "rgba(255,255,255,0.75)",
     marginTop: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 
   value: {
-    fontSize: 20,
-    color: "#4B5563",
-    marginBottom: 10,
+    fontSize: 15,
+    color: "#FFFFFF",
+    marginBottom: 2,
+    fontWeight: "500",
   },
 
   imageContainer: {
     alignItems: "center",
-    marginHorizontal: 20,
   },
 
   profileImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    padding: 20,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: "#F5C842",
   },
 
   deleteText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: "#DC2626",
+    marginTop: 8,
+    fontSize: 12,
+    color: "#FCA5A5",
     fontWeight: "600",
+  },
+
+  // White card body (sits below the blue header)
+  cardBody: {
+    backgroundColor: "#F0F4FF",
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -20,
+    paddingTop: 20,
+    paddingHorizontal: 16,
   },
 
   qrCodeSection: {
     alignItems: "center",
     backgroundColor: "white",
-    borderRadius: 30,
-    marginTop: 20,
-    padding: 12,
+    borderRadius: 20,
+    marginBottom: 16,
+    padding: 20,
     elevation: 3,
+    shadowColor: "#2356E1",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
 
   qrCodeTitle: {
-    fontSize: 24,
+    fontSize: 16,
     fontWeight: "bold",
-    color: "#1F2937",
-    marginBottom: 10,
+    color: "#2356E1",
+    marginBottom: 12,
   },
 
   qrCodeImage: {
-    width: 300,
-    height: 300,
-    backgroundColor: "#D1D5DB",
-    marginBottom: 100,
+    width: 220,
+    height: 220,
+    backgroundColor: "#E5EDFF",
+    borderRadius: 12,
   },
 
   idRequestSection: {
-    margin: 20,
-    marginTop: 0,
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     elevation: 2,
-    marginBottom: 120,
+    marginBottom: 20,
+    shadowColor: "#2356E1",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
   idRequestTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "bold",
     color: "#1F2937",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   idRequestSub: {
     fontSize: 13,
@@ -578,7 +600,7 @@ const styles = StyleSheet.create({
   idRequestBtn: {
     backgroundColor: "#2356E1",
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
