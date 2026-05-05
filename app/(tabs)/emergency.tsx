@@ -16,10 +16,10 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
-// 🔥 Firebase — replaces http://10.174.101.153:3000/api/emergency/send-alert
 import { sendSOSAlert } from '../../lib/firebase';
 
-const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"; // 🔴 PUT YOUR KEY HERE
+const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY";
+const HAS_VALID_MAPS_KEY = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
 const HOLD_DURATION_MS = 5000;
 
 const valenzuelaBarangays = [
@@ -72,8 +72,7 @@ export default function EmergencyScreen() {
   const [location, setLocation] = useState<any>(null);
   const [destination, setDestination] = useState<any>(null);
 
-  const [name, setName] = useState("");
-
+  const [name, setName] = useState('');
   const [fullAddress, setFullAddress] = useState('Fetching...');
   const [barangay, setBarangay] = useState('');
 
@@ -95,8 +94,8 @@ export default function EmergencyScreen() {
 
   useEffect(() => {
     const loadName = async () => {
-      const storedName = await AsyncStorage.getItem("userName");
-      setName(storedName || "Unknown");
+      const storedName = await AsyncStorage.getItem('userName');
+      setName(storedName || 'Unknown');
     };
     loadName();
   }, []);
@@ -107,7 +106,7 @@ export default function EmergencyScreen() {
     if (location && destination) {
       interval = setInterval(() => {
         setDestination((prev: any) => ({
-          latitude: prev.latitude + (location.latitude - prev.latitude) * 0.05,
+          latitude:  prev.latitude  + (location.latitude  - prev.latitude)  * 0.05,
           longitude: prev.longitude + (location.longitude - prev.longitude) * 0.05,
         }));
       }, 2000);
@@ -118,21 +117,19 @@ export default function EmergencyScreen() {
   const fetchLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission Denied');
+      Alert.alert('Permission Denied', 'Location access is required to send SOS alerts.');
       return;
     }
 
     const loc = await Location.getCurrentPositionAsync({});
     const coords = {
-      latitude: loc.coords.latitude,
+      latitude:  loc.coords.latitude,
       longitude: loc.coords.longitude,
     };
 
     setLocation(coords);
-
-    // Set initial responder (far away)
     setDestination({
-      latitude: coords.latitude + 0.02,
+      latitude:  coords.latitude  + 0.02,
       longitude: coords.longitude + 0.02,
     });
 
@@ -144,7 +141,6 @@ export default function EmergencyScreen() {
     }
   };
 
-  // SOS button handlers
   const startHold = () => {
     setIsHolding(true);
     setSecondsLeft(5);
@@ -174,46 +170,43 @@ export default function EmergencyScreen() {
     clearInterval(countdownInterval.current);
   };
 
-  const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+  const COOLDOWN_MS = 5 * 60 * 1000;
 
   const triggerSOS = async () => {
-    const now = Date.now();
+    // ✅ FIX 4: guard against null location before sending
+    if (!location) {
+      Alert.alert('Location unavailable', 'Still fetching your location. Please wait a moment.');
+      return;
+    }
 
+    const now = Date.now();
     if (lastSOS && now - lastSOS < COOLDOWN_MS) {
-      Alert.alert("Cooldown Active", "Please wait 5 minutes before sending another SOS.");
+      Alert.alert('Cooldown Active', 'Please wait 5 minutes before sending another SOS.');
       return;
     }
 
     try {
-      // 🔥 Write to Firestore "emergencies" collection.
-      // Admin SOSMap listens in real-time and shows this alert immediately.
       await sendSOSAlert({
-        name: name,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: fullAddress,
-        barangay: barangay,
-        emergencyType:
-          selectedEmergency === "Other"
-            ? otherEmergency
-            : selectedEmergency,
+        name,
+        latitude:      location.latitude,
+        longitude:     location.longitude,
+        address:       fullAddress,
+        barangay,
+        emergencyType: selectedEmergency === 'Other' ? otherEmergency : selectedEmergency,
       });
 
       setLastSOS(now);
       setCooldownActive(true);
+      setTimeout(() => setCooldownActive(false), COOLDOWN_MS);
 
-      // Auto remove cooldown after 5 mins
-      setTimeout(() => {
-        setCooldownActive(false);
-      }, COOLDOWN_MS);
-
+      Alert.alert('SOS Sent', 'Emergency alert has been sent successfully.');
     } catch (error: any) {
-      Alert.alert("Error", error?.message || "Failed to send SOS");
+      Alert.alert('Error', error?.message || 'Failed to send SOS');
     }
   };
 
   const rotate = progress.interpolate({
-    inputRange: [0, 1],
+    inputRange:  [0, 1],
     outputRange: ['0deg', '360deg'],
   });
 
@@ -229,56 +222,46 @@ export default function EmergencyScreen() {
             onPressIn={startHold}
             onPressOut={stopHold}
             disabled={cooldownActive}
-            style={[
-              styles.sosButton,
-              { opacity: cooldownActive ? 0.75 : 1 }
-            ]}
+            style={[styles.sosButton, { opacity: cooldownActive ? 0.75 : 1 }]}
           >
             <Text style={[styles.sosText, { fontSize: 26 * fontScale }]}>
-              {isHolding ? secondsLeft : "HOLD"}
+              {isHolding ? secondsLeft : 'HOLD'}
             </Text>
           </Pressable>
         </View>
 
-        {/* MAP — OpenStreetMap tiles (same detailed map as admin web) */}
+        {/* MAP */}
         <View style={styles.mapWrapper}>
           {location ? (
             <MapView
               style={styles.map}
-              mapType="none"
+              // ✅ FIX 1: use "standard" as base so something always renders,
+              //    even if the OSM UrlTile is slow or blocked on the device.
+              mapType="standard"
               region={{
-                latitude: location.latitude,
-                longitude: location.longitude,
+                latitude:      location.latitude,
+                longitude:     location.longitude,
                 latitudeDelta: 0.01,
                 longitudeDelta: 0.01,
               }}
             >
-              {/* OpenStreetMap tiles — same source as admin Leaflet map */}
+              {/* ✅ FIX 3: shouldReplaceMapContent prevents z-fighting with the base tiles */}
               <UrlTile
                 urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                 maximumZ={19}
                 flipY={false}
                 tileSize={256}
+                shouldReplaceMapContent
               />
 
-              {/* User location marker */}
-              <Marker
-                coordinate={location}
-                title="You"
-                pinColor="red"
-              />
+              <Marker coordinate={location} title="You" pinColor="red" />
 
-              {/* Responder marker */}
               {destination && (
-                <Marker
-                  coordinate={destination}
-                  title="Responder"
-                  pinColor="blue"
-                />
+                <Marker coordinate={destination} title="Responder" pinColor="blue" />
               )}
 
-              {/* Route line */}
-              {destination && (
+              {/* ✅ FIX 2: only render directions when a real API key is present */}
+              {destination && HAS_VALID_MAPS_KEY && (
                 <MapViewDirections
                   origin={destination}
                   destination={location}
@@ -296,22 +279,22 @@ export default function EmergencyScreen() {
         </View>
 
         {/* DROPDOWN */}
-        <Text style={[styles.label, { fontSize: 16 * fontScale }]}>{t("emergencyType")}</Text>
+        <Text style={[styles.label, { fontSize: 16 * fontScale }]}>{t('emergencyType')}</Text>
         <View style={styles.dropdown}>
           <Picker
             selectedValue={selectedEmergency}
             onValueChange={(val) => setSelectedEmergency(val)}
           >
-            <Picker.Item label={t("fall")} value="Fall" />
-            <Picker.Item label={t("heartAttack")} value="Heart Attack" />
-            <Picker.Item label={t("stroke")} value="Stroke" />
-            <Picker.Item label={t("other")} value="Other" />
+            <Picker.Item label={t('fall')}        value="Fall" />
+            <Picker.Item label={t('heartAttack')} value="Heart Attack" />
+            <Picker.Item label={t('stroke')}      value="Stroke" />
+            <Picker.Item label={t('other')}        value="Other" />
           </Picker>
         </View>
 
         {selectedEmergency === 'Other' && (
           <TextInput
-            placeholder={t("typeEmergency")}
+            placeholder={t('typeEmergency')}
             value={otherEmergency}
             onChangeText={setOtherEmergency}
             style={styles.input}
@@ -320,11 +303,11 @@ export default function EmergencyScreen() {
 
         {/* INFO */}
         <View style={styles.infoCard}>
-          <Text>{t("infoName")} {name}</Text>
-          <Text>{t("infoAddress")} {fullAddress}</Text>
-          <Text>{t("infoBarangay")} {barangay}</Text>
+          <Text>{t('infoName')} {name}</Text>
+          <Text>{t('infoAddress')} {fullAddress}</Text>
+          <Text>{t('infoBarangay')} {barangay}</Text>
           <Text>
-            {t("infoEmergency")} {selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}
+            {t('infoEmergency')} {selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}
           </Text>
         </View>
       </ScrollView>
@@ -333,19 +316,19 @@ export default function EmergencyScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea:            { flex: 1, backgroundColor: '#F9FAFB' },
-  scroll:              { padding: 20, paddingBottom: 120 },
-  header:              { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#CE2029', marginBottom: 20 },
-  sosWrapper:          { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
-  ring:                { position: 'absolute', width: 220, height: 220, borderRadius: 110, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
-  sosButton:           { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10 },
-  sosText:             { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  mapWrapper:          { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
-  map:                 { flex: 1 },
-  mapPlaceholder:      { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
-  mapPlaceholderText:  { color: '#9ca3af', fontSize: 14 },
-  dropdown:            { backgroundColor: '#fff', borderRadius: 10 },
-  input:               { backgroundColor: '#fff', padding: 10, marginTop: 10 },
-  infoCard:            { backgroundColor: '#fff', padding: 15, marginTop: 20 },
-  label:               { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
+  safeArea:           { flex: 1, backgroundColor: '#F9FAFB' },
+  scroll:             { padding: 20, paddingBottom: 120 },
+  header:             { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#CE2029', marginBottom: 20 },
+  sosWrapper:         { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
+  ring:               { position: 'absolute', width: 220, height: 220, borderRadius: 110, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
+  sosButton:          { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10 },
+  sosText:            { color: '#fff', fontSize: 26, fontWeight: 'bold' },
+  mapWrapper:         { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
+  map:                { flex: 1 },
+  mapPlaceholder:     { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
+  mapPlaceholderText: { color: '#9ca3af', fontSize: 14 },
+  dropdown:           { backgroundColor: '#fff', borderRadius: 10 },
+  input:              { backgroundColor: '#fff', padding: 10, marginTop: 10 },
+  infoCard:           { backgroundColor: '#fff', padding: 15, marginTop: 20 },
+  label:              { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
 });
