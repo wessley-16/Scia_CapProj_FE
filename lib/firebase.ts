@@ -23,6 +23,7 @@ import {
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
+
 // ── Same config as SCIA_Admin_Firebase ──────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyCUgV0Y6W5UedzmjIltFIoa8AY-mKYAfTU",
