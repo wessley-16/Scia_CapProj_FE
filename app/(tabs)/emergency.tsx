@@ -12,12 +12,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, UrlTile } from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
 // 🔥 Firebase — replaces http://10.174.101.153:3000/api/emergency/send-alert
 import { sendSOSAlert } from '../../lib/firebase';
 
+const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY"; // 🔴 PUT YOUR KEY HERE
 const HOLD_DURATION_MS = 5000;
 
 const valenzuelaBarangays = [
@@ -243,6 +245,7 @@ export default function EmergencyScreen() {
           {location ? (
             <MapView
               style={styles.map}
+              mapType="none"
               region={{
                 latitude: location.latitude,
                 longitude: location.longitude,
@@ -250,6 +253,14 @@ export default function EmergencyScreen() {
                 longitudeDelta: 0.01,
               }}
             >
+              {/* OpenStreetMap tiles — same source as admin Leaflet map */}
+              <UrlTile
+                urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                maximumZ={19}
+                flipY={false}
+                tileSize={256}
+              />
+
               {/* User location marker */}
               <Marker
                 coordinate={location}
@@ -263,6 +274,17 @@ export default function EmergencyScreen() {
                   coordinate={destination}
                   title="Responder"
                   pinColor="blue"
+                />
+              )}
+
+              {/* Route line */}
+              {destination && (
+                <MapViewDirections
+                  origin={destination}
+                  destination={location}
+                  apikey={GOOGLE_MAPS_API_KEY}
+                  strokeWidth={5}
+                  strokeColor="#0f52ba"
                 />
               )}
             </MapView>
