@@ -92,7 +92,12 @@ export default function Signup() {
       });
       router.replace({
         pathname: "/account",
-        params: { ...user, name: `${firstName} ${lastName}` },
+        params: {
+          ...user,
+          name: `${firstName} ${lastName}`,
+          isVerified: String(user.isVerified ?? false),
+          status: user.status ?? "PENDING",
+        },
       });
     } catch (error: any) {
       Alert.alert("Error", error?.message || "Registration failed");

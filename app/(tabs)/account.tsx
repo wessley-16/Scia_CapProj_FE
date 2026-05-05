@@ -200,6 +200,24 @@ export default function account() {
             </View>
           </View>
 
+          {/* ── VERIFICATION BANNER ─────────────────────────────── */}
+          {params.isVerified === "false" || !params.idNumber ? (
+            <View style={styles.unverifiedBanner}>
+              <Ionicons name="alert-circle-outline" size={20} color="#92400E" style={{ marginRight: 8 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.unverifiedTitle}>Account Unverified</Text>
+                <Text style={styles.unverifiedSubtitle}>
+                  Submit your Senior Citizen ID number below to get verified.
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.verifiedBanner}>
+              <Ionicons name="checkmark-circle" size={20} color="#065F46" style={{ marginRight: 8 }} />
+              <Text style={styles.verifiedTitle}>Verified Account ✓</Text>
+            </View>
+          )}
+
           <View style={styles.topSection}>
             {/* DETAILS */}
             <View style={styles.detailsContainer}>
@@ -207,7 +225,7 @@ export default function account() {
               <Text style={styles.value}>{params.firstName} {params.midName} {params.lastName || "N/A"}</Text>
 
               <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("seniorCitizenId")}</Text>
-              <Text style={styles.value}>{params.idNumber || "N/A"}</Text>
+              <Text style={styles.value}>{params.idNumber || "Not yet provided"}</Text>
 
               <Text style={[styles.label, { fontSize: 20 * fontScale }]}>{t("addressLabel")}</Text>
               <Text style={styles.value}>{params.address || "N/A"}</Text>
@@ -437,6 +455,45 @@ const styles = StyleSheet.create({
 
   contentContainer: {
     padding: 0,
+  },
+
+  // Verification banners
+  unverifiedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FEF3C7",
+    borderColor: "#F59E0B",
+    borderWidth: 1,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+  },
+  unverifiedTitle: {
+    fontWeight: "700",
+    color: "#92400E",
+    fontSize: 13,
+  },
+  unverifiedSubtitle: {
+    color: "#92400E",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  verifiedBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#D1FAE5",
+    borderColor: "#10B981",
+    borderWidth: 1,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    padding: 12,
+  },
+  verifiedTitle: {
+    fontWeight: "700",
+    color: "#065F46",
+    fontSize: 13,
   },
 
   header: {
