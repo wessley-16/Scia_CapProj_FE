@@ -55,7 +55,7 @@ function stripUndefined<T extends Record<string, any>>(obj: T): T {
 export const COLLECTIONS = {
   USERS: "users",
   EVENTS: "editorial_health",
-  EMERGENCIES: "sos_events",       // ✅ fixed: matches Firestore rules
+  EMERGENCIES: "emergencies",      // matches admin SOSMap collection
   APPOINTMENTS: "appointments",
   ID_REQUESTS: "id_requests",
   ANNOUNCEMENTS: "announcements",
@@ -86,8 +86,9 @@ export interface UserRegistration {
 }
 
 export async function registerUser(data: UserRegistration) {
-  const isVerified = !!(data.idNumber && data.idNumber.trim().length > 0);
-  const status = isVerified ? "VERIFIED" : "PENDING";
+  // Always PENDING — admin must verify, never auto-verified on signup
+  const isVerified = false;
+  const status = "PENDING";
 
   const effectiveIdNumber =
     data.idNumber && data.idNumber.trim().length > 0

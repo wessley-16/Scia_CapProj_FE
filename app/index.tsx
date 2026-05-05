@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -13,13 +12,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-// 🔥 Firebase — replaces http://10.174.101.153:3000/api/auth/login
 import { loginUser } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 
 const logo = require("../assets/images/Logo.png");
 
 export default function Index() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [idnum, setNscidNum] = useState("");
   const [password, setPassword] = useState("");
@@ -32,20 +32,10 @@ export default function Index() {
     }
     setIsLoading(true);
     try {
-      // 🔥 Query Firestore "users" collection directly
-      const user = await loginUser(idnum, password);
-
-      // Persist useful fields locally for other screens
-      await AsyncStorage.setItem("user", JSON.stringify(user));
-      await AsyncStorage.setItem("userId", user.id);
-      await AsyncStorage.setItem("userName", `${(user as any).firstName ?? ""} ${(user as any).lastName ?? ""}`.trim());
-      await AsyncStorage.setItem("userBarangay", (user as any).barangay ?? (user as any).address ?? "");
-      await AsyncStorage.setItem("userDistrict", (user as any).district ?? "");
-
-      router.replace({
-        pathname: "/(tabs)/home",
-        params: user as any,
-      });
+      await loginUser(idnum, password);
+      // Refresh the auth context so user data is globally available
+      await refreshUser();
+      router.replace("/(tabs)/home");
     } catch (error: any) {
       Alert.alert("Login Failed", error?.message || "Invalid credentials");
     } finally {
@@ -79,26 +69,22 @@ export default function Index() {
           </View>
         )}
 
-        {/* Show Login toggle */}
         {!showLogin && (
           <TouchableOpacity style={styles.primaryBtn} onPress={() => setShowLogin(true)}>
             <Text style={styles.primaryText}>Log In</Text>
           </TouchableOpacity>
         )}
 
-        {/* SUBMIT */}
         {showLogin && (
           <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
             {isLoading ? <ActivityIndicator color="white" /> : <Text style={styles.primaryText}>Submit</Text>}
           </TouchableOpacity>
         )}
 
-        {/* SIGN UP */}
         <TouchableOpacity onPress={() => router.push("/(auth)/signup")} style={styles.secondaryBtn}>
           <Text style={styles.secondaryText}>Sign-up</Text>
         </TouchableOpacity>
 
-        {/* GUEST */}
         <Text onPress={() => router.push("/(tabs)/home")} style={styles.guest}>Guest</Text>
       </View>
     </KeyboardAvoidingView>

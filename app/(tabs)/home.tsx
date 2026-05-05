@@ -2,22 +2,23 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import { Animated, Dimensions, Image, ImageBackground, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — replaces http://10.142.254.160:3000/api/events
 import { subscribeToEvents, Event as FirebaseEvent } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 import { Medicine } from "@/interfaces/interfaces";
 
 const background = require("../../assets/images/Foreground.png");
 
 export default function Home() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const name = typeof params.name === "string" ? params.name : "Sa inyo";
-  const idNumber = typeof params.idNumber === "string" ? params.idNumber : "No ID";
+  const { user } = useAuth();
+  const name = user ? (`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Sa inyo") : "Sa inyo";
+  const idNumber = user?.idNumber ?? "No ID";
   const tabBarHeight = useBottomTabBarHeight();
   const { fontScale, t } = useSettings();
   const [refreshing, setRefreshing] = useState(false);

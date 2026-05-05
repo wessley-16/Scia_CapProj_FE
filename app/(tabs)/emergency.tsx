@@ -13,13 +13,14 @@ import {
   View,
 } from 'react-native';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
-import MapViewDirections from 'react-native-maps-directions';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
+import { useAuth } from '../../context/AuthContext';
 import { sendSOSAlert } from '../../lib/firebase';
 
-const GOOGLE_MAPS_API_KEY = "YOUR_GOOGLE_MAPS_API_KEY";
-const HAS_VALID_MAPS_KEY = GOOGLE_MAPS_API_KEY !== "YOUR_GOOGLE_MAPS_API_KEY";
+// MapViewDirections removed — requires valid Google Maps API key
+// If you add a real key, re-import MapViewDirections and uncomment the component below
+
 const HOLD_DURATION_MS = 5000;
 
 const valenzuelaBarangays = [
@@ -69,8 +70,8 @@ const getBarangayFromCoords = (lat: number, lng: number): string => {
 
 export default function EmergencyScreen() {
   const { fontScale, t } = useSettings();
+  const { user } = useAuth();
   const [location, setLocation] = useState<any>(null);
-  const [destination, setDestination] = useState<any>(null);
 
   const [name, setName] = useState('');
   const [fullAddress, setFullAddress] = useState('Fetching...');
@@ -84,6 +85,7 @@ export default function EmergencyScreen() {
 
   const progress = useRef(new Animated.Value(0)).current;
   const countdownInterval = useRef<any>(null);
+  const animRef = useRef<any>(null);
 
   const [lastSOS, setLastSOS] = useState<number | null>(null);
   const [cooldownActive, setCooldownActive] = useState(false);
@@ -92,27 +94,16 @@ export default function EmergencyScreen() {
     fetchLocation();
   }, []);
 
+  // Load user name from AuthContext or AsyncStorage fallback
   useEffect(() => {
-    const loadName = async () => {
-      const storedName = await AsyncStorage.getItem('userName');
-      setName(storedName || 'Unknown');
-    };
-    loadName();
-  }, []);
-
-  // Simulate responder moving toward user
-  useEffect(() => {
-    let interval: any;
-    if (location && destination) {
-      interval = setInterval(() => {
-        setDestination((prev: any) => ({
-          latitude:  prev.latitude  + (location.latitude  - prev.latitude)  * 0.05,
-          longitude: prev.longitude + (location.longitude - prev.longitude) * 0.05,
-        }));
-      }, 2000);
+    if (user) {
+      setName(`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown');
+    } else {
+      AsyncStorage.getItem('userName').then(stored => {
+        setName(stored || 'Unknown');
+      });
     }
-    return () => clearInterval(interval);
-  }, [location, destination]);
+  }, [user]);
 
   const fetchLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -120,18 +111,9 @@ export default function EmergencyScreen() {
       Alert.alert('Permission Denied', 'Location access is required to send SOS alerts.');
       return;
     }
-
     const loc = await Location.getCurrentPositionAsync({});
-    const coords = {
-      latitude:  loc.coords.latitude,
-      longitude: loc.coords.longitude,
-    };
-
+    const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
     setLocation(coords);
-    setDestination({
-      latitude:  coords.latitude  + 0.02,
-      longitude: coords.longitude + 0.02,
-    });
 
     const geo = await Location.reverseGeocodeAsync(loc.coords);
     if (geo.length > 0) {
@@ -156,11 +138,12 @@ export default function EmergencyScreen() {
       });
     }, 1000);
 
-    Animated.timing(progress, {
+    animRef.current = Animated.timing(progress, {
       toValue: 1,
       duration: HOLD_DURATION_MS,
       useNativeDriver: true,
-    }).start();
+    });
+    animRef.current.start();
   };
 
   const stopHold = () => {
@@ -168,17 +151,16 @@ export default function EmergencyScreen() {
     progress.setValue(0);
     setSecondsLeft(5);
     clearInterval(countdownInterval.current);
+    animRef.current?.stop();
   };
 
   const COOLDOWN_MS = 5 * 60 * 1000;
 
   const triggerSOS = async () => {
-    // ✅ FIX 4: guard against null location before sending
     if (!location) {
       Alert.alert('Location unavailable', 'Still fetching your location. Please wait a moment.');
       return;
     }
-
     const now = Date.now();
     if (lastSOS && now - lastSOS < COOLDOWN_MS) {
       Alert.alert('Cooldown Active', 'Please wait 5 minutes before sending another SOS.');
@@ -194,14 +176,12 @@ export default function EmergencyScreen() {
         barangay,
         emergencyType: selectedEmergency === 'Other' ? otherEmergency : selectedEmergency,
       });
-
       setLastSOS(now);
       setCooldownActive(true);
       setTimeout(() => setCooldownActive(false), COOLDOWN_MS);
-
-      Alert.alert('SOS Sent', 'Emergency alert has been sent successfully.');
+      Alert.alert('🚨 SOS Sent', 'Emergency alert has been sent. Help is on the way!');
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to send SOS');
+      Alert.alert('Error', error?.message || 'Failed to send SOS. Please try again.');
     }
   };
 
@@ -225,18 +205,22 @@ export default function EmergencyScreen() {
             style={[styles.sosButton, { opacity: cooldownActive ? 0.75 : 1 }]}
           >
             <Text style={[styles.sosText, { fontSize: 26 * fontScale }]}>
-              {isHolding ? secondsLeft : 'HOLD'}
+              {cooldownActive ? 'SENT' : isHolding ? secondsLeft : 'HOLD'}
             </Text>
           </Pressable>
         </View>
+
+        {cooldownActive && (
+          <View style={styles.cooldownBanner}>
+            <Text style={styles.cooldownText}>✅ SOS alert was sent. Cooldown active (5 min).</Text>
+          </View>
+        )}
 
         {/* MAP */}
         <View style={styles.mapWrapper}>
           {location ? (
             <MapView
               style={styles.map}
-              // ✅ FIX 1: use "standard" as base so something always renders,
-              //    even if the OSM UrlTile is slow or blocked on the device.
               mapType="standard"
               region={{
                 latitude:      location.latitude,
@@ -245,7 +229,6 @@ export default function EmergencyScreen() {
                 longitudeDelta: 0.01,
               }}
             >
-              {/* ✅ FIX 3: shouldReplaceMapContent prevents z-fighting with the base tiles */}
               <UrlTile
                 urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                 maximumZ={19}
@@ -253,23 +236,7 @@ export default function EmergencyScreen() {
                 tileSize={256}
                 shouldReplaceMapContent
               />
-
-              <Marker coordinate={location} title="You" pinColor="red" />
-
-              {destination && (
-                <Marker coordinate={destination} title="Responder" pinColor="blue" />
-              )}
-
-              {/* ✅ FIX 2: only render directions when a real API key is present */}
-              {destination && HAS_VALID_MAPS_KEY && (
-                <MapViewDirections
-                  origin={destination}
-                  destination={location}
-                  apikey={GOOGLE_MAPS_API_KEY}
-                  strokeWidth={5}
-                  strokeColor="#0f52ba"
-                />
-              )}
+              <Marker coordinate={location} title="Your Location" pinColor="red" />
             </MapView>
           ) : (
             <View style={styles.mapPlaceholder}>
@@ -281,14 +248,11 @@ export default function EmergencyScreen() {
         {/* DROPDOWN */}
         <Text style={[styles.label, { fontSize: 16 * fontScale }]}>{t('emergencyType')}</Text>
         <View style={styles.dropdown}>
-          <Picker
-            selectedValue={selectedEmergency}
-            onValueChange={(val) => setSelectedEmergency(val)}
-          >
+          <Picker selectedValue={selectedEmergency} onValueChange={(val) => setSelectedEmergency(val)}>
             <Picker.Item label={t('fall')}        value="Fall" />
             <Picker.Item label={t('heartAttack')} value="Heart Attack" />
             <Picker.Item label={t('stroke')}      value="Stroke" />
-            <Picker.Item label={t('other')}        value="Other" />
+            <Picker.Item label={t('other')}       value="Other" />
           </Picker>
         </View>
 
@@ -301,13 +265,20 @@ export default function EmergencyScreen() {
           />
         )}
 
-        {/* INFO */}
+        {/* INFO CARD */}
         <View style={styles.infoCard}>
-          <Text>{t('infoName')} {name}</Text>
-          <Text>{t('infoAddress')} {fullAddress}</Text>
-          <Text>{t('infoBarangay')} {barangay}</Text>
-          <Text>
-            {t('infoEmergency')} {selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}
+          <Text style={styles.infoTitle}>📋 Alert Details</Text>
+          <Text style={styles.infoRow}>{t('infoName')} <Text style={styles.infoValue}>{name}</Text></Text>
+          <Text style={styles.infoRow}>{t('infoAddress')} <Text style={styles.infoValue}>{fullAddress}</Text></Text>
+          <Text style={styles.infoRow}>{t('infoBarangay')} <Text style={styles.infoValue}>{barangay}</Text></Text>
+          <Text style={styles.infoRow}>
+            {t('infoEmergency')} <Text style={styles.infoValue}>{selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}</Text>
+          </Text>
+        </View>
+
+        <View style={styles.instructionCard}>
+          <Text style={styles.instructionText}>
+            🆘 Hold the red button for 5 seconds to send an emergency alert to responders.
           </Text>
         </View>
       </ScrollView>
@@ -321,14 +292,21 @@ const styles = StyleSheet.create({
   header:             { fontSize: 28, fontWeight: 'bold', textAlign: 'center', color: '#CE2029', marginBottom: 20 },
   sosWrapper:         { alignItems: 'center', justifyContent: 'center', marginVertical: 20 },
   ring:               { position: 'absolute', width: 220, height: 220, borderRadius: 110, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
-  sosButton:          { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10 },
+  sosButton:          { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10, shadowColor: '#CE2029', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8 },
   sosText:            { color: '#fff', fontSize: 26, fontWeight: 'bold' },
+  cooldownBanner:     { backgroundColor: '#D1FAE5', borderRadius: 12, padding: 12, marginBottom: 12, alignItems: 'center' },
+  cooldownText:       { color: '#065F46', fontWeight: '600', fontSize: 14 },
   mapWrapper:         { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
   map:                { flex: 1 },
   mapPlaceholder:     { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
   mapPlaceholderText: { color: '#9ca3af', fontSize: 14 },
-  dropdown:           { backgroundColor: '#fff', borderRadius: 10 },
-  input:              { backgroundColor: '#fff', padding: 10, marginTop: 10 },
-  infoCard:           { backgroundColor: '#fff', padding: 15, marginTop: 20 },
-  label:              { fontSize: 16, fontWeight: 'bold', marginBottom: 6 },
+  dropdown:           { backgroundColor: '#fff', borderRadius: 10, marginBottom: 10 },
+  input:              { backgroundColor: '#fff', padding: 10, marginTop: 10, borderRadius: 8 },
+  infoCard:           { backgroundColor: '#fff', padding: 16, marginTop: 16, borderRadius: 14, elevation: 2 },
+  infoTitle:          { fontSize: 16, fontWeight: 'bold', color: '#1F2937', marginBottom: 10 },
+  infoRow:            { fontSize: 14, color: '#6B7280', marginBottom: 4 },
+  infoValue:          { color: '#111827', fontWeight: '600' },
+  label:              { fontSize: 16, fontWeight: 'bold', marginBottom: 6, color: '#374151' },
+  instructionCard:    { backgroundColor: '#FEF3C7', borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 1, borderColor: '#F59E0B' },
+  instructionText:    { color: '#92400E', fontSize: 14, lineHeight: 20 },
 });
