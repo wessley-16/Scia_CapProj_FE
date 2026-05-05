@@ -1,4 +1,3 @@
-// Firebase SDK — same project as the Admin panel
 import { initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
@@ -20,6 +19,7 @@ import {
   serverTimestamp,
   setDoc,
   where,
+  getDoc,
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -40,8 +40,6 @@ export const storage = getStorage(app);
 export const auth = getAuth(app);
 
 // ── Helper: build a synthetic email from idNumber ───────────────────────────
-// Firebase Auth requires an email format. We convert the senior's idNumber
-// into a stable internal email that is never shown to the user.
 export const idToEmail = (idNumber: string) =>
   `${idNumber.trim().toLowerCase()}@scia.app`;
 
@@ -56,9 +54,11 @@ function stripUndefined<T extends Record<string, any>>(obj: T): T {
 export const COLLECTIONS = {
   USERS: "users",
   EVENTS: "editorial_health",
-  EMERGENCIES: "emergencies",
+  EMERGENCIES: "sos_events",       // ✅ fixed: matches Firestore rules
   APPOINTMENTS: "appointments",
   ID_REQUESTS: "id_requests",
+  ANNOUNCEMENTS: "announcements",
+  HEALTH_CENTERS: "health_centers",
 };
 
 // ── AUTH STATE ───────────────────────────────────────────────────────────────
@@ -88,8 +88,6 @@ export async function registerUser(data: UserRegistration) {
   const isVerified = !!(data.idNumber && data.idNumber.trim().length > 0);
   const status = isVerified ? "VERIFIED" : "PENDING";
 
-  // Every senior needs an idNumber to sign in later.
-  // If they don't have one yet, we generate a temporary one from timestamp.
   const effectiveIdNumber =
     data.idNumber && data.idNumber.trim().length > 0
       ? data.idNumber.trim()
@@ -131,15 +129,10 @@ export async function loginUser(idNumber: string, password: string) {
   const cred = await signInWithEmailAndPassword(auth, email, password);
   const uid = cred.user.uid;
 
-  // Fetch the Firestore profile
-  const q = query(
-    collection(db, COLLECTIONS.USERS),
-    where("uid", "==", uid)
-  );
-  const snapshot = await getDocs(q);
-  if (snapshot.empty) throw new Error("User profile not found.");
-  const docSnap = snapshot.docs[0];
-  return { id: docSnap.id, ...docSnap.data() };
+  // Fetch the Firestore profile directly by uid (document ID)
+  const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+  if (!userDoc.exists()) throw new Error("User profile not found.");
+  return { id: userDoc.id, ...userDoc.data() };
 }
 
 // ── ANNOUNCEMENTS / EVENTS ───────────────────────────────────────────────────
@@ -231,7 +224,6 @@ export interface EmergencyAlert {
 }
 
 export async function sendSOSAlert(data: EmergencyAlert) {
-  // auth.currentUser is guaranteed here since only logged-in seniors can send SOS
   const uid = auth.currentUser?.uid ?? "anonymous";
   const docRef = await addDoc(collection(db, COLLECTIONS.EMERGENCIES), {
     ...data,
@@ -265,6 +257,37 @@ export async function submitAppointment(data: AppointmentRequest) {
     })
   );
   return docRef.id;
+}
+
+// ── HEALTH CENTERS ───────────────────────────────────────────────────────────
+export interface HealthCenter {
+  id: string;
+  name: string;
+  address?: string;
+  barangay?: string;
+  latitude?: number;
+  longitude?: number;
+  phone?: string;
+  hours?: string;
+}
+
+export async function fetchHealthCenters(): Promise<HealthCenter[]> {
+  const snapshot = await getDocs(collection(db, COLLECTIONS.HEALTH_CENTERS));
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HealthCenter));
+}
+
+export function subscribeToHealthCenters(
+  callback: (centers: HealthCenter[]) => void
+) {
+  return onSnapshot(
+    collection(db, COLLECTIONS.HEALTH_CENTERS),
+    (snapshot) => {
+      const centers = snapshot.docs.map(
+        (d) => ({ id: d.id, ...d.data() } as HealthCenter)
+      );
+      callback(centers);
+    }
+  );
 }
 
 // ── PHYSICAL ID REQUEST ───────────────────────────────────────────────────────

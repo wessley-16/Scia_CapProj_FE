@@ -2,9 +2,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 import { CHATBOT_STORAGE_KEY, MAX_CHATBOT_MESSAGES } from "@/constants/constants";
 
-// ── YOUR ANTHROPIC API KEY ───────────────────────────────────────────────────
-// Get one free at https://console.anthropic.com
-// ⚠️  For production, move this to a backend proxy so it stays secret.
+// ── ANTHROPIC CONFIGURATION ─────────────────────────────────────────────────
+// ⚠️  REPLACE WITH YOUR KEY from https://console.anthropic.com
+// For production, move this to a secure backend proxy.
 const ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_API_KEY_HERE";
 const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 
@@ -49,24 +49,20 @@ const buildAnthropicMessages = (
   history: ChatMessage[],
   currentMessage: string
 ) => {
-  // Take last N messages for context (must alternate user/assistant)
   const context = history
     .slice(-MAX_CONTEXT_MESSAGES)
-    .filter((m) => m.id !== "initial") // skip the greeting
+    .filter((m) => m.id !== "initial")
     .map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.text,
     }));
 
-  // Anthropic requires the messages array to start with a user turn
-  // and strictly alternate. Remove leading assistant messages if any.
+  // Anthropic requires messages to start with a user turn
   while (context.length > 0 && context[0].role === "assistant") {
     context.shift();
   }
 
-  // Append the current user message
   context.push({ role: "user", content: currentMessage });
-
   return context;
 };
 
@@ -145,7 +141,14 @@ export const useChatbot = () => {
     setLoading(true);
 
     try {
-      // Call Anthropic Claude API directly ─────────────────────────────────
+      if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY === "YOUR_ANTHROPIC_API_KEY_HERE") {
+        addMessage(
+          "assistant",
+          "⚠️ HealthAI is not configured yet. Please ask your administrator to add the Anthropic API key in hooks/useChatbot.ts."
+        );
+        return;
+      }
+
       const anthropicMessages = buildAnthropicMessages(messages, trimmed);
 
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -154,7 +157,6 @@ export const useChatbot = () => {
           "Content-Type": "application/json",
           "x-api-key": ANTHROPIC_API_KEY,
           "anthropic-version": "2023-06-01",
-          // Required for direct browser/RN calls (bypasses CORS preflight check):
           "anthropic-dangerous-request-from-browser": "true",
         },
         body: JSON.stringify({
@@ -174,7 +176,6 @@ export const useChatbot = () => {
         return;
       }
 
-      // Extract text from Anthropic response content blocks
       const reply: string =
         data?.content
           ?.filter((block: any) => block.type === "text")
