@@ -18,7 +18,11 @@
         "monochromeImage": "./assets/images/Monochrome.jpg"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.scia"
+      "package": "com.anonymous.scia",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "static",
@@ -52,6 +56,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8ecd04c2-94d9-4c95-bcc2-fa9f07355a33"
+      }
     }
   }
 }
