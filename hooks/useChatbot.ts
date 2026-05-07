@@ -1,12 +1,12 @@
+// hooks/useChatbot.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 import { CHATBOT_STORAGE_KEY, MAX_CHATBOT_MESSAGES } from "@/constants/constants";
-// ✅ Use getGenerativeModel directly from @react-native-firebase/vertexai
-//    The correct package for React Native Firebase is @react-native-firebase/vertexai,
-//    not @react-native-firebase/ai — getVertexAI does not exist in that package.
-import { getGenerativeModel } from "@react-native-firebase/vertexai";
+// ✅ @react-native-firebase/ai v24 — getGenerativeModel(app, modelParams)
+import { getGenerativeModel } from "@react-native-firebase/ai";
+import { getApp } from "@react-native-firebase/app";
 
-// ── SCIA Health AI system prompt ─────────────────────────────────────────────
+// ── SCIA Health AI system prompt ──────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are HealthAI, a caring and knowledgeable health assistant for senior citizens in Valenzuela City, Philippines. You are part of the SCIA (Senior Citizens Information and Assistance) mobile app.
 
 Your role:
@@ -21,7 +21,7 @@ Your role:
 
 Important: You are NOT a substitute for emergency services. If someone describes an emergency, always tell them to call 911 or use the SOS button in the app immediately.`;
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -42,22 +42,26 @@ const INITIAL_MESSAGE: ChatMessage = {
 const getTrimmedMessages = (messages: ChatMessage[]) =>
   messages.slice(-MAX_CHATBOT_MESSAGES);
 
-// ── Vertex AI model (lazy-initialized) ───────────────────────────────────────
-// FIX: getGenerativeModel is called directly without getVertexAI wrapper.
-// Make sure "Vertex AI for Firebase" is enabled in your Firebase console.
+// ── Vertex AI model (lazy-initialized) ────────────────────────────────────────
+// getGenerativeModel in @react-native-firebase/ai v24 requires 2 arguments:
+//   arg1: Firebase App instance
+//   arg2: model params object
 let _model: ReturnType<typeof getGenerativeModel> | null = null;
 
 const getModel = () => {
   if (!_model) {
-    _model = getGenerativeModel({
-      model: "gemini-2.0-flash",
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    });
+    _model = getGenerativeModel(
+      getApp(),  // ← required first arg in v24
+      {
+        model: "gemini-2.0-flash",
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      }
+    );
   }
   return _model;
 };
 
-// ── Storage helpers ──────────────────────────────────────────────────────────
+// ── Storage helpers ───────────────────────────────────────────────────────────
 type StoredChatMessage = Omit<ChatMessage, "id"> & { id?: string };
 
 const isValidMessagesArray = (value: unknown): value is StoredChatMessage[] => {
@@ -70,7 +74,7 @@ const isValidMessagesArray = (value: unknown): value is StoredChatMessage[] => {
   );
 };
 
-// ── Hook ─────────────────────────────────────────────────────────────────────
+// ── Hook ──────────────────────────────────────────────────────────────────────
 export const useChatbot = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
   const [hydrated, setHydrated] = useState(false);
@@ -132,8 +136,6 @@ export const useChatbot = () => {
     try {
       const model = getModel();
 
-      // FIX: Explicitly type history entries so `role` is the literal union
-      // "user" | "model" expected by the Vertex AI SDK, not a plain string.
       type HistoryEntry = { role: "user" | "model"; parts: { text: string }[] };
 
       const historyMessages: HistoryEntry[] = messages
@@ -144,7 +146,6 @@ export const useChatbot = () => {
           parts: [{ text: m.text }],
         }));
 
-      // Ensure history doesn't start with a model turn
       while (historyMessages.length > 0 && historyMessages[0].role === "model") {
         historyMessages.shift();
       }
@@ -155,7 +156,7 @@ export const useChatbot = () => {
 
       addMessage("assistant", reply);
     } catch (error: any) {
-      console.log("HealthAI Vertex error:", error);
+      console.log("HealthAI error:", error);
       addMessage(
         "assistant",
         "Connection error. Please check your internet and try again."

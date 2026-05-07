@@ -1,24 +1,61 @@
-import auth, { FirebaseAuthTypes } from "@react-native-firebase/auth";
-import firestore, { FirebaseFirestoreTypes } from "@react-native-firebase/firestore";
-import storage from "@react-native-firebase/storage";
+// ─────────────────────────────────────────────────────────────────────────────
+// lib/firebase.ts
+// Uses the JS Firebase Web SDK (already in package.json as "firebase": "^12")
+// This works in ANY Expo build — no native linking required.
+// ─────────────────────────────────────────────────────────────────────────────
 
-// No initializeApp() needed — native SDK auto-initializes from
-// google-services.json (Android) / GoogleService-Info.plist (iOS)
+import { getApp, getApps, initializeApp } from "firebase/app";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged as _onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  getFirestore,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
-export { auth, firestore, storage };
+// ── Firebase config (from google-services.json) ───────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyC0pThdE1nLlSN_8G132qKMdR9-KMAsDLk",
+  authDomain: "scia-b5440.firebaseapp.com",
+  databaseURL: "https://scia-b5440-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "scia-b5440",
+  storageBucket: "scia-b5440.firebasestorage.app",
+  messagingSenderId: "244279971713",
+  appId: "1:244279971713:android:c8f3a04684059cd593a280",
+};
 
-// ── Helper: build a synthetic email from idNumber ───────────────────────────
+// Guard against double-init on hot reload
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+
+// ── Helper: build a synthetic email from idNumber ────────────────────────────
 export const idToEmail = (idNumber: string) =>
   `${idNumber.trim().toLowerCase()}@scia.app`;
 
-// ── Helper: remove undefined fields ─────────────────────────────────────────
+// ── Helper: strip undefined so Firestore doesn't complain ────────────────────
 function stripUndefined<T extends Record<string, any>>(obj: T): T {
   return Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined)
   ) as T;
 }
 
-// ── Collection names ─────────────────────────────────────────────────────────
+// ── Collection names ──────────────────────────────────────────────────────────
 export const COLLECTIONS = {
   USERS: "users",
   EVENTS: "editorial_health",
@@ -29,18 +66,16 @@ export const COLLECTIONS = {
   HEALTH_CENTERS: "health_centers",
 };
 
-// ── AUTH STATE ───────────────────────────────────────────────────────────────
-export function subscribeToAuthState(
-  callback: (user: FirebaseAuthTypes.User | null) => void
-) {
-  return auth().onAuthStateChanged(callback);
+// ── AUTH STATE ────────────────────────────────────────────────────────────────
+export function subscribeToAuthState(callback: (user: any | null) => void) {
+  return _onAuthStateChanged(auth, callback);
 }
 
 export async function logoutUser() {
-  await auth().signOut();
+  await signOut(auth);
 }
 
-// ── USER REGISTRATION ────────────────────────────────────────────────────────
+// ── USER REGISTRATION ─────────────────────────────────────────────────────────
 export interface UserRegistration {
   firstName: string;
   midName: string;
@@ -64,47 +99,44 @@ export async function registerUser(data: UserRegistration) {
       : `TEMP-${Date.now()}`;
 
   const email = idToEmail(effectiveIdNumber);
-
-  const cred = await auth().createUserWithEmailAndPassword(email, data.password);
+  const cred = await createUserWithEmailAndPassword(auth, email, data.password);
   const uid = cred.user.uid;
 
-  await firestore()
-    .collection(COLLECTIONS.USERS)
-    .doc(uid)
-    .set(
-      stripUndefined({
-        firstName: data.firstName,
-        midName: data.midName,
-        lastName: data.lastName,
-        address: data.address,
-        conNumber: data.conNumber,
-        gender: data.gender,
-        dob: data.dob,
-        idNumber: effectiveIdNumber,
-        imageBase64: data.imageBase64,
-        status,
-        isVerified,
-        role: "SENIOR_CITIZEN",
-        uid,
-        createdAt: firestore.FieldValue.serverTimestamp(),
-      })
-    );
+  await setDoc(
+    doc(db, COLLECTIONS.USERS, uid),
+    stripUndefined({
+      firstName: data.firstName,
+      midName: data.midName,
+      lastName: data.lastName,
+      address: data.address,
+      conNumber: data.conNumber,
+      gender: data.gender,
+      dob: data.dob,
+      idNumber: effectiveIdNumber,
+      imageBase64: data.imageBase64,
+      status,
+      isVerified,
+      role: "SENIOR_CITIZEN",
+      uid,
+      createdAt: serverTimestamp(),
+    })
+  );
 
   return { id: uid, ...data, idNumber: effectiveIdNumber, status, isVerified };
 }
 
-// ── LOGIN ────────────────────────────────────────────────────────────────────
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
 export async function loginUser(idNumber: string, password: string) {
   const email = idToEmail(idNumber);
-  const cred = await auth().signInWithEmailAndPassword(email, password);
+  const cred = await signInWithEmailAndPassword(auth, email, password);
   const uid = cred.user.uid;
 
-  const userDoc = await firestore().collection(COLLECTIONS.USERS).doc(uid).get();
-  if (!userDoc.exists) throw new Error("User profile not found.");
+  const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+  if (!userDoc.exists()) throw new Error("User profile not found.");
   return { id: userDoc.id, ...userDoc.data() };
 }
 
-// ── ANNOUNCEMENTS / EVENTS ───────────────────────────────────────────────────
+// ── EVENTS ────────────────────────────────────────────────────────────────────
 export interface Event {
   id: string;
   Title?: string;
@@ -123,17 +155,13 @@ export interface Event {
   Status?: string;
 }
 
-export async function fetchEvents(
+function filterEvents(
+  docs: any[],
   barangay?: string | null,
   district?: string | null
-): Promise<Event[]> {
-  const snapshot = await firestore()
-    .collection(COLLECTIONS.EVENTS)
-    .orderBy("createdAt", "desc")
-    .get();
-
+): Event[] {
   const now = new Date();
-  return snapshot.docs
+  return docs
     .map((d) => ({ id: d.id, ...d.data() } as Event))
     .filter((event) => {
       if (event.expiration) {
@@ -150,36 +178,33 @@ export async function fetchEvents(
     });
 }
 
+export async function fetchEvents(
+  barangay?: string | null,
+  district?: string | null
+): Promise<Event[]> {
+  const q = query(
+    collection(db, COLLECTIONS.EVENTS),
+    orderBy("createdAt", "desc")
+  );
+  const snapshot = await getDocs(q);
+  return filterEvents(snapshot.docs, barangay, district);
+}
+
 export function subscribeToEvents(
   barangay: string | null,
   district: string | null,
   callback: (events: Event[]) => void
 ) {
-  return firestore()
-    .collection(COLLECTIONS.EVENTS)
-    .orderBy("createdAt", "desc")
-    .onSnapshot((snapshot) => {
-      const now = new Date();
-      const events = snapshot.docs
-        .map((d) => ({ id: d.id, ...d.data() } as Event))
-        .filter((event) => {
-          if (event.expiration) {
-            try {
-              if (new Date(event.expiration) <= now) return false;
-            } catch (_) {}
-          }
-          const audience = event.Audience || event.audience || "ALL";
-          if (audience === "ALL") return true;
-          if (audience === "DISTRICT_1" && district === "DISTRICT_1") return true;
-          if (audience === "DISTRICT_2" && district === "DISTRICT_2") return true;
-          if (audience === "BARANGAY" && barangay === event.barangay) return true;
-          return false;
-        });
-      callback(events);
-    });
+  const q = query(
+    collection(db, COLLECTIONS.EVENTS),
+    orderBy("createdAt", "desc")
+  );
+  return onSnapshot(q, (snapshot) => {
+    callback(filterEvents(snapshot.docs, barangay, district));
+  });
 }
 
-// ── SOS / EMERGENCY ──────────────────────────────────────────────────────────
+// ── SOS / EMERGENCY ───────────────────────────────────────────────────────────
 export interface EmergencyAlert {
   name: string;
   latitude: number;
@@ -190,19 +215,17 @@ export interface EmergencyAlert {
 }
 
 export async function sendSOSAlert(data: EmergencyAlert) {
-  const uid = auth().currentUser?.uid ?? "anonymous";
-  const docRef = await firestore()
-    .collection(COLLECTIONS.EMERGENCIES)
-    .add({
-      ...data,
-      uid,
-      status: "pending",
-      createdAt: firestore.FieldValue.serverTimestamp(),
-    });
+  const uid = auth.currentUser?.uid ?? "anonymous";
+  const docRef = await addDoc(collection(db, COLLECTIONS.EMERGENCIES), {
+    ...data,
+    uid,
+    status: "pending",
+    createdAt: serverTimestamp(),
+  });
   return docRef.id;
 }
 
-// ── APPOINTMENTS ─────────────────────────────────────────────────────────────
+// ── APPOINTMENTS ──────────────────────────────────────────────────────────────
 export interface AppointmentRequest {
   seniorName: string;
   seniorId: string;
@@ -213,22 +236,21 @@ export interface AppointmentRequest {
 }
 
 export async function submitAppointment(data: AppointmentRequest) {
-  const uid = auth().currentUser?.uid ?? "anonymous";
-  const docRef = await firestore()
-    .collection(COLLECTIONS.APPOINTMENTS)
-    .add(
-      stripUndefined({
-        ...data,
-        uid,
-        center: "3S Center Valenzuela",
-        status: "pending",
-        createdAt: firestore.FieldValue.serverTimestamp(),
-      })
-    );
+  const uid = auth.currentUser?.uid ?? "anonymous";
+  const docRef = await addDoc(
+    collection(db, COLLECTIONS.APPOINTMENTS),
+    stripUndefined({
+      ...data,
+      uid,
+      center: "3S Center Valenzuela",
+      status: "pending",
+      createdAt: serverTimestamp(),
+    })
+  );
   return docRef.id;
 }
 
-// ── HEALTH CENTERS ───────────────────────────────────────────────────────────
+// ── HEALTH CENTERS ────────────────────────────────────────────────────────────
 export interface HealthCenter {
   id: string;
   name: string;
@@ -241,21 +263,18 @@ export interface HealthCenter {
 }
 
 export async function fetchHealthCenters(): Promise<HealthCenter[]> {
-  const snapshot = await firestore().collection(COLLECTIONS.HEALTH_CENTERS).get();
+  const snapshot = await getDocs(collection(db, COLLECTIONS.HEALTH_CENTERS));
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HealthCenter));
 }
 
 export function subscribeToHealthCenters(
   callback: (centers: HealthCenter[]) => void
 ) {
-  return firestore()
-    .collection(COLLECTIONS.HEALTH_CENTERS)
-    .onSnapshot((snapshot) => {
-      const centers = snapshot.docs.map(
-        (d) => ({ id: d.id, ...d.data() } as HealthCenter)
-      );
-      callback(centers);
-    });
+  return onSnapshot(collection(db, COLLECTIONS.HEALTH_CENTERS), (snapshot) => {
+    callback(
+      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HealthCenter))
+    );
+  });
 }
 
 // ── PHYSICAL ID REQUEST ───────────────────────────────────────────────────────
@@ -269,16 +288,15 @@ export interface IDRequest {
 }
 
 export async function submitIDRequest(data: IDRequest) {
-  const uid = auth().currentUser?.uid ?? "anonymous";
-  const docRef = await firestore()
-    .collection(COLLECTIONS.ID_REQUESTS)
-    .add(
-      stripUndefined({
-        ...data,
-        uid,
-        status: "pending",
-        createdAt: firestore.FieldValue.serverTimestamp(),
-      })
-    );
+  const uid = auth.currentUser?.uid ?? "anonymous";
+  const docRef = await addDoc(
+    collection(db, COLLECTIONS.ID_REQUESTS),
+    stripUndefined({
+      ...data,
+      uid,
+      status: "pending",
+      createdAt: serverTimestamp(),
+    })
+  );
   return docRef.id;
 }

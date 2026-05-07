@@ -1,6 +1,9 @@
+// context/AuthContext.tsx
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { auth, firestore, COLLECTIONS } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db, COLLECTIONS } from '@/lib/firebase';
 
 export interface UserProfile {
   id: string;
@@ -44,8 +47,8 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   const fetchUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
-      const userDoc = await firestore().collection(COLLECTIONS.USERS).doc(uid).get();
-      if (userDoc.exists) {
+      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+      if (userDoc.exists()) {
         const data = { id: userDoc.id, ...userDoc.data() } as UserProfile;
         await AsyncStorage.setItem('user', JSON.stringify(data));
         await AsyncStorage.setItem('userId', data.id);
@@ -61,7 +64,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   };
 
   const refreshUser = async () => {
-    const currentUser = auth().currentUser;
+    const currentUser = auth.currentUser;
     if (currentUser) {
       const profile = await fetchUserProfile(currentUser.uid);
       setUser(profile);
@@ -74,11 +77,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   };
 
   useEffect(() => {
-    // FIX for ts(2774): Do NOT wrap onAuthStateChanged in a conditional check
-    // like `if (auth().onAuthStateChanged)` — TypeScript sees it as always-truthy
-    // because it's always a defined function. Call it directly and use the
-    // returned unsubscribe function for cleanup.
-    const unsubscribe = auth().onAuthStateChanged(async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const profile = await fetchUserProfile(firebaseUser.uid);
         setUser(profile);
