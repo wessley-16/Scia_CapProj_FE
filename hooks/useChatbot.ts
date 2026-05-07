@@ -1,12 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 import { CHATBOT_STORAGE_KEY, MAX_CHATBOT_MESSAGES } from "@/constants/constants";
-
-// ── ANTHROPIC CONFIGURATION ─────────────────────────────────────────────────
-// ⚠️  REPLACE WITH YOUR KEY from https://console.anthropic.com
-// For production, move this to a secure backend proxy.
-const ANTHROPIC_API_KEY = "YOUR_ANTHROPIC_API_KEY_HERE";
-const ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+// ✅ Use getGenerativeModel directly from @react-native-firebase/vertexai
+//    The correct package for React Native Firebase is @react-native-firebase/vertexai,
+//    not @react-native-firebase/ai — getVertexAI does not exist in that package.
+import { getGenerativeModel } from "@react-native-firebase/vertexai";
 
 // ── SCIA Health AI system prompt ─────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are HealthAI, a caring and knowledgeable health assistant for senior citizens in Valenzuela City, Philippines. You are part of the SCIA (Senior Citizens Information and Assistance) mobile app.
@@ -44,26 +42,19 @@ const INITIAL_MESSAGE: ChatMessage = {
 const getTrimmedMessages = (messages: ChatMessage[]) =>
   messages.slice(-MAX_CHATBOT_MESSAGES);
 
-// ── Build Anthropic messages array from chat history ─────────────────────────
-const buildAnthropicMessages = (
-  history: ChatMessage[],
-  currentMessage: string
-) => {
-  const context = history
-    .slice(-MAX_CONTEXT_MESSAGES)
-    .filter((m) => m.id !== "initial")
-    .map((m) => ({
-      role: m.role as "user" | "assistant",
-      content: m.text,
-    }));
+// ── Vertex AI model (lazy-initialized) ───────────────────────────────────────
+// FIX: getGenerativeModel is called directly without getVertexAI wrapper.
+// Make sure "Vertex AI for Firebase" is enabled in your Firebase console.
+let _model: ReturnType<typeof getGenerativeModel> | null = null;
 
-  // Anthropic requires messages to start with a user turn
-  while (context.length > 0 && context[0].role === "assistant") {
-    context.shift();
+const getModel = () => {
+  if (!_model) {
+    _model = getGenerativeModel({
+      model: "gemini-2.0-flash",
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    });
   }
-
-  context.push({ role: "user", content: currentMessage });
-  return context;
+  return _model;
 };
 
 // ── Storage helpers ──────────────────────────────────────────────────────────
@@ -85,7 +76,6 @@ export const useChatbot = () => {
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Load persisted conversation on mount
   useEffect(() => {
     const loadMessages = async () => {
       try {
@@ -108,7 +98,6 @@ export const useChatbot = () => {
     loadMessages();
   }, []);
 
-  // Persist conversation whenever it changes
   useEffect(() => {
     if (!hydrated) return;
     const persist = async () => {
@@ -141,50 +130,32 @@ export const useChatbot = () => {
     setLoading(true);
 
     try {
-      if (!ANTHROPIC_API_KEY || ANTHROPIC_API_KEY === "YOUR_ANTHROPIC_API_KEY_HERE") {
-        addMessage(
-          "assistant",
-          "⚠️ HealthAI is not configured yet. Please ask your administrator to add the Anthropic API key in hooks/useChatbot.ts."
-        );
-        return;
+      const model = getModel();
+
+      // FIX: Explicitly type history entries so `role` is the literal union
+      // "user" | "model" expected by the Vertex AI SDK, not a plain string.
+      type HistoryEntry = { role: "user" | "model"; parts: { text: string }[] };
+
+      const historyMessages: HistoryEntry[] = messages
+        .slice(-MAX_CONTEXT_MESSAGES)
+        .filter((m) => m.id !== "initial")
+        .map((m) => ({
+          role: m.role === "assistant" ? ("model" as const) : ("user" as const),
+          parts: [{ text: m.text }],
+        }));
+
+      // Ensure history doesn't start with a model turn
+      while (historyMessages.length > 0 && historyMessages[0].role === "model") {
+        historyMessages.shift();
       }
 
-      const anthropicMessages = buildAnthropicMessages(messages, trimmed);
-
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": ANTHROPIC_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-request-from-browser": "true",
-        },
-        body: JSON.stringify({
-          model: ANTHROPIC_MODEL,
-          max_tokens: 512,
-          system: SYSTEM_PROMPT,
-          messages: anthropicMessages,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        const errMsg =
-          data?.error?.message || "AI service error. Please try again.";
-        addMessage("assistant", errMsg);
-        return;
-      }
-
-      const reply: string =
-        data?.content
-          ?.filter((block: any) => block.type === "text")
-          .map((block: any) => block.text)
-          .join("\n") ?? "No response from AI.";
+      const chat = model.startChat({ history: historyMessages });
+      const result = await chat.sendMessage(trimmed);
+      const reply = result.response.text() ?? "No response from AI.";
 
       addMessage("assistant", reply);
-    } catch (error) {
-      console.log("HealthAI error:", error);
+    } catch (error: any) {
+      console.log("HealthAI Vertex error:", error);
       addMessage(
         "assistant",
         "Connection error. Please check your internet and try again."

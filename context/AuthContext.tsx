@@ -1,8 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { auth, db, COLLECTIONS } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { auth, firestore, COLLECTIONS } from '@/lib/firebase';
 
 export interface UserProfile {
   id: string;
@@ -46,8 +44,8 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   const fetchUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
-      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
-      if (userDoc.exists()) {
+      const userDoc = await firestore().collection(COLLECTIONS.USERS).doc(uid).get();
+      if (userDoc.exists) {
         const data = { id: userDoc.id, ...userDoc.data() } as UserProfile;
         await AsyncStorage.setItem('user', JSON.stringify(data));
         await AsyncStorage.setItem('userId', data.id);
@@ -63,8 +61,9 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   };
 
   const refreshUser = async () => {
-    if (auth.currentUser) {
-      const profile = await fetchUserProfile(auth.currentUser.uid);
+    const currentUser = auth().currentUser;
+    if (currentUser) {
+      const profile = await fetchUserProfile(currentUser.uid);
       setUser(profile);
     }
   };
@@ -75,12 +74,15 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // FIX for ts(2774): Do NOT wrap onAuthStateChanged in a conditional check
+    // like `if (auth().onAuthStateChanged)` — TypeScript sees it as always-truthy
+    // because it's always a defined function. Call it directly and use the
+    // returned unsubscribe function for cleanup.
+    const unsubscribe = auth().onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
         const profile = await fetchUserProfile(firebaseUser.uid);
         setUser(profile);
       } else {
-        // Try loading from AsyncStorage as fallback
         const stored = await AsyncStorage.getItem('user');
         if (stored) {
           try { setUser(JSON.parse(stored)); } catch { setUser(null); }

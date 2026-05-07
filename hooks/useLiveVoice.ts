@@ -1,4 +1,10 @@
-import { Audio } from "expo-av";
+/**
+ * useLiveVoice — Gemini Live WebSocket voice session
+ *
+ * FIX: Replaced FileSystem.EncodingType.Base64 with the string literal "base64"
+ * because FileSystem.EncodingType is no longer exported by expo-file-system in
+ * newer SDK versions (ts2339 error at Ln 214).
+ */
 import * as FileSystem from "expo-file-system";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -6,6 +12,20 @@ import {
   LIVE_TOKEN_API_URL,
   LIVE_WS_BASE_URL,
 } from "@/constants/constants";
+
+// ── Audio imports — prefer expo-audio (SDK 54+), fall back to expo-av ────────
+let AudioModule: any = null;
+try {
+  AudioModule = require("expo-audio");
+} catch {
+  try {
+    AudioModule = require("expo-av").Audio;
+  } catch {
+    console.warn("No audio module available (expo-audio or expo-av).");
+  }
+}
+
+const Audio = AudioModule;
 
 type LiveStatus = "idle" | "connecting" | "connected" | "responding" | "error";
 
@@ -28,39 +48,24 @@ const parseSampleRate = (mimeType?: string) => {
   const match = mimeType.match(/rate=(\d+)/i);
   if (!match) return DEFAULT_PCM_SAMPLE_RATE;
   const parsed = Number.parseInt(match[1], 10);
-  return Number.isFinite(parsed) && parsed > 0
-    ? parsed
-    : DEFAULT_PCM_SAMPLE_RATE;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PCM_SAMPLE_RATE;
 };
 
 const base64ToBytes = (base64: string) => {
-  if (typeof globalThis.atob !== "function") {
-    throw new Error("atob is not available in this runtime.");
-  }
-
+  if (typeof globalThis.atob !== "function") throw new Error("atob not available.");
   const binary = globalThis.atob(base64);
   const bytes = new Uint8Array(binary.length);
-
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   return bytes;
 };
 
 const bytesToBase64 = (bytes: Uint8Array) => {
-  if (typeof globalThis.btoa !== "function") {
-    throw new Error("btoa is not available in this runtime.");
-  }
-
+  if (typeof globalThis.btoa !== "function") throw new Error("btoa not available.");
   let binary = "";
   const chunkSize = 0x8000;
-
   for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize);
-    binary += String.fromCharCode(...chunk);
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
   }
-
   return globalThis.btoa(binary);
 };
 
@@ -71,9 +76,7 @@ const pcmToWavDataUri = (chunks: Uint8Array[], sampleRate: number) => {
   const view = new DataView(wavBytes.buffer);
 
   const writeString = (offset: number, value: string) => {
-    for (let i = 0; i < value.length; i += 1) {
-      view.setUint8(offset + i, value.charCodeAt(i));
-    }
+    for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i));
   };
 
   writeString(0, "RIFF");
@@ -91,74 +94,50 @@ const pcmToWavDataUri = (chunks: Uint8Array[], sampleRate: number) => {
   view.setUint32(40, pcmByteLength, true);
 
   let offset = 44;
-  for (const chunk of chunks) {
-    wavBytes.set(chunk, offset);
-    offset += chunk.length;
-  }
+  for (const chunk of chunks) { wavBytes.set(chunk, offset); offset += chunk.length; }
 
-  const wavBase64 = bytesToBase64(wavBytes);
-  return `data:audio/wav;base64,${wavBase64}`;
+  return `data:audio/wav;base64,${bytesToBase64(wavBytes)}`;
 };
 
 const wsStateLabel = (state: number) => {
   switch (state) {
-    case WebSocket.CONNECTING:
-      return "CONNECTING";
-    case WebSocket.OPEN:
-      return "OPEN";
-    case WebSocket.CLOSING:
-      return "CLOSING";
-    case WebSocket.CLOSED:
-      return "CLOSED";
-    default:
-      return `UNKNOWN(${state})`;
+    case WebSocket.CONNECTING: return "CONNECTING";
+    case WebSocket.OPEN: return "OPEN";
+    case WebSocket.CLOSING: return "CLOSING";
+    case WebSocket.CLOSED: return "CLOSED";
+    default: return `UNKNOWN(${state})`;
   }
 };
 
 const closeHint = (code: number) => {
-  if (code === 1006)
-    return "Network/SSL interruption while reaching Gemini Live.";
-  if (code === 1008)
-    return "Policy/auth rejection (token or setup not accepted).";
+  if (code === 1006) return "Network/SSL interruption while reaching Gemini Live.";
+  if (code === 1008) return "Policy/auth rejection (token or setup not accepted).";
   if (code === 1011) return "Gemini Live internal server error; retry shortly.";
   return "";
 };
 
 const parseServerMessage = (raw: string) => {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(raw); } catch { return null; }
 };
 
 const decodeSocketMessageData = async (data: unknown) => {
-  if (typeof data === "string") {
-    return data;
-  }
-
+  if (typeof data === "string") return data;
   if (data instanceof ArrayBuffer) {
-    try {
-      return new TextDecoder("utf-8").decode(new Uint8Array(data));
-    } catch {
-      return null;
-    }
+    try { return new TextDecoder("utf-8").decode(new Uint8Array(data)); } catch { return null; }
   }
-
-  if (
-    data &&
-    typeof data === "object" &&
-    "text" in data &&
-    typeof (data as { text?: () => Promise<string> }).text === "function"
-  ) {
-    try {
-      return await (data as { text: () => Promise<string> }).text();
-    } catch {
-      return null;
-    }
+  if (data && typeof data === "object" && "text" in data && typeof (data as any).text === "function") {
+    try { return await (data as any).text(); } catch { return null; }
   }
-
   return null;
+};
+
+const safeSetAudioMode = async (opts: any) => {
+  if (!Audio) return;
+  try {
+    if (typeof Audio.setAudioModeAsync === "function") {
+      await Audio.setAudioModeAsync(opts);
+    }
+  } catch { /* noop */ }
 };
 
 export const useLiveVoice = () => {
@@ -168,14 +147,11 @@ export const useLiveVoice = () => {
   const pcmSampleRateRef = useRef(DEFAULT_PCM_SAMPLE_RATE);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const soundRef = useRef<any>(null);
+  const recordingRef = useRef<any>(null);
 
   const clearSocketTimeout = () => {
-    if (socketTimeoutRef.current) {
-      clearTimeout(socketTimeoutRef.current);
-      socketTimeoutRef.current = null;
-    }
+    if (socketTimeoutRef.current) { clearTimeout(socketTimeoutRef.current); socketTimeoutRef.current = null; }
   };
 
   const [status, setStatus] = useState<LiveStatus>("idle");
@@ -193,30 +169,17 @@ export const useLiveVoice = () => {
     audioQueueRef.current = [];
 
     if (soundRef.current) {
-      try {
-        await soundRef.current.stopAsync();
-      } catch {
-        // Ignore stop failures during teardown.
-      }
-      try {
-        await soundRef.current.unloadAsync();
-      } catch {
-        // Ignore unload failures during teardown.
-      }
+      try { await soundRef.current.stopAsync(); } catch { }
+      try { await soundRef.current.unloadAsync(); } catch { }
       soundRef.current = null;
     }
 
     if (recordingRef.current) {
-      try {
-        await recordingRef.current.stopAndUnloadAsync();
-      } catch {
-        // Ignore stop failures if recording has not fully started.
-      }
+      try { await recordingRef.current.stopAndUnloadAsync(); } catch { }
       recordingRef.current = null;
     }
 
     setIsRecording(false);
-
     isPlayingRef.current = false;
   }, []);
 
@@ -237,37 +200,17 @@ export const useLiveVoice = () => {
     }
 
     try {
-      const data = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      // FIX: Use the string literal "base64" instead of FileSystem.EncodingType.Base64
+      // FileSystem.EncodingType is no longer exported in newer expo-file-system versions.
+      const data = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+      if (!data) { setLastError("Recorded audio file is empty."); return false; }
 
-      if (!data) {
-        setLastError("Recorded audio file is empty.");
-        return false;
-      }
-
-      const mimeType = getMimeTypeFromUri(uri);
-
-      ws.send(
-        JSON.stringify({
-          clientContent: {
-            turns: [
-              {
-                role: "user",
-                parts: [
-                  {
-                    inlineData: {
-                      mimeType,
-                      data,
-                    },
-                  },
-                ],
-              },
-            ],
-            turnComplete: true,
-          },
-        }),
-      );
+      ws.send(JSON.stringify({
+        clientContent: {
+          turns: [{ role: "user", parts: [{ inlineData: { mimeType: getMimeTypeFromUri(uri), data } }] }],
+          turnComplete: true,
+        },
+      }));
 
       setInterrupted(false);
       setStatus("responding");
@@ -275,9 +218,7 @@ export const useLiveVoice = () => {
       return true;
     } catch (error) {
       setLastError("Failed to send recorded voice.");
-      setDiagnostic(
-        error instanceof Error ? error.message : "Unknown upload error.",
-      );
+      setDiagnostic(error instanceof Error ? error.message : "Unknown upload error.");
       return false;
     }
   }, []);
@@ -288,31 +229,20 @@ export const useLiveVoice = () => {
       setLastError("Connect to Live first before recording.");
       return false;
     }
-
-    if (recordingRef.current || isRecording) {
-      return true;
-    }
+    if (recordingRef.current || isRecording) return true;
+    if (!Audio) { setLastError("Audio module not available."); return false; }
 
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
         setLastError("Microphone permission is required.");
-        setDiagnostic("Allow microphone permission and try again.");
         return false;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: false,
-      });
+      await safeSetAudioMode({ allowsRecordingIOS: true, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false, staysActiveInBackground: false });
 
       const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       await recording.startAsync();
 
       recordingRef.current = recording;
@@ -323,19 +253,14 @@ export const useLiveVoice = () => {
     } catch (error) {
       setIsRecording(false);
       setLastError("Failed to start microphone recording.");
-      setDiagnostic(
-        error instanceof Error ? error.message : "Unknown recording error.",
-      );
+      setDiagnostic(error instanceof Error ? error.message : "Unknown recording error.");
       return false;
     }
   }, [isRecording]);
 
   const stopMicRecording = useCallback(async () => {
     const recording = recordingRef.current;
-    if (!recording) {
-      setIsRecording(false);
-      return false;
-    }
+    if (!recording) { setIsRecording(false); return false; }
 
     try {
       await recording.stopAndUnloadAsync();
@@ -343,33 +268,21 @@ export const useLiveVoice = () => {
       recordingRef.current = null;
       setIsRecording(false);
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-        staysActiveInBackground: false,
-      });
+      await safeSetAudioMode({ allowsRecordingIOS: false, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false, staysActiveInBackground: false });
 
-      if (!uri) {
-        setLastError("Could not read recorded audio file.");
-        return false;
-      }
-
+      if (!uri) { setLastError("Could not read recorded audio file."); return false; }
       return await sendRecordedAudioTurn(uri);
     } catch (error) {
       recordingRef.current = null;
       setIsRecording(false);
       setLastError("Failed to stop microphone recording.");
-      setDiagnostic(
-        error instanceof Error ? error.message : "Unknown stop error.",
-      );
+      setDiagnostic(error instanceof Error ? error.message : "Unknown stop error.");
       return false;
     }
   }, [sendRecordedAudioTurn]);
 
   const playQueue = useCallback(async () => {
-    if (isPlayingRef.current) return;
+    if (isPlayingRef.current || !Audio) return;
     isPlayingRef.current = true;
 
     try {
@@ -377,26 +290,14 @@ export const useLiveVoice = () => {
         const uri = audioQueueRef.current.shift();
         if (!uri) continue;
 
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-          staysActiveInBackground: false,
-        });
+        await safeSetAudioMode({ allowsRecordingIOS: false, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false, staysActiveInBackground: false });
 
-        const { sound } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: true },
-        );
+        const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
         soundRef.current = sound;
 
         await new Promise<void>((resolve) => {
-          sound.setOnPlaybackStatusUpdate((playbackStatus) => {
-            if (!playbackStatus.isLoaded) return;
-            if (playbackStatus.didJustFinish) {
-              resolve();
-            }
+          sound.setOnPlaybackStatusUpdate((s: any) => {
+            if (s.isLoaded && s.didJustFinish) resolve();
           });
         });
 
@@ -405,9 +306,7 @@ export const useLiveVoice = () => {
       }
     } catch (error) {
       setLastError("Live audio playback failed.");
-      setDiagnostic(
-        error instanceof Error ? error.message : "Unknown audio error.",
-      );
+      setDiagnostic(error instanceof Error ? error.message : "Unknown audio error.");
     } finally {
       isPlayingRef.current = false;
     }
@@ -415,34 +314,22 @@ export const useLiveVoice = () => {
 
   const queueTurnAudio = useCallback(async () => {
     if (pcmChunksRef.current.length === 0) return;
-
     try {
-      const uri = pcmToWavDataUri(
-        pcmChunksRef.current,
-        pcmSampleRateRef.current,
-      );
+      const uri = pcmToWavDataUri(pcmChunksRef.current, pcmSampleRateRef.current);
       audioQueueRef.current.push(uri);
       pcmChunksRef.current = [];
       await playQueue();
     } catch (error) {
       setLastError("Failed to decode Gemini audio.");
-      setDiagnostic(
-        error instanceof Error ? error.message : "Unknown decode error.",
-      );
+      setDiagnostic(error instanceof Error ? error.message : "Unknown decode error.");
       pcmChunksRef.current = [];
     }
   }, [playQueue]);
 
   const disconnect = useCallback(() => {
     clearSocketTimeout();
-
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
+    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
     void clearAudioState();
-
     setDiagnostic("");
     setStatus("idle");
   }, [clearAudioState]);
@@ -450,10 +337,7 @@ export const useLiveVoice = () => {
   useEffect(() => {
     return () => {
       clearSocketTimeout();
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
+      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
       void clearAudioState();
     };
   }, [clearAudioState]);
@@ -468,58 +352,39 @@ export const useLiveVoice = () => {
 
     try {
       const abortController = new AbortController();
-      const tokenTimeout = setTimeout(() => {
-        abortController.abort();
-      }, TOKEN_TIMEOUT_MS);
+      const tokenTimeout = setTimeout(() => abortController.abort(), TOKEN_TIMEOUT_MS);
 
       const tokenResponse = await fetch(LIVE_TOKEN_API_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         signal: abortController.signal,
       });
 
       clearTimeout(tokenTimeout);
 
       let tokenData: LiveTokenResponse = {};
-      try {
-        tokenData = await tokenResponse.json();
-      } catch {
-        tokenData = {
-          error: `Live token endpoint returned invalid JSON (${tokenResponse.status}).`,
-        };
-      }
+      try { tokenData = await tokenResponse.json(); }
+      catch { tokenData = { error: `Live token endpoint returned invalid JSON (${tokenResponse.status}).` }; }
 
       if (!tokenResponse.ok || !tokenData?.token) {
         const details = tokenData?.details ? ` (${tokenData.details})` : "";
-        throw new Error(
-          tokenData?.error ||
-            `Failed to get live token (${tokenResponse.status})${details}.`,
-        );
+        throw new Error(tokenData?.error || `Failed to get live token (${tokenResponse.status})${details}.`);
       }
 
-      const ws = new WebSocket(
-        `${LIVE_WS_BASE_URL}?access_token=${encodeURIComponent(tokenData.token)}`,
-      );
+      const ws = new WebSocket(`${LIVE_WS_BASE_URL}?access_token=${encodeURIComponent(tokenData.token)}`);
       wsRef.current = ws;
 
       socketTimeoutRef.current = setTimeout(() => {
         if (ws.readyState === WebSocket.CONNECTING) {
           setLastError("Live WebSocket handshake timeout.");
-          setDiagnostic(
-            "Socket never left CONNECTING. Check internet/firewall and allow generativelanguage.googleapis.com.",
-          );
+          setDiagnostic("Socket never left CONNECTING. Check internet/firewall.");
           setStatus("error");
           ws.close();
           return;
         }
-
         if (ws.readyState === WebSocket.OPEN) {
           setLastError("Live setup timeout (no setupComplete). Please retry.");
-          setDiagnostic(
-            "Socket opened but Gemini did not acknowledge setup within timeout.",
-          );
+          setDiagnostic("Socket opened but Gemini did not acknowledge setup within timeout.");
           setStatus("error");
           ws.close();
         }
@@ -527,24 +392,16 @@ export const useLiveVoice = () => {
 
       ws.onopen = () => {
         const setupModelRaw = tokenData.model || LIVE_MODEL;
-        const setupModel = setupModelRaw.startsWith("models/")
-          ? setupModelRaw
-          : `models/${setupModelRaw}`;
-
+        const setupModel = setupModelRaw.startsWith("models/") ? setupModelRaw : `models/${setupModelRaw}`;
         setDiagnostic(`Socket opened. Sending setup for ${setupModel}...`);
-
-        const setupMessage = {
+        ws.send(JSON.stringify({
           setup: {
             model: setupModel,
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-            },
+            generationConfig: { responseModalities: ["AUDIO"] },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
           },
-        };
-
-        ws.send(JSON.stringify(setupMessage));
+        }));
       };
 
       ws.onmessage = async (event) => {
@@ -552,20 +409,13 @@ export const useLiveVoice = () => {
         const message = raw ? parseServerMessage(raw) : null;
 
         if (!message) {
-          if (raw && raw.includes("setupComplete")) {
+          if (raw?.includes("setupComplete")) {
             clearSocketTimeout();
-            setDiagnostic("setupComplete detected from raw socket payload.");
+            setDiagnostic("setupComplete detected.");
             setStatus("connected");
             return;
           }
-
-          if (raw) {
-            setDiagnostic(`Unparsed socket payload: ${raw.slice(0, 180)}`);
-          } else {
-            setDiagnostic(
-              "Received non-text socket message that could not be decoded.",
-            );
-          }
+          if (raw) setDiagnostic(`Unparsed payload: ${raw.slice(0, 180)}`);
           return;
         }
 
@@ -578,30 +428,19 @@ export const useLiveVoice = () => {
 
         if (message.error) {
           clearSocketTimeout();
-          setLastError(
-            message.error?.message ||
-              "Live API setup failed. Please reconnect.",
-          );
+          setLastError(message.error?.message || "Live API setup failed. Please reconnect.");
           setDiagnostic(JSON.stringify(message).slice(0, 260));
           setStatus("error");
           ws.close();
           return;
         }
 
-        if (message.goAway) {
-          setDiagnostic(
-            `Server goAway: ${JSON.stringify(message.goAway).slice(0, 180)}`,
-          );
-        }
+        if (message.goAway) setDiagnostic(`Server goAway: ${JSON.stringify(message.goAway).slice(0, 180)}`);
 
         const serverContent = message.serverContent;
-
         if (!serverContent) return;
 
-        if (serverContent.interrupted === true) {
-          setInterrupted(true);
-          setStatus("connected");
-        }
+        if (serverContent.interrupted === true) { setInterrupted(true); setStatus("connected"); }
 
         const modelParts = serverContent.modelTurn?.parts;
         if (Array.isArray(modelParts)) {
@@ -609,62 +448,34 @@ export const useLiveVoice = () => {
             const inlineData = part?.inlineData;
             const base64Audio = inlineData?.data;
             const mimeType = inlineData?.mimeType;
-
             if (!base64Audio || typeof base64Audio !== "string") continue;
             if (!mimeType?.startsWith("audio/pcm")) continue;
-
             pcmSampleRateRef.current = parseSampleRate(mimeType);
-            try {
-              pcmChunksRef.current.push(base64ToBytes(base64Audio));
-            } catch (error) {
-              setLastError("Failed to decode Gemini audio chunk.");
-              setDiagnostic(
-                error instanceof Error
-                  ? error.message
-                  : "Unknown chunk decode error.",
-              );
-            }
+            try { pcmChunksRef.current.push(base64ToBytes(base64Audio)); }
+            catch (error) { setLastError("Failed to decode Gemini audio chunk."); }
           }
         }
 
-        if (serverContent.inputTranscription?.text) {
-          setInputTranscript(serverContent.inputTranscription.text);
-        }
-
-        if (serverContent.outputTranscription?.text) {
-          setOutputTranscript(serverContent.outputTranscription.text);
-          setStatus("responding");
-        }
-
-        if (serverContent.turnComplete === true) {
-          void queueTurnAudio();
-          setStatus("connected");
-        }
+        if (serverContent.inputTranscription?.text) setInputTranscript(serverContent.inputTranscription.text);
+        if (serverContent.outputTranscription?.text) { setOutputTranscript(serverContent.outputTranscription.text); setStatus("responding"); }
+        if (serverContent.turnComplete === true) { void queueTurnAudio(); setStatus("connected"); }
       };
 
       ws.onerror = () => {
         clearSocketTimeout();
         setLastError(`Live socket error (${wsStateLabel(ws.readyState)}).`);
-        setDiagnostic(
-          "React Native onerror has limited detail; see close code detail below.",
-        );
         setStatus("error");
       };
 
       ws.onclose = (event) => {
         clearSocketTimeout();
-
         wsRef.current = null;
-
         if (event.code !== 1000) {
           const reason = event.reason ? ` (${event.reason})` : "";
           setLastError(`Live socket closed [${event.code}]${reason}`);
           const hint = closeHint(event.code);
-          if (hint) {
-            setDiagnostic(hint);
-          }
+          if (hint) setDiagnostic(hint);
         }
-
         setStatus((prev) => (prev === "error" ? "error" : "idle"));
       };
     } catch (error) {
@@ -672,9 +483,7 @@ export const useLiveVoice = () => {
         setLastError("Token request timeout. Make sure backend is reachable.");
         setDiagnostic("Token request aborted after timeout.");
       } else {
-        setLastError(
-          error instanceof Error ? error.message : "Failed to connect.",
-        );
+        setLastError(error instanceof Error ? error.message : "Failed to connect.");
         setDiagnostic("Connection failed before setup completed.");
       }
       setStatus("error");
@@ -684,21 +493,11 @@ export const useLiveVoice = () => {
   const sendRealtimeText = useCallback((text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return false;
-
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-
     setInterrupted(false);
     setStatus("responding");
-
-    ws.send(
-      JSON.stringify({
-        realtimeInput: {
-          text: trimmed,
-        },
-      }),
-    );
-
+    ws.send(JSON.stringify({ realtimeInput: { text: trimmed } }));
     return true;
   }, []);
 
@@ -713,36 +512,12 @@ export const useLiveVoice = () => {
 
   return useMemo(
     () => ({
-      status,
-      isConnected,
-      inputTranscript,
-      outputTranscript,
-      interrupted,
-      lastError,
-      diagnostic,
-      isRecording,
-      connect,
-      disconnect,
-      resetSession,
-      sendRealtimeText,
-      startMicRecording,
-      stopMicRecording,
+      status, isConnected, inputTranscript, outputTranscript, interrupted,
+      lastError, diagnostic, isRecording, connect, disconnect, resetSession,
+      sendRealtimeText, startMicRecording, stopMicRecording,
     }),
-    [
-      connect,
-      disconnect,
-      inputTranscript,
-      interrupted,
-      isConnected,
-      isRecording,
-      lastError,
-      diagnostic,
-      outputTranscript,
-      resetSession,
-      sendRealtimeText,
-      startMicRecording,
-      stopMicRecording,
-      status,
-    ],
+    [connect, disconnect, inputTranscript, interrupted, isConnected, isRecording,
+      lastError, diagnostic, outputTranscript, resetSession, sendRealtimeText,
+      startMicRecording, stopMicRecording, status]
   );
 };
