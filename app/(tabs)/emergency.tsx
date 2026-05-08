@@ -10,8 +10,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
@@ -221,7 +223,7 @@ export default function EmergencyScreen() {
           {location ? (
             <MapView
               style={styles.map}
-              mapType="standard"
+              mapType="none"
               region={{
                 latitude:      location.latitude,
                 longitude:     location.longitude,
@@ -243,6 +245,10 @@ export default function EmergencyScreen() {
               <Text style={styles.mapPlaceholderText}>Fetching location...</Text>
             </View>
           )}
+          {/* Refresh location button */}
+          <TouchableOpacity style={styles.refreshBtn} onPress={fetchLocation}>
+            <Ionicons name="locate" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
 
         {/* DROPDOWN */}
@@ -300,6 +306,7 @@ const styles = StyleSheet.create({
   map:                { flex: 1 },
   mapPlaceholder:     { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
   mapPlaceholderText: { color: '#9ca3af', fontSize: 14 },
+  refreshBtn:         { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#CE2029', borderRadius: 20, padding: 8, elevation: 4 },
   dropdown:           { backgroundColor: '#fff', borderRadius: 10, marginBottom: 10 },
   input:              { backgroundColor: '#fff', padding: 10, marginTop: 10, borderRadius: 8 },
   infoCard:           { backgroundColor: '#fff', padding: 16, marginTop: 16, borderRadius: 14, elevation: 2 },

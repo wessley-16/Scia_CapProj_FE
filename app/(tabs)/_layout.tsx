@@ -86,7 +86,7 @@ export default function Layout() {
   const router = useRouter();
 
   const onScanPress = () => {
-    router.push("/voice");
+    router.push("/voice" as any);
   };
 
   return (

@@ -1,10 +1,12 @@
 // hooks/useChatbot.ts
+// Uses the Firebase Web SDK (firebase package) — consistent with lib/firebase.ts
+// NO @react-native-firebase/ai native dependency needed.
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
 import { CHATBOT_STORAGE_KEY, MAX_CHATBOT_MESSAGES } from "@/constants/constants";
-// ✅ @react-native-firebase/ai v24 — getGenerativeModel(app, modelParams)
-import { getGenerativeModel } from "@react-native-firebase/ai";
-import { getApp } from "@react-native-firebase/app";
+import { getVertexAI, getGenerativeModel } from "firebase/vertexai";
+import { app } from "@/lib/firebase";
 
 // ── SCIA Health AI system prompt ──────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are HealthAI, a caring and knowledgeable health assistant for senior citizens in Valenzuela City, Philippines. You are part of the SCIA (Senior Citizens Information and Assistance) mobile app.
@@ -42,21 +44,16 @@ const INITIAL_MESSAGE: ChatMessage = {
 const getTrimmedMessages = (messages: ChatMessage[]) =>
   messages.slice(-MAX_CHATBOT_MESSAGES);
 
-// ── Vertex AI model (lazy-initialized) ────────────────────────────────────────
-// getGenerativeModel in @react-native-firebase/ai v24 requires 2 arguments:
-//   arg1: Firebase App instance
-//   arg2: model params object
+// ── Vertex AI model (lazy-initialized via Web SDK) ────────────────────────────
 let _model: ReturnType<typeof getGenerativeModel> | null = null;
 
 const getModel = () => {
   if (!_model) {
-    _model = getGenerativeModel(
-      getApp(),  // ← required first arg in v24
-      {
-        model: "gemini-2.0-flash",
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      }
-    );
+    const vertexAI = getVertexAI(app);
+    _model = getGenerativeModel(vertexAI, {
+      model: "gemini-2.0-flash",
+      systemInstruction: SYSTEM_PROMPT,
+    });
   }
   return _model;
 };
@@ -80,6 +77,7 @@ export const useChatbot = () => {
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Load persisted conversation
   useEffect(() => {
     const loadMessages = async () => {
       try {
@@ -102,6 +100,7 @@ export const useChatbot = () => {
     loadMessages();
   }, []);
 
+  // Persist on every change
   useEffect(() => {
     if (!hydrated) return;
     const persist = async () => {
@@ -136,6 +135,7 @@ export const useChatbot = () => {
     try {
       const model = getModel();
 
+      // Build history for multi-turn context (Gemini expects "model" not "assistant")
       type HistoryEntry = { role: "user" | "model"; parts: { text: string }[] };
 
       const historyMessages: HistoryEntry[] = messages
@@ -146,6 +146,7 @@ export const useChatbot = () => {
           parts: [{ text: m.text }],
         }));
 
+      // Gemini requires history to start with a user message
       while (historyMessages.length > 0 && historyMessages[0].role === "model") {
         historyMessages.shift();
       }
@@ -157,9 +158,10 @@ export const useChatbot = () => {
       addMessage("assistant", reply);
     } catch (error: any) {
       console.log("HealthAI error:", error);
+      // Fallback: friendly error message
       addMessage(
         "assistant",
-        "Connection error. Please check your internet and try again."
+        "I'm having trouble connecting right now. Please check your internet connection and try again. If the issue persists, please consult a doctor directly. 😊"
       );
     } finally {
       setLoading(false);

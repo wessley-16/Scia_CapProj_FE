@@ -43,8 +43,8 @@ export default function Home() {
   );
 
   /* ---------------- NAVIGATION ---------------- */
-  const goToChat = () => router.push("/(tabs)/chatbot");
-  const goToVoice = () => router.push("/(tabs)/voice");
+  const goToChat = () => router.push("/chatbot" as any);
+  const goToVoice = () => router.push("/voice" as any);
   const goToMedicine = () => router.push("/(tabs)/healthcare");
   const goToAppointment = () => router.push("/(tabs)/healthcare");
   const goToEmergency = () => router.push("/(tabs)/emergency");
