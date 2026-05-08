@@ -8,8 +8,7 @@
     "scheme": "scia",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true,
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {

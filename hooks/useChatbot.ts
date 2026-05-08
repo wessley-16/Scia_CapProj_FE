@@ -1,12 +1,21 @@
 // hooks/useChatbot.ts
-// Uses the Firebase Web SDK (firebase package) — consistent with lib/firebase.ts
-// NO @react-native-firebase/ai native dependency needed.
+// Real-time STREAMING chatbot using Google Gemini API directly.
+// ✅ No Firebase Vertex AI billing required
+// ✅ Streams tokens live so the reply appears word-by-word
+// ✅ Persists conversation in AsyncStorage
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CHATBOT_STORAGE_KEY, MAX_CHATBOT_MESSAGES } from "@/constants/constants";
-import { getVertexAI, getGenerativeModel } from "firebase/vertexai";
-import { app } from "@/lib/firebase";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔑  PASTE YOUR GEMINI API KEY HERE
+//     Get one free at: https://aistudio.google.com/app/apikey
+// ─────────────────────────────────────────────────────────────────────────────
+const GEMINI_API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE";
+
+const GEMINI_MODEL = "gemini-2.0-flash";
+const GEMINI_STREAM_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
 
 // ── SCIA Health AI system prompt ──────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are HealthAI, a caring and knowledgeable health assistant for senior citizens in Valenzuela City, Philippines. You are part of the SCIA (Senior Citizens Information and Assistance) mobile app.
@@ -44,20 +53,6 @@ const INITIAL_MESSAGE: ChatMessage = {
 const getTrimmedMessages = (messages: ChatMessage[]) =>
   messages.slice(-MAX_CHATBOT_MESSAGES);
 
-// ── Vertex AI model (lazy-initialized via Web SDK) ────────────────────────────
-let _model: ReturnType<typeof getGenerativeModel> | null = null;
-
-const getModel = () => {
-  if (!_model) {
-    const vertexAI = getVertexAI(app);
-    _model = getGenerativeModel(vertexAI, {
-      model: "gemini-2.0-flash",
-      systemInstruction: SYSTEM_PROMPT,
-    });
-  }
-  return _model;
-};
-
 // ── Storage helpers ───────────────────────────────────────────────────────────
 type StoredChatMessage = Omit<ChatMessage, "id"> & { id?: string };
 
@@ -71,13 +66,43 @@ const isValidMessagesArray = (value: unknown): value is StoredChatMessage[] => {
   );
 };
 
+// ── Build Gemini request body ─────────────────────────────────────────────────
+function buildRequestBody(history: ChatMessage[], userMessage: string) {
+  // Map history to Gemini "contents" format (role: "user" | "model")
+  const contents = history
+    .slice(-MAX_CONTEXT_MESSAGES)
+    .filter((m) => m.id !== "initial")
+    .map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.text }],
+    }));
+
+  // Gemini requires history to start with a user turn
+  while (contents.length > 0 && contents[0].role === "model") {
+    contents.shift();
+  }
+
+  // Append the new user message
+  contents.push({ role: "user", parts: [{ text: userMessage }] });
+
+  return {
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents,
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 800,
+    },
+  };
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 export const useChatbot = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Load persisted conversation
+  // ── Load persisted conversation ────────────────────────────────────────────
   useEffect(() => {
     const loadMessages = async () => {
       try {
@@ -100,7 +125,7 @@ export const useChatbot = () => {
     loadMessages();
   }, []);
 
-  // Persist on every change
+  // ── Persist on every change ────────────────────────────────────────────────
   useEffect(() => {
     if (!hydrated) return;
     const persist = async () => {
@@ -116,52 +141,119 @@ export const useChatbot = () => {
     persist();
   }, [hydrated, messages]);
 
-  const addMessage = useCallback(
-    (role: ChatMessage["role"], text: string) => {
-      setMessages((prev) =>
-        getTrimmedMessages([...prev, { id: generateId(), role, text }])
-      );
-    },
-    []
-  );
+  const addMessage = useCallback((role: ChatMessage["role"], text: string) => {
+    setMessages((prev) =>
+      getTrimmedMessages([...prev, { id: generateId(), role, text }])
+    );
+  }, []);
 
+  // ── Send with real-time streaming ──────────────────────────────────────────
   const sendMessage = async (message: string) => {
     const trimmed = message.trim();
     if (!trimmed || loading) return;
 
+    // Cancel any ongoing stream
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
     addMessage("user", trimmed);
     setLoading(true);
 
+    // Create a placeholder bot message that we'll stream into
+    const botId = generateId();
+    setMessages((prev) =>
+      getTrimmedMessages([
+        ...prev,
+        { id: botId, role: "assistant", text: "" },
+      ])
+    );
+
     try {
-      const model = getModel();
+      const body = buildRequestBody(
+        // capture current messages snapshot before the user msg was added
+        messages,
+        trimmed
+      );
 
-      // Build history for multi-turn context (Gemini expects "model" not "assistant")
-      type HistoryEntry = { role: "user" | "model"; parts: { text: string }[] };
+      const response = await fetch(GEMINI_STREAM_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: abortRef.current.signal,
+      });
 
-      const historyMessages: HistoryEntry[] = messages
-        .slice(-MAX_CONTEXT_MESSAGES)
-        .filter((m) => m.id !== "initial")
-        .map((m) => ({
-          role: m.role === "assistant" ? ("model" as const) : ("user" as const),
-          parts: [{ text: m.text }],
-        }));
-
-      // Gemini requires history to start with a user message
-      while (historyMessages.length > 0 && historyMessages[0].role === "model") {
-        historyMessages.shift();
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Gemini API error ${response.status}: ${errText}`);
       }
 
-      const chat = model.startChat({ history: historyMessages });
-      const result = await chat.sendMessage(trimmed);
-      const reply = result.response.text() ?? "No response from AI.";
+      // ── SSE stream reader ────────────────────────────────────────────────
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
 
-      addMessage("assistant", reply);
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let accumulated = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") continue;
+          try {
+            const chunk = JSON.parse(jsonStr);
+            const token: string =
+              chunk?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+            if (token) {
+              accumulated += token;
+              // Update the placeholder message live
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === botId ? { ...m, text: accumulated } : m
+                )
+              );
+            }
+          } catch (_) {
+            // malformed SSE chunk — skip
+          }
+        }
+      }
+
+      // If nothing came back, show a fallback
+      if (!accumulated) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === botId
+              ? {
+                  ...m,
+                  text: "I received your message but got an empty response. Please try again.",
+                }
+              : m
+          )
+        );
+      }
     } catch (error: any) {
-      console.log("HealthAI error:", error);
-      // Fallback: friendly error message
-      addMessage(
-        "assistant",
-        "I'm having trouble connecting right now. Please check your internet connection and try again. If the issue persists, please consult a doctor directly. 😊"
+      if (error?.name === "AbortError") {
+        // User cancelled — leave the partial message as-is
+        return;
+      }
+      console.log("HealthAI streaming error:", error);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === botId
+            ? {
+                ...m,
+                text: "I'm having trouble connecting right now. Please check your internet connection and try again. If the issue persists, please consult a doctor directly. 😊",
+              }
+            : m
+        )
       );
     } finally {
       setLoading(false);
@@ -169,6 +261,7 @@ export const useChatbot = () => {
   };
 
   const clearConversation = async () => {
+    abortRef.current?.abort();
     setMessages([INITIAL_MESSAGE]);
     try {
       await AsyncStorage.removeItem(CHATBOT_STORAGE_KEY);
