@@ -24,10 +24,11 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  where,
 } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
-// ── Firebase config (from google-services.json) ───────────────────────────────
+// ── Firebase config ───────────────────────────────────────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyC0pThdE1nLlSN_8G132qKMdR9-KMAsDLk",
   authDomain: "scia-b5440.firebaseapp.com",
@@ -190,18 +191,36 @@ export async function fetchEvents(
   return filterEvents(snapshot.docs, barangay, district);
 }
 
+// ✅ Guards the listener — only attaches after user is confirmed authenticated
 export function subscribeToEvents(
   barangay: string | null,
   district: string | null,
   callback: (events: Event[]) => void
 ) {
-  const q = query(
-    collection(db, COLLECTIONS.EVENTS),
-    orderBy("createdAt", "desc")
-  );
-  return onSnapshot(q, (snapshot) => {
-    callback(filterEvents(snapshot.docs, barangay, district));
+  let unsubscribeSnapshot: (() => void) | null = null;
+
+  const unsubscribeAuth = _onAuthStateChanged(auth, (user) => {
+    // Tear down any existing snapshot listener first
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
+    }
+    if (!user) return; // not authenticated — don't attach
+
+    const q = query(
+      collection(db, COLLECTIONS.EVENTS),
+      orderBy("createdAt", "desc")
+    );
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+      callback(filterEvents(snapshot.docs, barangay, district));
+    });
   });
+
+  // Return a cleanup that kills both listeners
+  return () => {
+    unsubscribeAuth();
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+  };
 }
 
 // ── SOS / EMERGENCY ───────────────────────────────────────────────────────────
@@ -250,6 +269,35 @@ export async function submitAppointment(data: AppointmentRequest) {
   return docRef.id;
 }
 
+// ── APPOINTMENTS LISTENER (auth-gated) ───────────────────────────────────────
+export function subscribeToUserAppointments(
+  callback: (appointments: any[]) => void
+) {
+  let unsubscribeSnapshot: (() => void) | null = null;
+
+  const unsubscribeAuth = _onAuthStateChanged(auth, (user) => {
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
+    }
+    if (!user) return;
+
+    const q = query(
+      collection(db, COLLECTIONS.APPOINTMENTS),
+      where("uid", "==", user.uid),
+      orderBy("createdAt", "desc")
+    );
+    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+  });
+
+  return () => {
+    unsubscribeAuth();
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+  };
+}
+
 // ── HEALTH CENTERS ────────────────────────────────────────────────────────────
 export interface HealthCenter {
   id: string;
@@ -267,14 +315,33 @@ export async function fetchHealthCenters(): Promise<HealthCenter[]> {
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HealthCenter));
 }
 
+// ✅ health_centers is public to all authenticated users — still guard auth
 export function subscribeToHealthCenters(
   callback: (centers: HealthCenter[]) => void
 ) {
-  return onSnapshot(collection(db, COLLECTIONS.HEALTH_CENTERS), (snapshot) => {
-    callback(
-      snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HealthCenter))
+  let unsubscribeSnapshot: (() => void) | null = null;
+
+  const unsubscribeAuth = _onAuthStateChanged(auth, (user) => {
+    if (unsubscribeSnapshot) {
+      unsubscribeSnapshot();
+      unsubscribeSnapshot = null;
+    }
+    if (!user) return;
+
+    unsubscribeSnapshot = onSnapshot(
+      collection(db, COLLECTIONS.HEALTH_CENTERS),
+      (snapshot) => {
+        callback(
+          snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HealthCenter))
+        );
+      }
     );
   });
+
+  return () => {
+    unsubscribeAuth();
+    if (unsubscribeSnapshot) unsubscribeSnapshot();
+  };
 }
 
 // ── PHYSICAL ID REQUEST ───────────────────────────────────────────────────────
