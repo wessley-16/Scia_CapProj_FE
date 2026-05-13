@@ -1,11 +1,14 @@
 /**
- * useLiveVoice — Firebase AI Logic Live voice session
+ * useLiveVoice — Real-time voice session with Gemini Live via Firebase AI Logic + Vertex AI
  *
- * Uses @siteed/expo-audio-studio (formerly expo-audio-stream) for real-time PCM.
- * The correct import is ExpoAudioStreamModule from @siteed/expo-audio-studio.
+ * How it works:
+ *  1. connect()  → Opens a Gemini Live WebSocket session via Firebase AI Logic (Vertex AI backend)
+ *  2. startMicRecording() → Streams raw 16-bit PCM @ 16 kHz → session.sendRealtimeAudio()
+ *  3. Server VAD fires when user stops talking → model sends back PCM audio chunks
+ *  4. On turnComplete we assemble the chunks into a WAV and play it via expo-av
  *
- * Architecture: stream raw PCM chunks → session.sendRealtimeAudio() in real-time
- * so the server's built-in VAD detects when the user stops talking and auto-responds.
+ * Supports both @siteed/expo-audio-studio and @siteed/audio-studio (tries both)
+ * Playback: expo-av (falls back gracefully if unavailable)
  */
 
 import {
@@ -17,452 +20,537 @@ import {
 import { getApp } from "@react-native-firebase/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// ── @siteed/expo-audio-studio for real-time PCM chunks ────────────────────────
-// Formerly known as expo-audio-stream / @siteed/expo-audio-stream.
-// The module exposes ExpoAudioStreamModule for permissions + startRecording.
-let ExpoAudioStreamModule: any = null;
-try {
-  const studio = require("@siteed/expo-audio-studio");
-  // The module can be at .ExpoAudioStreamModule or .default.ExpoAudioStreamModule
-  ExpoAudioStreamModule =
-    studio.ExpoAudioStreamModule ?? studio.default?.ExpoAudioStreamModule ?? null;
-} catch {
+// ─────────────────────────────────────────────────────────────────────────────
+// Audio recording — try both package names; fallback to no-op so app still boots
+// ─────────────────────────────────────────────────────────────────────────────
+let _startRecording: ((cfg: any) => Promise<any>) | null = null;
+let _stopRecording: (() => Promise<any>) | null = null;
+let _requestMicPerm: (() => Promise<any>) | null = null;
+
+const AUDIO_PKG_NAMES = ["@siteed/expo-audio-studio", "@siteed/audio-studio"];
+
+for (const pkgName of AUDIO_PKG_NAMES) {
+  try {
+    const pkg = require(pkgName);
+    _startRecording =
+      pkg.startRecording ??
+      pkg.default?.startRecording ??
+      null;
+    _stopRecording =
+      pkg.stopRecording ??
+      pkg.default?.stopRecording ??
+      null;
+
+    // Permissions: ExpoAudioStreamModule.requestPermissionsAsync()
+    const streamMod =
+      pkg.ExpoAudioStreamModule ??
+      pkg.default?.ExpoAudioStreamModule ??
+      null;
+    if (streamMod?.requestPermissionsAsync) {
+      _requestMicPerm = () => streamMod.requestPermissionsAsync();
+    }
+
+    if (_startRecording) break; // found a working package
+  } catch {
+    // try next
+  }
+}
+
+// Fallback: expo-av mic permissions
+if (!_requestMicPerm) {
+  try {
+    const { Audio } = require("expo-av");
+    _requestMicPerm = () => Audio.requestPermissionsAsync();
+  } catch {}
+}
+
+if (!_startRecording) {
   console.warn(
-    "@siteed/expo-audio-studio not available. " +
-      "Run: npx expo install @siteed/expo-audio-studio"
+    "[useLiveVoice] No audio recording package found.\n" +
+    "Install one: npx expo install @siteed/expo-audio-studio"
   );
 }
 
-// ── Playback: prefer expo-audio (SDK 54+), fall back to expo-av ───────────────
-let AudioModule: any = null;
+// ─────────────────────────────────────────────────────────────────────────────
+// Audio playback — expo-av (expo-audio as fallback)
+// ─────────────────────────────────────────────────────────────────────────────
+let AudioLib: any = null;
 try {
-  AudioModule = require("expo-audio");
+  AudioLib = require("expo-av").Audio;
 } catch {
   try {
-    AudioModule = require("expo-av").Audio;
+    AudioLib = require("expo-audio");
   } catch {
-    console.warn("No audio playback module available.");
+    console.warn("[useLiveVoice] No audio playback module available.");
   }
 }
-const Audio = AudioModule;
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-type LiveStatus = "idle" | "connecting" | "connected" | "responding" | "error";
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+const MIC_SAMPLE_RATE = 16_000;    // Gemini Live input  — 16 kHz PCM16 mono
+const OUT_SAMPLE_RATE = 24_000;    // Gemini Live output — 24 kHz PCM16 mono
+const VERTEX_REGION   = "us-central1";
+const LIVE_MODEL      = "gemini-live-2.5-flash-native-audio";
+// Fallback if the above model is unavailable:
+// const LIVE_MODEL   = "gemini-2.0-flash-live-001";
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-// Live API input: 16-bit PCM at 16kHz mono
-const MIC_SAMPLE_RATE = 16000;
-// Live API output: 16-bit PCM at 24kHz mono
-const OUTPUT_SAMPLE_RATE = 24000;
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
+export type LiveStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "listening"   // mic is hot
+  | "responding"  // model is speaking
+  | "error";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const parseSampleRate = (mimeType?: string): number => {
-  if (!mimeType) return OUTPUT_SAMPLE_RATE;
-  const match = mimeType.match(/rate=(\d+)/i);
-  if (!match) return OUTPUT_SAMPLE_RATE;
-  const parsed = parseInt(match[1], 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : OUTPUT_SAMPLE_RATE;
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// Pure helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function parseSampleRate(mime?: string): number {
+  const m = mime?.match(/rate=(\d+)/i);
+  const n = m ? parseInt(m[1], 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : OUT_SAMPLE_RATE;
+}
 
-const base64ToBytes = (base64: string): Uint8Array => {
-  const binary = globalThis.atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-};
+function b64ToU8(b64: string): Uint8Array {
+  const bin = globalThis.atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
 
-const bytesToBase64 = (bytes: Uint8Array): string => {
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return globalThis.btoa(binary);
-};
+function u8ToB64(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return globalThis.btoa(bin);
+}
 
-const pcmToWavDataUri = (chunks: Uint8Array[], sampleRate: number): string => {
-  const pcmByteLength = chunks.reduce((sum, c) => sum + c.length, 0);
-  const wavBytes = new Uint8Array(44 + pcmByteLength);
-  const view = new DataView(wavBytes.buffer);
-  const writeString = (offset: number, s: string) => {
-    for (let i = 0; i < s.length; i++)
-      view.setUint8(offset + i, s.charCodeAt(i));
+/** Pack raw PCM chunks into a WAV data-URI playable by expo-av */
+function buildWavUri(chunks: Uint8Array[], sampleRate: number): string {
+  const pcmLen = chunks.reduce((s, c) => s + c.length, 0);
+  const buf = new Uint8Array(44 + pcmLen);
+  const dv  = new DataView(buf.buffer);
+  const str = (off: number, s: string) => {
+    for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i));
   };
-  writeString(0, "RIFF");
-  view.setUint32(4, 36 + pcmByteLength, true);
-  writeString(8, "WAVE");
-  writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // Mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeString(36, "data");
-  view.setUint32(40, pcmByteLength, true);
-  let offset = 44;
-  for (const chunk of chunks) {
-    wavBytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return `data:audio/wav;base64,${bytesToBase64(wavBytes)}`;
-};
+  str(0, "RIFF");  dv.setUint32(4, 36 + pcmLen, true);
+  str(8, "WAVE");  str(12, "fmt ");
+  dv.setUint32(16, 16, true);           // chunk size
+  dv.setUint16(20,  1, true);           // PCM
+  dv.setUint16(22,  1, true);           // mono
+  dv.setUint32(24, sampleRate, true);
+  dv.setUint32(28, sampleRate * 2, true);
+  dv.setUint16(32,  2, true);
+  dv.setUint16(34, 16, true);
+  str(36, "data"); dv.setUint32(40, pcmLen, true);
+  let off = 44;
+  for (const c of chunks) { buf.set(c, off); off += c.length; }
+  return `data:audio/wav;base64,${u8ToB64(buf)}`;
+}
 
-const safeSetAudioMode = async (opts: Record<string, unknown>) => {
-  if (!Audio) return;
+async function setAudioMode(opts: Record<string, unknown>) {
+  if (!AudioLib) return;
   try {
-    if (typeof Audio.setAudioModeAsync === "function") {
-      await Audio.setAudioModeAsync(opts);
-    }
-  } catch {
-    /* noop */
-  }
+    if (typeof AudioLib.setAudioModeAsync === "function")
+      await AudioLib.setAudioModeAsync(opts);
+  } catch { /* noop — some platforms don't support all keys */ }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// System instruction
+// ─────────────────────────────────────────────────────────────────────────────
+const SYSTEM_INSTRUCTION = {
+  parts: [
+    {
+      text:
+        "You are HealthAI, a warm and caring voice assistant for senior citizens " +
+        "in Valenzuela City, Philippines (the SCIA app). " +
+        "Speak simply, patiently, and in a friendly tone. " +
+        "Keep responses short — one to three sentences unless more detail is asked for. " +
+        "Never diagnose; always recommend seeing a doctor for serious concerns. " +
+        "If someone describes an emergency, immediately tell them to call 911 " +
+        "or tap the SOS button in the app.",
+    },
+  ],
 };
 
-// ── Hook ──────────────────────────────────────────────────────────────────────
-export const useLiveVoice = () => {
-  const sessionRef = useRef<any>(null);
-  const soundRef = useRef<any>(null);
-  // Subscription/stop handle returned by startRecording
-  const recordingHandleRef = useRef<any>(null);
-  const pcmChunksRef = useRef<Uint8Array[]>([]);
-  const pcmSampleRateRef = useRef(OUTPUT_SAMPLE_RATE);
-  const audioQueueRef = useRef<string[]>([]);
-  const isPlayingRef = useRef(false);
+// ─────────────────────────────────────────────────────────────────────────────
+// Hook
+// ─────────────────────────────────────────────────────────────────────────────
+export function useLiveVoice() {
+  // Session / recording refs — not state because we don't want re-renders on change
+  const sessionRef       = useRef<any>(null);
+  const soundRef         = useRef<any>(null);
+  const isRecordingRef   = useRef(false);
+  const isDestroyedRef   = useRef(false);   // unmount guard
+  const audioQueueRef    = useRef<string[]>([]);
+  const isPlayingRef     = useRef(false);
+  const pcmChunksRef     = useRef<Uint8Array[]>([]);
+  const pcmRateRef       = useRef(OUT_SAMPLE_RATE);
 
-  const [status, setStatus] = useState<LiveStatus>("idle");
+  // Reactive state
+  const [status,          setStatus]          = useState<LiveStatus>("idle");
+  const [isRecording,     setIsRecording]     = useState(false);
   const [inputTranscript, setInputTranscript] = useState("");
-  const [outputTranscript, setOutputTranscript] = useState("");
-  const [lastError, setLastError] = useState("");
-  const [diagnostic, setDiagnostic] = useState("");
-  const [interrupted, setInterrupted] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [outputTranscript,setOutputTranscript]= useState("");
+  const [lastError,       setLastError]       = useState("");
+  const [diagnostic,      setDiagnostic]      = useState("");
+  const [interrupted,     setInterrupted]     = useState(false);
 
-  const isConnected = status === "connected" || status === "responding";
+  const isConnected = status === "connected" || status === "listening" || status === "responding";
 
-  // ── Teardown ───────────────────────────────────────────────────────────────
-  const clearAudioState = useCallback(async () => {
-    if (recordingHandleRef.current) {
-      try {
-        // @siteed/expo-audio-studio: stopRecording can be called on the module
-        await ExpoAudioStreamModule?.stopRecording?.();
-      } catch {}
-      recordingHandleRef.current = null;
-    }
-    pcmChunksRef.current = [];
-    audioQueueRef.current = [];
-    isPlayingRef.current = false;
-    if (soundRef.current) {
-      try {
-        await soundRef.current.stopAsync();
-      } catch {}
-      try {
-        await soundRef.current.unloadAsync();
-      } catch {}
-      soundRef.current = null;
-    }
-    setIsRecording(false);
+  // ── safe state setters (no-op after unmount) ──────────────────────────────
+  const safeSet = useCallback(<T>(setter: (v: T) => void) => (v: T) => {
+    if (!isDestroyedRef.current) setter(v);
   }, []);
 
-  // ── Playback queue ─────────────────────────────────────────────────────────
-  const playQueue = useCallback(async () => {
-    if (isPlayingRef.current || !Audio) return;
+  const setStatusSafe          = safeSet(setStatus);
+  const setIsRecordingSafe     = safeSet(setIsRecording);
+  const setInputTranscriptSafe = safeSet(setInputTranscript);
+  const setOutputTranscriptSafe= safeSet(setOutputTranscript);
+  const setLastErrorSafe       = safeSet(setLastError);
+  const setDiagnosticSafe      = safeSet(setDiagnostic);
+  const setInterruptedSafe     = safeSet(setInterrupted);
+
+  // ── Teardown audio state ──────────────────────────────────────────────────
+  const clearAudio = useCallback(async () => {
+    // Stop recording
+    if (isRecordingRef.current) {
+      isRecordingRef.current = false;
+      try { await _stopRecording?.(); } catch {}
+    }
+    setIsRecordingSafe(false);
+
+    // Stop playback
+    isPlayingRef.current = false;
+    audioQueueRef.current = [];
+    pcmChunksRef.current  = [];
+    if (soundRef.current) {
+      try { await soundRef.current.stopAsync(); } catch {}
+      try { await soundRef.current.unloadAsync(); } catch {}
+      soundRef.current = null;
+    }
+  }, [setIsRecordingSafe]);
+
+  // ── Playback queue ────────────────────────────────────────────────────────
+  const drainPlayQueue = useCallback(async () => {
+    if (isPlayingRef.current || !AudioLib) return;
     isPlayingRef.current = true;
     try {
       while (audioQueueRef.current.length > 0) {
         const uri = audioQueueRef.current.shift();
         if (!uri) continue;
-        await safeSetAudioMode({
+
+        // Switch audio session to playback mode
+        await setAudioMode({
           allowsRecordingIOS: false,
           playsInSilentModeIOS: true,
           shouldDuckAndroid: true,
           playThroughEarpieceAndroid: false,
+          staysActiveInBackground: false,
         });
-        const { sound } = await Audio.Sound.createAsync(
+
+        const { sound } = await AudioLib.Sound.createAsync(
           { uri },
-          { shouldPlay: true }
+          { shouldPlay: true, volume: 1.0 }
         );
         soundRef.current = sound;
+
+        // Wait for the clip to finish
         await new Promise<void>((resolve) => {
           sound.setOnPlaybackStatusUpdate((s: any) => {
-            if (s.isLoaded && s.didJustFinish) resolve();
+            if (s.isLoaded && (s.didJustFinish || s.error)) resolve();
           });
         });
-        await sound.unloadAsync();
+
+        try { await sound.unloadAsync(); } catch {}
         soundRef.current = null;
       }
     } catch (err) {
-      setLastError("Audio playback failed.");
-      setDiagnostic(
-        err instanceof Error ? err.message : "Unknown audio error."
-      );
+      setLastErrorSafe("Audio playback failed: " + (err instanceof Error ? err.message : "?"));
     } finally {
       isPlayingRef.current = false;
     }
-  }, []);
+  }, [setLastErrorSafe]);
 
-  const flushAudioTurn = useCallback(async () => {
+  /** Assemble buffered PCM chunks → WAV → enqueue for playback */
+  const flushTurn = useCallback(async () => {
     if (pcmChunksRef.current.length === 0) return;
     try {
-      const uri = pcmToWavDataUri(
-        pcmChunksRef.current,
-        pcmSampleRateRef.current
-      );
+      const uri = buildWavUri(pcmChunksRef.current, pcmRateRef.current);
       pcmChunksRef.current = [];
       audioQueueRef.current.push(uri);
-      await playQueue();
-    } catch {
-      setLastError("Failed to decode model audio.");
+      await drainPlayQueue();
+    } catch (err) {
+      setLastErrorSafe("Failed to build audio: " + (err instanceof Error ? err.message : "?"));
       pcmChunksRef.current = [];
     }
-  }, [playQueue]);
+  }, [drainPlayQueue, setLastErrorSafe]);
 
-  // ── Session message handler ────────────────────────────────────────────────
+  // ── Receive-loop message handler ──────────────────────────────────────────
   const handleMessage = useCallback(
-    async (message: any) => {
-      if (!message) return;
+    async (msg: any) => {
+      if (!msg?.serverContent) return;
+      const sc = msg.serverContent;
 
-      if (message.serverContent?.interrupted === true) {
-        setInterrupted(true);
+      // Model was interrupted by new user speech
+      if (sc.interrupted === true) {
+        setInterruptedSafe(true);
         pcmChunksRef.current = [];
-        setStatus("connected");
+        audioQueueRef.current = [];
+        // Stop current playback immediately
+        try {
+          await soundRef.current?.stopAsync();
+          await soundRef.current?.unloadAsync();
+        } catch {}
+        soundRef.current = null;
+        isPlayingRef.current = false;
+        setStatusSafe("listening");
+        return;
       }
 
-      const parts = message.serverContent?.modelTurn?.parts;
-      if (Array.isArray(parts)) {
-        for (const part of parts) {
-          const inlineData = part?.inlineData;
-          if (
-            !inlineData?.data ||
-            !inlineData.mimeType?.startsWith("audio/pcm")
-          )
-            continue;
-          pcmSampleRateRef.current = parseSampleRate(inlineData.mimeType);
-          try {
-            pcmChunksRef.current.push(base64ToBytes(inlineData.data));
-          } catch {}
+      // Collect incoming PCM audio chunks from the model
+      const parts = sc.modelTurn?.parts ?? [];
+      for (const part of parts) {
+        const id = part?.inlineData;
+        if (id?.data && id.mimeType?.startsWith("audio/pcm")) {
+          pcmRateRef.current = parseSampleRate(id.mimeType);
+          try { pcmChunksRef.current.push(b64ToU8(id.data)); } catch {}
         }
       }
 
-      if (message.serverContent?.inputTranscription?.text) {
-        setInputTranscript(message.serverContent.inputTranscription.text);
-      }
-      if (message.serverContent?.outputTranscription?.text) {
-        setOutputTranscript(message.serverContent.outputTranscription.text);
-        setStatus("responding");
+      // Live input transcription (what the user said)
+      if (sc.inputTranscription?.text) {
+        setInputTranscriptSafe(sc.inputTranscription.text);
       }
 
-      if (message.serverContent?.turnComplete === true) {
-        await flushAudioTurn();
-        setStatus("connected");
+      // Live output transcription (what the model is saying)
+      if (sc.outputTranscription?.text) {
+        setOutputTranscriptSafe(sc.outputTranscription.text);
+        setStatusSafe("responding");
+      }
+
+      // Model finished its turn — play everything we buffered
+      if (sc.turnComplete === true) {
+        await flushTurn();
+        setStatusSafe(isRecordingRef.current ? "listening" : "connected");
       }
     },
-    [flushAudioTurn]
+    [flushTurn, setInterruptedSafe, setStatusSafe, setInputTranscriptSafe, setOutputTranscriptSafe]
   );
 
-  // ── Connect ────────────────────────────────────────────────────────────────
+  // ── Connect to Gemini Live ────────────────────────────────────────────────
   const connect = useCallback(async () => {
-    if (sessionRef.current) return;
-    setLastError("");
-    setDiagnostic("");
-    setInterrupted(false);
-    setStatus("connecting");
+    if (sessionRef.current || isDestroyedRef.current) return;
+    setLastErrorSafe("");
+    setDiagnosticSafe("");
+    setInterruptedSafe(false);
+    setStatusSafe("connecting");
 
     try {
-      const app = getApp();
-      const ai = getAI(app, { backend: new VertexAIBackend("us-central1") });
-
+      const app  = getApp();
+      const ai   = getAI(app, { backend: new VertexAIBackend(VERTEX_REGION) });
       const liveModel = getLiveGenerativeModel(ai, {
-        model: "gemini-live-2.5-flash-native-audio",
+        model: LIVE_MODEL,
         liveGenerationConfig: {
           responseModalities: [ResponseModality.AUDIO],
           inputAudioTranscription: {},
           outputAudioTranscription: {},
         },
-        systemInstruction: {
-          parts: [
-            {
-              text: `You are HealthAI, a caring voice assistant for senior citizens \nin Valenzuela City, Philippines (SCIA app). Speak simply and warmly. \nNever diagnose — always recommend seeing a doctor for serious concerns. \nIf someone describes an emergency, tell them to call 911 or use the SOS button immediately.`,
-            },
-          ],
-        },
+        systemInstruction: SYSTEM_INSTRUCTION,
       });
 
-      setDiagnostic("Connecting to Gemini Live...");
+      setDiagnosticSafe("Opening Gemini Live session…");
       const session = await liveModel.connect();
-      sessionRef.current = session;
-      setStatus("connected");
-      setDiagnostic("Connected. Tap mic to speak.");
+      if (isDestroyedRef.current) { session.close?.(); return; }
 
+      sessionRef.current = session;
+      setStatusSafe("connected");
+      setDiagnosticSafe("Connected — tap the mic to start speaking.");
+
+      // Background receive loop — runs for the lifetime of the session
       (async () => {
         try {
           for await (const message of session.receive()) {
+            if (isDestroyedRef.current || !sessionRef.current) break;
             await handleMessage(message);
           }
-          if (sessionRef.current) {
+          // Session closed cleanly
+          if (!isDestroyedRef.current && sessionRef.current) {
             sessionRef.current = null;
-            setStatus("idle");
-            setDiagnostic("Session ended.");
+            setStatusSafe("idle");
+            setDiagnosticSafe("Session ended.");
           }
         } catch (err) {
-          if (sessionRef.current) {
+          if (!isDestroyedRef.current && sessionRef.current) {
             sessionRef.current = null;
-            setLastError(err instanceof Error ? err.message : "Session error.");
-            setStatus("error");
+            const msg = err instanceof Error ? err.message : "Session error.";
+            setLastErrorSafe(msg);
+            setDiagnosticSafe("Connection lost.");
+            setStatusSafe("error");
           }
         }
       })();
     } catch (err) {
       sessionRef.current = null;
-      setLastError(err instanceof Error ? err.message : "Failed to connect.");
-      setDiagnostic("Connection failed.");
-      setStatus("error");
+      const msg = err instanceof Error ? err.message : "Could not connect.";
+      setLastErrorSafe(msg);
+      setDiagnosticSafe("Failed to connect. Check Firebase setup and internet.");
+      setStatusSafe("error");
     }
-  }, [handleMessage]);
+  }, [handleMessage, setLastErrorSafe, setDiagnosticSafe, setInterruptedSafe, setStatusSafe]);
 
-  // ── Disconnect ─────────────────────────────────────────────────────────────
+  // ── Disconnect ────────────────────────────────────────────────────────────
   const disconnect = useCallback(() => {
-    const session = sessionRef.current;
+    const s = sessionRef.current;
     sessionRef.current = null;
-    try {
-      session?.close();
-    } catch {}
-    void clearAudioState();
-    setDiagnostic("");
-    setStatus("idle");
-  }, [clearAudioState]);
+    try { s?.close(); } catch {}
+    void clearAudio();
+    setStatusSafe("idle");
+    setDiagnosticSafe("");
+  }, [clearAudio, setStatusSafe, setDiagnosticSafe]);
 
+  // ── Unmount cleanup ───────────────────────────────────────────────────────
   useEffect(() => {
+    isDestroyedRef.current = false;
     return () => {
-      const session = sessionRef.current;
+      isDestroyedRef.current = true;
+      const s = sessionRef.current;
       sessionRef.current = null;
-      try {
-        session?.close();
-      } catch {}
-      void clearAudioState();
+      try { s?.close(); } catch {}
+      // clearAudio can't be awaited in useEffect cleanup — fire and forget
+      void (async () => {
+        isRecordingRef.current = false;
+        try { await _stopRecording?.(); } catch {}
+        try { await soundRef.current?.stopAsync(); } catch {}
+        try { await soundRef.current?.unloadAsync(); } catch {}
+      })();
     };
-  }, [clearAudioState]);
+  }, []);
 
-  // ── Start streaming mic → sendRealtimeAudio ────────────────────────────────
+  // ── Start streaming mic PCM → Gemini Live ─────────────────────────────────
   const startMicRecording = useCallback(async (): Promise<boolean> => {
     if (!sessionRef.current) {
-      setLastError("Connect first before recording.");
+      setLastErrorSafe("Not connected. Tap Connect first.");
       return false;
     }
-    if (isRecording || recordingHandleRef.current) return true;
+    if (isRecordingRef.current) return true; // already recording
 
-    if (!ExpoAudioStreamModule) {
-      setLastError(
-        "@siteed/expo-audio-studio not installed. Run: npx expo install @siteed/expo-audio-studio"
+    if (!_startRecording || !_requestMicPerm) {
+      setLastErrorSafe(
+        "Audio recording unavailable. Run: npx expo install @siteed/expo-audio-studio"
       );
       return false;
     }
 
     try {
-      // ── Request mic permission via ExpoAudioStreamModule ──────────────────
-      // @siteed/expo-audio-studio exposes requestPermissionsAsync on the module.
-      const permResult =
-        await ExpoAudioStreamModule.requestPermissionsAsync();
-      const granted =
-        permResult?.granted === true || permResult?.status === "granted";
+      // Request microphone permission
+      const perm = await _requestMicPerm();
+      const granted = perm?.granted === true || perm?.status === "granted";
       if (!granted) {
-        setLastError("Microphone permission is required.");
+        setLastErrorSafe("Microphone permission is required.");
         return false;
       }
 
-      await safeSetAudioMode({
+      // Set iOS audio session to recording mode
+      await setAudioMode({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
         shouldDuckAndroid: true,
         playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
       });
 
-      // ── Start recording with real-time PCM stream callback ────────────────
-      const result = await ExpoAudioStreamModule.startRecording({
-        sampleRate: MIC_SAMPLE_RATE, // 16kHz — required by Live API
-        channels: 1,                 // mono
-        encoding: "pcm_16bit",       // 16-bit PCM
-        interval: 100,               // fire onAudioStream every 100ms
-        onAudioStream: (event: { data: string }) => {
+      // Start recording — onAudioStream fires every `interval` ms with base64 PCM
+      await _startRecording({
+        sampleRate: MIC_SAMPLE_RATE,  // 16 kHz — required by Gemini Live
+        channels: 1,                  // mono
+        encoding: "pcm_16bit",        // signed 16-bit little-endian
+        interval: 100,                // chunk every 100 ms
+        onAudioStream: (event: { data?: string; audioData?: string }) => {
           const session = sessionRef.current;
-          if (!session || !event?.data) return;
+          if (!session) return;
+          const data = event.data ?? (event as any).audioData;
+          if (!data) return;
           try {
             session.sendRealtimeAudio({
-              data: event.data,
+              data,
               mimeType: `audio/pcm;rate=${MIC_SAMPLE_RATE}`,
             });
           } catch {
-            // Ignore individual chunk send errors
+            // Individual chunk errors are non-fatal — ignore
           }
         },
       });
 
-      // startRecording returns either a subscription object or { subscription }
-      recordingHandleRef.current = result?.subscription ?? result ?? true;
-      setIsRecording(true);
-      setInterrupted(false);
-      setDiagnostic("Listening… speak now. I'll respond automatically.");
+      isRecordingRef.current = true;
+      setIsRecordingSafe(true);
+      setInterruptedSafe(false);
+      setStatusSafe("listening");
+      setDiagnosticSafe("Listening… speak now. I'll respond when you stop.");
       return true;
     } catch (err) {
-      setIsRecording(false);
-      recordingHandleRef.current = null;
-      setLastError("Failed to start microphone.");
-      setDiagnostic(
-        err instanceof Error ? err.message : "Unknown recording error."
-      );
+      isRecordingRef.current = false;
+      setIsRecordingSafe(false);
+      const msg = err instanceof Error ? err.message : "Unknown recording error.";
+      setLastErrorSafe("Mic error: " + msg);
+      setDiagnosticSafe(msg);
       return false;
     }
-  }, [isRecording]);
+  }, [setLastErrorSafe, setIsRecordingSafe, setInterruptedSafe, setStatusSafe, setDiagnosticSafe]);
 
-  // ── Stop streaming mic ─────────────────────────────────────────────────────
+  // ── Stop mic streaming ────────────────────────────────────────────────────
   const stopMicRecording = useCallback(async (): Promise<boolean> => {
-    if (!recordingHandleRef.current && !isRecording) return false;
+    if (!isRecordingRef.current) return false;
+    isRecordingRef.current = false;
     try {
-      await ExpoAudioStreamModule?.stopRecording?.();
-      recordingHandleRef.current = null;
-      setIsRecording(false);
-      await safeSetAudioMode({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-      setDiagnostic("Mic off.");
-      return true;
-    } catch (err) {
-      recordingHandleRef.current = null;
-      setIsRecording(false);
-      setLastError("Failed to stop microphone.");
-      return false;
-    }
-  }, [isRecording]);
+      await _stopRecording?.();
+    } catch {}
+    setIsRecordingSafe(false);
+    setStatusSafe(sessionRef.current ? "connected" : "idle");
+    await setAudioMode({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+    });
+    setDiagnosticSafe("Mic stopped.");
+    return true;
+  }, [setIsRecordingSafe, setStatusSafe, setDiagnosticSafe]);
 
-  // ── Toggle (mic button in Voice.tsx) ──────────────────────────────────────
+  // ── Toggle mic (main button in Voice.tsx) ─────────────────────────────────
   const toggleMic = useCallback(async () => {
     if (!isConnected) {
+      // Auto-connect then start mic
       await connect();
-      setTimeout(() => startMicRecording(), 600);
+      // Wait briefly for the session to open, then start mic
+      setTimeout(() => { void startMicRecording(); }, 800);
       return;
     }
-    if (isRecording) {
+    if (isRecordingRef.current) {
       await stopMicRecording();
     } else {
       await startMicRecording();
     }
-  }, [isConnected, isRecording, connect, startMicRecording, stopMicRecording]);
+  }, [isConnected, connect, startMicRecording, stopMicRecording]);
 
-  const resetSession = useCallback(() => {
-    setInputTranscript("");
-    setOutputTranscript("");
-    setInterrupted(false);
-    setLastError("");
-    setDiagnostic("");
-    void clearAudioState();
-  }, [clearAudioState]);
+  // ── Reset transcript display ──────────────────────────────────────────────
+  const resetTranscripts = useCallback(() => {
+    setInputTranscriptSafe("");
+    setOutputTranscriptSafe("");
+    setInterruptedSafe(false);
+    setLastErrorSafe("");
+    setDiagnosticSafe("");
+  }, [setInputTranscriptSafe, setOutputTranscriptSafe, setInterruptedSafe, setLastErrorSafe, setDiagnosticSafe]);
 
+  // ─────────────────────────────────────────────────────────────────────────
   return useMemo(
     () => ({
+      // State
       status,
       isConnected,
       isRecording,
@@ -471,28 +559,20 @@ export const useLiveVoice = () => {
       interrupted,
       lastError,
       diagnostic,
+      // Actions
       connect,
       disconnect,
-      resetSession,
       toggleMic,
       startMicRecording,
       stopMicRecording,
+      resetTranscripts,
     }),
     [
-      status,
-      isConnected,
-      isRecording,
-      inputTranscript,
-      outputTranscript,
-      interrupted,
-      lastError,
-      diagnostic,
-      connect,
-      disconnect,
-      resetSession,
-      toggleMic,
-      startMicRecording,
-      stopMicRecording,
+      status, isConnected, isRecording,
+      inputTranscript, outputTranscript,
+      interrupted, lastError, diagnostic,
+      connect, disconnect, toggleMic,
+      startMicRecording, stopMicRecording, resetTranscripts,
     ]
   );
-};
+}
