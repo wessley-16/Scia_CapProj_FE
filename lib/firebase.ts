@@ -1,58 +1,42 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// lib/firebase.ts
-// Uses the JS Firebase Web SDK (already in package.json as "firebase": "^12")
-// This works in ANY Expo build — no native linking required.
-// ─────────────────────────────────────────────────────────────────────────────
-
-import { getApp, getApps, initializeApp } from "firebase/app";
 import {
-  createUserWithEmailAndPassword,
   getAuth,
-  onAuthStateChanged as _onAuthStateChanged,
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-} from "firebase/auth";
+  FirebaseAuthTypes,
+} from "@react-native-firebase/auth";
 import {
-  addDoc,
+  getFirestore,
   collection,
   doc,
   getDoc,
   getDocs,
-  getFirestore,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
+  addDoc,
   setDoc,
+  query,
   where,
-} from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
+  FieldValue,
+} from "@react-native-firebase/firestore";
+import { getStorage } from "@react-native-firebase/storage";
 
-// ── Firebase config ───────────────────────────────────────────────────────────
-const firebaseConfig = {
-  apiKey: "AIzaSyC0pThdE1nLlSN_8G132qKMdR9-KMAsDLk",
-  authDomain: "scia-b5440.firebaseapp.com",
-  databaseURL: "https://scia-b5440-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "scia-b5440",
-  storageBucket: "scia-b5440.firebasestorage.app",
-  messagingSenderId: "244279971713",
-  appId: "1:244279971713:android:c8f3a04684059cd593a280",
-};
-
-// Guard against double-init on hot reload
-export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+const auth = getAuth();
+const db = getFirestore();
+export const storage = getStorage();
 
 // ── Helper: build a synthetic email from idNumber ────────────────────────────
-export const idToEmail = (idNumber: string) =>
-  `${idNumber.trim().toLowerCase()}@scia.app`;
+export const idToEmail = (idNumber: string) => {
+  const cleaned = idNumber.trim().replace(/[^a-z0-9]/gi, "").toLowerCase();
+  return `${cleaned}@scia.app`;
+};
 
 // ── Helper: strip undefined so Firestore doesn't complain ────────────────────
 function stripUndefined<T extends Record<string, any>>(obj: T): T {
   return Object.fromEntries(
-    Object.entries(obj).filter(([, v]) => v !== undefined)
+    Object.entries(obj).filter(([, v]) => v !== undefined),
   ) as T;
 }
 
@@ -65,11 +49,14 @@ export const COLLECTIONS = {
   ID_REQUESTS: "id_requests",
   ANNOUNCEMENTS: "announcements",
   HEALTH_CENTERS: "health_centers",
+  USER_LOOKUP: "user_lookup",
 };
 
 // ── AUTH STATE ────────────────────────────────────────────────────────────────
-export function subscribeToAuthState(callback: (user: any | null) => void) {
-  return _onAuthStateChanged(auth, callback);
+export function subscribeToAuthState(
+  callback: (user: FirebaseAuthTypes.User | null) => void,
+) {
+  return onAuthStateChanged(auth, callback);
 }
 
 export async function logoutUser() {
@@ -97,7 +84,7 @@ export async function registerUser(data: UserRegistration) {
   const effectiveIdNumber =
     data.idNumber && data.idNumber.trim().length > 0
       ? data.idNumber.trim()
-      : `TEMP-${Date.now()}`;
+      : `TEMP${Math.floor(100000 + Math.random() * 900000)}`;
 
   const email = idToEmail(effectiveIdNumber);
   const cred = await createUserWithEmailAndPassword(auth, email, data.password);
@@ -120,7 +107,33 @@ export async function registerUser(data: UserRegistration) {
       role: "SENIOR_CITIZEN",
       uid,
       createdAt: serverTimestamp(),
-    })
+    }),
+  );
+
+  // ── Write lookup entries (public) so loginByIdentifier can find this user ──
+  // Keys: 6-digit ID or TEMP######, phone number, full name, first+last name
+  const fullName =
+    `${data.firstName} ${data.midName} ${data.lastName}`.trim().toLowerCase().replace(/\s+/g, "_");
+  const firstLast =
+    `${data.firstName} ${data.lastName}`.trim().toLowerCase().replace(/\s+/g, "_");
+
+  const lookupKeys = [
+    effectiveIdNumber.toLowerCase(),  // "123456" or "temp123456"
+    data.conNumber.trim(),            // "09955015206"
+    fullName,                         // "juan_santos_cruz"
+    firstLast,                        // "juan_cruz"
+  ];
+
+  // Deduplicate in case any keys are identical
+  const uniqueKeys = [...new Set(lookupKeys)];
+
+  await Promise.all(
+    uniqueKeys.map((key) =>
+      setDoc(doc(db, COLLECTIONS.USER_LOOKUP, key), {
+        idNumber: effectiveIdNumber,
+        uid,
+      })
+    )
   );
 
   return { id: uid, ...data, idNumber: effectiveIdNumber, status, isVerified };
@@ -133,8 +146,74 @@ export async function loginUser(idNumber: string, password: string) {
   const uid = cred.user.uid;
 
   const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
-  if (!userDoc.exists()) throw new Error("User profile not found.");
+  if (!userDoc.exists) throw new Error("User profile not found.");
   return { id: userDoc.id, ...userDoc.data() };
+}
+
+export async function loginByIdentifier(identifier: string, password: string) {
+  const trimmed = identifier.trim();
+
+  // Build lookup keys to try — same normalization used during registration
+  const isNameInput = /\s/.test(trimmed); // contains spaces → likely a name
+
+  const keysToTry: string[] = [];
+
+  if (isNameInput) {
+    const parts = trimmed.split(/\s+/);
+    // Full name (all parts joined)
+    keysToTry.push(trimmed.toLowerCase().replace(/\s+/g, "_"));
+    // First + last only (drop middle)
+    if (parts.length >= 3) {
+      keysToTry.push(
+        `${parts[0]}_${parts[parts.length - 1]}`.toLowerCase()
+      );
+    }
+  } else {
+    // ID number (6-digit or TEMP######) or phone number
+    keysToTry.push(trimmed.toLowerCase());
+  }
+
+  // Try each key against the public user_lookup collection
+  let idNumber: string | null = null;
+
+  for (const key of keysToTry) {
+    try {
+      const snap = await getDoc(doc(db, COLLECTIONS.USER_LOOKUP, key));
+      if (snap.exists()) {
+        idNumber = snap.data().idNumber as string;
+        break;
+      }
+    } catch (_) {
+      // key not found — try next
+    }
+  }
+
+  // If no lookup hit, treat the input itself as the ID number directly
+  // (covers TEMP IDs and 6-digit IDs for users registered before lookup existed)
+  if (!idNumber) {
+    idNumber = trimmed;
+  }
+
+  const email = idToEmail(idNumber);
+
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const uid = cred.user.uid;
+    const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+    if (!userDoc.exists()) throw new Error("User profile not found.");
+    return { id: userDoc.id, ...userDoc.data() };
+  } catch (err: any) {
+    if (
+      err.code === "auth/user-not-found" ||
+      err.code === "auth/wrong-password" ||
+      err.code === "auth/invalid-credential"
+    ) {
+      throw new Error(
+        "No account found for that ID, phone number, or name. Please check your credentials.",
+      );
+    }
+    throw err;
+  }
 }
 
 // ── EVENTS ────────────────────────────────────────────────────────────────────
@@ -156,14 +235,10 @@ export interface Event {
   Status?: string;
 }
 
-function filterEvents(
-  docs: any[],
-  barangay?: string | null,
-  district?: string | null
-): Event[] {
+function filterEvents(docs: any[], barangay?: string | null, district?: string | null): Event[] {
   const now = new Date();
   return docs
-    .map((d) => ({ id: d.id, ...d.data() } as Event))
+    .map((d) => ({ id: d.id, ...d.data() }) as Event)
     .filter((event) => {
       if (event.expiration) {
         try {
@@ -181,42 +256,36 @@ function filterEvents(
 
 export async function fetchEvents(
   barangay?: string | null,
-  district?: string | null
+  district?: string | null,
 ): Promise<Event[]> {
-  const q = query(
-    collection(db, COLLECTIONS.EVENTS),
-    orderBy("createdAt", "desc")
+  const snapshot = await getDocs(
+    query(collection(db, COLLECTIONS.EVENTS), orderBy("createdAt", "desc")),
   );
-  const snapshot = await getDocs(q);
   return filterEvents(snapshot.docs, barangay, district);
 }
 
-// ✅ Guards the listener — only attaches after user is confirmed authenticated
 export function subscribeToEvents(
   barangay: string | null,
   district: string | null,
-  callback: (events: Event[]) => void
+  callback: (events: Event[]) => void,
 ) {
   let unsubscribeSnapshot: (() => void) | null = null;
 
-  const unsubscribeAuth = _onAuthStateChanged(auth, (user) => {
-    // Tear down any existing snapshot listener first
+  const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
     if (unsubscribeSnapshot) {
       unsubscribeSnapshot();
       unsubscribeSnapshot = null;
     }
-    if (!user) return; // not authenticated — don't attach
+    if (!user) return;
 
-    const q = query(
-      collection(db, COLLECTIONS.EVENTS),
-      orderBy("createdAt", "desc")
+    unsubscribeSnapshot = onSnapshot(
+      query(collection(db, COLLECTIONS.EVENTS), orderBy("createdAt", "desc")),
+      (snapshot) => {
+        callback(filterEvents(snapshot.docs, barangay, district));
+      },
     );
-    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-      callback(filterEvents(snapshot.docs, barangay, district));
-    });
   });
 
-  // Return a cleanup that kills both listeners
   return () => {
     unsubscribeAuth();
     if (unsubscribeSnapshot) unsubscribeSnapshot();
@@ -230,7 +299,6 @@ export interface EmergencyAlert {
   longitude: number;
   address: string;
   barangay: string;
-  emergencyType: string;
 }
 
 export async function sendSOSAlert(data: EmergencyAlert) {
@@ -242,6 +310,15 @@ export async function sendSOSAlert(data: EmergencyAlert) {
     createdAt: serverTimestamp(),
   });
   return docRef.id;
+}
+
+export function subscribeToSOSAlert(
+  docId: string,
+  callback: (data: any) => void,
+) {
+  return onSnapshot(doc(db, COLLECTIONS.EMERGENCIES, docId), (snap) => {
+    if (snap.exists) callback({ id: snap.id, ...snap.data() });
+  });
 }
 
 // ── APPOINTMENTS ──────────────────────────────────────────────────────────────
@@ -264,32 +341,33 @@ export async function submitAppointment(data: AppointmentRequest) {
       center: "3S Center Valenzuela",
       status: "pending",
       createdAt: serverTimestamp(),
-    })
+    }),
   );
   return docRef.id;
 }
 
-// ── APPOINTMENTS LISTENER (auth-gated) ───────────────────────────────────────
 export function subscribeToUserAppointments(
-  callback: (appointments: any[]) => void
+  callback: (appointments: any[]) => void,
 ) {
   let unsubscribeSnapshot: (() => void) | null = null;
 
-  const unsubscribeAuth = _onAuthStateChanged(auth, (user) => {
+  const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
     if (unsubscribeSnapshot) {
       unsubscribeSnapshot();
       unsubscribeSnapshot = null;
     }
     if (!user) return;
 
-    const q = query(
-      collection(db, COLLECTIONS.APPOINTMENTS),
-      where("uid", "==", user.uid),
-      orderBy("createdAt", "desc")
+    unsubscribeSnapshot = onSnapshot(
+      query(
+        collection(db, COLLECTIONS.APPOINTMENTS),
+        where("uid", "==", user.uid),
+        orderBy("createdAt", "desc"),
+      ),
+      (snapshot) => {
+        callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+      },
     );
-    unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
-      callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
   });
 
   return () => {
@@ -312,16 +390,15 @@ export interface HealthCenter {
 
 export async function fetchHealthCenters(): Promise<HealthCenter[]> {
   const snapshot = await getDocs(collection(db, COLLECTIONS.HEALTH_CENTERS));
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HealthCenter));
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as HealthCenter);
 }
 
-// ✅ health_centers is public to all authenticated users — still guard auth
 export function subscribeToHealthCenters(
-  callback: (centers: HealthCenter[]) => void
+  callback: (centers: HealthCenter[]) => void,
 ) {
   let unsubscribeSnapshot: (() => void) | null = null;
 
-  const unsubscribeAuth = _onAuthStateChanged(auth, (user) => {
+  const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
     if (unsubscribeSnapshot) {
       unsubscribeSnapshot();
       unsubscribeSnapshot = null;
@@ -332,9 +409,9 @@ export function subscribeToHealthCenters(
       collection(db, COLLECTIONS.HEALTH_CENTERS),
       (snapshot) => {
         callback(
-          snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as HealthCenter))
+          snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as HealthCenter),
         );
-      }
+      },
     );
   });
 
@@ -363,7 +440,7 @@ export async function submitIDRequest(data: IDRequest) {
       uid,
       status: "pending",
       createdAt: serverTimestamp(),
-    })
+    }),
   );
   return docRef.id;
 }

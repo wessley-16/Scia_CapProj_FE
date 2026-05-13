@@ -3,7 +3,7 @@ import React from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-export default function Chatbot() {
+export default function chatbot() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <AiChat />

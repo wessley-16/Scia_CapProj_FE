@@ -1,18 +1,19 @@
-import React, { useCallback, useRef } from "react";
-import {
-    ActivityIndicator,
-    FlatList,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    View,
-} from "react-native";
-import { useSettings } from "@/context/SettingsContext";
-import { useChatbot } from "@/hooks/useChatbot";
+// components/AiChat.tsx
 import ChatHeader from "@/components/chat/ChatHeader";
 import ChatInputArea from "@/components/chat/ChatInputArea";
 import ChatMessageBubble from "@/components/chat/ChatMessageBubble";
+import { useSettings } from "@/context/SettingsContext";
+import { useChatbot } from "@/hooks/useChatbot";
+import React, { useCallback, useRef } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 const AiChat = () => {
   const { messages, loading, sendMessage } = useChatbot();
@@ -28,29 +29,6 @@ const AiChat = () => {
     });
   }, []);
 
-  const displayMessages = messages.map((msg, index) => {
-    if (msg.role === "assistant" && msg.text.includes("prescription list")) {
-      return {
-        ...msg,
-        actions: [
-          {
-            label: "View My\nPrescription",
-            icon: "script-text-outline",
-            color: "#fcd34d",
-            textColor: "#92400e",
-          },
-          {
-            label: "Add New\nMedication",
-            icon: "plus-circle-outline",
-            color: "#f3f4f6",
-            textColor: "#374151",
-          },
-        ],
-      };
-    }
-    return msg;
-  });
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -61,9 +39,11 @@ const AiChat = () => {
 
       <FlatList
         ref={flatListRef}
-        data={displayMessages}
+        data={messages}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ChatMessageBubble message={item} fontScale={fontScale} />}
+        renderItem={({ item }) => (
+          <ChatMessageBubble message={item} fontScale={fontScale} />
+        )}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -71,7 +51,9 @@ const AiChat = () => {
           loading ? (
             <View style={styles.typingContainer}>
               <ActivityIndicator size="small" color="#2b5ce6" />
-              <Text style={[styles.typingText, { fontSize: 13 * fontScale }]}>HealthAI is typing...</Text>
+              <Text style={[styles.typingText, { fontSize: 13 * fontScale }]}>
+                HealthAI is typing...
+              </Text>
             </View>
           ) : null
         }

@@ -1,7 +1,9 @@
+// components/chat/ChatMessageBubble.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ChatMessage } from "@/hooks/useChatbot";
+import MarkdownText from "@/components/chat/Markdowntext";
 
 interface ActionProps {
   label: string;
@@ -19,43 +21,40 @@ export default function ChatMessageBubble({ message, fontScale }: ChatMessageBub
   const isUser = message.role === "user";
 
   return (
-    <View
-      style={[
-        styles.container,
-        isUser ? styles.containerUser : styles.containerBot,
-      ]}
-    >
+    <View style={[styles.container, isUser ? styles.containerUser : styles.containerBot]}>
+
+      {/* ── Bot header ── */}
       {!isUser && (
         <View style={styles.header}>
           <View style={styles.botAvatar}>
-            <MaterialCommunityIcons
-              name="shield-star"
-              size={16}
-              color="white"
-            />
+            <MaterialCommunityIcons name="shield-star" size={18} color="white" />
           </View>
-          <Text style={[styles.headerText, { fontSize: 10 * fontScale }]}>
+          <Text style={[styles.headerText, { fontSize: 11 * fontScale }]}>
             HEALTHAI ASSISTANT • {message.time || "NOW"}
           </Text>
         </View>
       )}
 
+      {/* ── User header ── */}
       {isUser && (
         <View style={[styles.header, styles.headerUser]}>
-          <Text style={[styles.headerText, { fontSize: 10 * fontScale }]}>
-            YOU • {message.time || "2 MIN AGO"}
+          <Text style={[styles.headerText, { fontSize: 11 * fontScale }]}>
+            YOU • {message.time || "JUST NOW"}
           </Text>
         </View>
       )}
 
-      <View
-        style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble]}
-      >
-        <Text style={[styles.text, isUser ? styles.userText : styles.botText, { fontSize: 15 * fontScale, lineHeight: 22 * fontScale }]}>
-          {message.text}
-        </Text>
+      {/* ── Bubble ── */}
+      <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble]}>
+        {isUser ? (
+          <Text style={[styles.userText, { fontSize: 16 * fontScale, lineHeight: 25 * fontScale }]}>
+            {message.text}
+          </Text>
+        ) : (
+          <MarkdownText text={message.text} fontScale={fontScale} />
+        )}
 
-        {/* Action Buttons (Mockup for bot messages like the design) */}
+        {/* ── Action buttons ── */}
         {!isUser && message.actions && message.actions.length > 0 && (
           <View style={styles.actionsContainer}>
             {message.actions.map((action, index) => (
@@ -65,15 +64,10 @@ export default function ChatMessageBubble({ message, fontScale }: ChatMessageBub
               >
                 <MaterialCommunityIcons
                   name={action.icon}
-                  size={20}
+                  size={22}
                   color={action.textColor || "#000"}
                 />
-                <Text
-                  style={[
-                    styles.actionBtnText,
-                    { color: action.textColor || "#000", fontSize: 12 * fontScale },
-                  ]}
-                >
+                <Text style={[styles.actionBtnText, { color: action.textColor || "#000", fontSize: 13 * fontScale }]}>
                   {action.label}
                 </Text>
               </TouchableOpacity>
@@ -87,9 +81,9 @@ export default function ChatMessageBubble({ message, fontScale }: ChatMessageBub
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 12,
+    marginVertical: 10,
     marginHorizontal: 16,
-    maxWidth: "85%",
+    maxWidth: "88%",
   },
   containerUser: {
     alignSelf: "flex-end",
@@ -107,52 +101,47 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   botAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: "#7b8fed",
     alignItems: "center",
     justifyContent: "center",
   },
   headerText: {
-    fontSize: 10,
     fontWeight: "700",
     color: "#9ca3af",
     textTransform: "uppercase",
+    letterSpacing: 0.3,
   },
   bubble: {
-    padding: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   botBubble: {
     backgroundColor: "#ffffff",
     borderBottomLeftRadius: 4,
-    borderBottomRightRadius: 16,
+    borderBottomRightRadius: 18,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.07,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
   },
   userBubble: {
     backgroundColor: "#1d4ed8",
-    borderBottomLeftRadius: 16,
+    borderBottomLeftRadius: 18,
     borderBottomRightRadius: 4,
-  },
-  text: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  botText: {
-    color: "#374151",
   },
   userText: {
     color: "#ffffff",
+    fontWeight: "500",
   },
   actionsContainer: {
     flexDirection: "row",
-    marginTop: 16,
+    marginTop: 14,
     gap: 10,
   },
   actionBtn: {
@@ -165,7 +154,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   actionBtnText: {
-    fontSize: 12,
     fontWeight: "600",
     textAlign: "center",
   },

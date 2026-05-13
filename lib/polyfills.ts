@@ -1,6 +1,3 @@
-// lib/polyfills.ts
-// Must be imported at the very top of app/_layout.tsx
-
 if (typeof AbortSignal.any === "undefined") {
   AbortSignal.any = function (signals: AbortSignal[]): AbortSignal {
     const controller = new AbortController();

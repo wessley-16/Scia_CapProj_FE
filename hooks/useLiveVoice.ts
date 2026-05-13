@@ -1,19 +1,35 @@
 /**
- * useLiveVoice — Gemini Live WebSocket voice session
+ * useLiveVoice — Firebase AI Logic Live voice session
  *
- * FIX: Replaced FileSystem.EncodingType.Base64 with the string literal "base64"
- * because FileSystem.EncodingType is no longer exported by expo-file-system in
- * newer SDK versions (ts2339 error at Ln 214).
+ * Architecture: stream raw PCM chunks → session.sendRealtimeAudio() in real-time
+ * so the server's built-in VAD detects when the user stops talking and auto-responds.
+ *
+ * NO manual "tap to stop" needed — just tap once to start, speak, and the model
+ * replies automatically when it detects silence.
+ *
+ * Requires: expo-audio-stream (yarn add expo-audio-stream)
+ * which gives us raw PCM callbacks while recording — unlike expo-av which only
+ * gives a file after recording stops.
  */
-import * as FileSystem from "expo-file-system";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  LIVE_MODEL,
-  LIVE_TOKEN_API_URL,
-  LIVE_WS_BASE_URL,
-} from "@/constants/constants";
 
-// ── Audio imports — prefer expo-audio (SDK 54+), fall back to expo-av ────────
+import {
+  ResponseModality,
+  VertexAIBackend,
+  getAI,
+  getLiveGenerativeModel,
+} from "@react-native-firebase/ai";
+import { getApp } from "@react-native-firebase/app";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+// ── expo-audio-stream for real-time PCM chunks ────────────────────────────────
+let ExpoAudioStream: any = null;
+try {
+  ExpoAudioStream = require("expo-audio-stream");
+} catch {
+  console.warn("expo-audio-stream not available.");
+}
+
+// ── Playback: prefer expo-audio (SDK 54+), fall back to expo-av ───────────────
 let AudioModule: any = null;
 try {
   AudioModule = require("expo-audio");
@@ -21,46 +37,37 @@ try {
   try {
     AudioModule = require("expo-av").Audio;
   } catch {
-    console.warn("No audio module available (expo-audio or expo-av).");
+    console.warn("No audio playback module available.");
   }
 }
-
 const Audio = AudioModule;
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 type LiveStatus = "idle" | "connecting" | "connected" | "responding" | "error";
 
-type LiveTokenResponse = {
-  token?: string;
-  expireTime?: string;
-  newSessionExpireTime?: string;
-  model?: string;
-  code?: string;
-  error?: string;
-  details?: string;
-};
+// ── Constants ─────────────────────────────────────────────────────────────────
+// Live API input: 16-bit PCM at 16kHz mono
+const MIC_SAMPLE_RATE = 16000;
+// Live API output: 16-bit PCM at 24kHz mono
+const OUTPUT_SAMPLE_RATE = 24000;
 
-const TOKEN_TIMEOUT_MS = 12000;
-const SOCKET_TIMEOUT_MS = 25000;
-const DEFAULT_PCM_SAMPLE_RATE = 24000;
-
-const parseSampleRate = (mimeType?: string) => {
-  if (!mimeType) return DEFAULT_PCM_SAMPLE_RATE;
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const parseSampleRate = (mimeType?: string): number => {
+  if (!mimeType) return OUTPUT_SAMPLE_RATE;
   const match = mimeType.match(/rate=(\d+)/i);
-  if (!match) return DEFAULT_PCM_SAMPLE_RATE;
-  const parsed = Number.parseInt(match[1], 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PCM_SAMPLE_RATE;
+  if (!match) return OUTPUT_SAMPLE_RATE;
+  const parsed = parseInt(match[1], 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : OUTPUT_SAMPLE_RATE;
 };
 
-const base64ToBytes = (base64: string) => {
-  if (typeof globalThis.atob !== "function") throw new Error("atob not available.");
+const base64ToBytes = (base64: string): Uint8Array => {
   const binary = globalThis.atob(base64);
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 };
 
-const bytesToBase64 = (bytes: Uint8Array) => {
-  if (typeof globalThis.btoa !== "function") throw new Error("btoa not available.");
+const bytesToBase64 = (bytes: Uint8Array): string => {
   let binary = "";
   const chunkSize = 0x8000;
   for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -69,90 +76,55 @@ const bytesToBase64 = (bytes: Uint8Array) => {
   return globalThis.btoa(binary);
 };
 
-const pcmToWavDataUri = (chunks: Uint8Array[], sampleRate: number) => {
-  const pcmByteLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const wavByteLength = 44 + pcmByteLength;
-  const wavBytes = new Uint8Array(wavByteLength);
+const pcmToWavDataUri = (chunks: Uint8Array[], sampleRate: number): string => {
+  const pcmByteLength = chunks.reduce((sum, c) => sum + c.length, 0);
+  const wavBytes = new Uint8Array(44 + pcmByteLength);
   const view = new DataView(wavBytes.buffer);
-
-  const writeString = (offset: number, value: string) => {
-    for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i));
+  const writeString = (offset: number, s: string) => {
+    for (let i = 0; i < s.length; i++)
+      view.setUint8(offset + i, s.charCodeAt(i));
   };
-
   writeString(0, "RIFF");
   view.setUint32(4, 36 + pcmByteLength, true);
   writeString(8, "WAVE");
   writeString(12, "fmt ");
   view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true);
+  view.setUint16(20, 1, true); // PCM
+  view.setUint16(22, 1, true); // Mono
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, sampleRate * 2, true);
   view.setUint16(32, 2, true);
   view.setUint16(34, 16, true);
   writeString(36, "data");
   view.setUint32(40, pcmByteLength, true);
-
   let offset = 44;
-  for (const chunk of chunks) { wavBytes.set(chunk, offset); offset += chunk.length; }
-
+  for (const chunk of chunks) {
+    wavBytes.set(chunk, offset);
+    offset += chunk.length;
+  }
   return `data:audio/wav;base64,${bytesToBase64(wavBytes)}`;
 };
 
-const wsStateLabel = (state: number) => {
-  switch (state) {
-    case WebSocket.CONNECTING: return "CONNECTING";
-    case WebSocket.OPEN: return "OPEN";
-    case WebSocket.CLOSING: return "CLOSING";
-    case WebSocket.CLOSED: return "CLOSED";
-    default: return `UNKNOWN(${state})`;
-  }
-};
-
-const closeHint = (code: number) => {
-  if (code === 1006) return "Network/SSL interruption while reaching Gemini Live.";
-  if (code === 1008) return "Policy/auth rejection (token or setup not accepted).";
-  if (code === 1011) return "Gemini Live internal server error; retry shortly.";
-  return "";
-};
-
-const parseServerMessage = (raw: string) => {
-  try { return JSON.parse(raw); } catch { return null; }
-};
-
-const decodeSocketMessageData = async (data: unknown) => {
-  if (typeof data === "string") return data;
-  if (data instanceof ArrayBuffer) {
-    try { return new TextDecoder("utf-8").decode(new Uint8Array(data)); } catch { return null; }
-  }
-  if (data && typeof data === "object" && "text" in data && typeof (data as any).text === "function") {
-    try { return await (data as any).text(); } catch { return null; }
-  }
-  return null;
-};
-
-const safeSetAudioMode = async (opts: any) => {
+const safeSetAudioMode = async (opts: Record<string, unknown>) => {
   if (!Audio) return;
   try {
     if (typeof Audio.setAudioModeAsync === "function") {
       await Audio.setAudioModeAsync(opts);
     }
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
 };
 
+// ── Hook ──────────────────────────────────────────────────────────────────────
 export const useLiveVoice = () => {
-  const wsRef = useRef<WebSocket | null>(null);
-  const socketTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionRef = useRef<any>(null);
+  const soundRef = useRef<any>(null);
+  const streamSubRef = useRef<any>(null); // expo-audio-stream subscription
   const pcmChunksRef = useRef<Uint8Array[]>([]);
-  const pcmSampleRateRef = useRef(DEFAULT_PCM_SAMPLE_RATE);
+  const pcmSampleRateRef = useRef(OUTPUT_SAMPLE_RATE);
   const audioQueueRef = useRef<string[]>([]);
   const isPlayingRef = useRef(false);
-  const soundRef = useRef<any>(null);
-  const recordingRef = useRef<any>(null);
-
-  const clearSocketTimeout = () => {
-    if (socketTimeoutRef.current) { clearTimeout(socketTimeoutRef.current); socketTimeoutRef.current = null; }
-  };
 
   const [status, setStatus] = useState<LiveStatus>("idle");
   const [inputTranscript, setInputTranscript] = useState("");
@@ -164,171 +136,195 @@ export const useLiveVoice = () => {
 
   const isConnected = status === "connected" || status === "responding";
 
+  // ── Teardown ───────────────────────────────────────────────────────────────
   const clearAudioState = useCallback(async () => {
+    if (streamSubRef.current) {
+      try {
+        await ExpoAudioStream?.stopRecording?.();
+      } catch {}
+      streamSubRef.current = null;
+    }
     pcmChunksRef.current = [];
     audioQueueRef.current = [];
-
+    isPlayingRef.current = false;
     if (soundRef.current) {
-      try { await soundRef.current.stopAsync(); } catch { }
-      try { await soundRef.current.unloadAsync(); } catch { }
+      try {
+        await soundRef.current.stopAsync();
+      } catch {}
+      try {
+        await soundRef.current.unloadAsync();
+      } catch {}
       soundRef.current = null;
     }
-
-    if (recordingRef.current) {
-      try { await recordingRef.current.stopAndUnloadAsync(); } catch { }
-      recordingRef.current = null;
-    }
-
     setIsRecording(false);
-    isPlayingRef.current = false;
   }, []);
 
-  const getMimeTypeFromUri = (uri: string) => {
-    const clean = uri.split("?")[0].toLowerCase();
-    if (clean.endsWith(".wav")) return "audio/wav";
-    if (clean.endsWith(".aac")) return "audio/aac";
-    if (clean.endsWith(".caf")) return "audio/x-caf";
-    if (clean.endsWith(".mp3")) return "audio/mpeg";
-    return "audio/mp4";
-  };
-
-  const sendRecordedAudioTurn = useCallback(async (uri: string) => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      setLastError("Live session is not connected.");
-      return false;
-    }
-
-    try {
-      // FIX: Use the string literal "base64" instead of FileSystem.EncodingType.Base64
-      // FileSystem.EncodingType is no longer exported in newer expo-file-system versions.
-      const data = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
-      if (!data) { setLastError("Recorded audio file is empty."); return false; }
-
-      ws.send(JSON.stringify({
-        clientContent: {
-          turns: [{ role: "user", parts: [{ inlineData: { mimeType: getMimeTypeFromUri(uri), data } }] }],
-          turnComplete: true,
-        },
-      }));
-
-      setInterrupted(false);
-      setStatus("responding");
-      setDiagnostic("Voice sent. Waiting for Gemini response...");
-      return true;
-    } catch (error) {
-      setLastError("Failed to send recorded voice.");
-      setDiagnostic(error instanceof Error ? error.message : "Unknown upload error.");
-      return false;
-    }
-  }, []);
-
-  const startMicRecording = useCallback(async () => {
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      setLastError("Connect to Live first before recording.");
-      return false;
-    }
-    if (recordingRef.current || isRecording) return true;
-    if (!Audio) { setLastError("Audio module not available."); return false; }
-
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (!permission.granted) {
-        setLastError("Microphone permission is required.");
-        return false;
-      }
-
-      await safeSetAudioMode({ allowsRecordingIOS: true, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false, staysActiveInBackground: false });
-
-      const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await recording.startAsync();
-
-      recordingRef.current = recording;
-      setIsRecording(true);
-      setInterrupted(false);
-      setDiagnostic("Recording... tap mic again to send voice.");
-      return true;
-    } catch (error) {
-      setIsRecording(false);
-      setLastError("Failed to start microphone recording.");
-      setDiagnostic(error instanceof Error ? error.message : "Unknown recording error.");
-      return false;
-    }
-  }, [isRecording]);
-
-  const stopMicRecording = useCallback(async () => {
-    const recording = recordingRef.current;
-    if (!recording) { setIsRecording(false); return false; }
-
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      recordingRef.current = null;
-      setIsRecording(false);
-
-      await safeSetAudioMode({ allowsRecordingIOS: false, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false, staysActiveInBackground: false });
-
-      if (!uri) { setLastError("Could not read recorded audio file."); return false; }
-      return await sendRecordedAudioTurn(uri);
-    } catch (error) {
-      recordingRef.current = null;
-      setIsRecording(false);
-      setLastError("Failed to stop microphone recording.");
-      setDiagnostic(error instanceof Error ? error.message : "Unknown stop error.");
-      return false;
-    }
-  }, [sendRecordedAudioTurn]);
-
+  // ── Playback queue ─────────────────────────────────────────────────────────
   const playQueue = useCallback(async () => {
     if (isPlayingRef.current || !Audio) return;
     isPlayingRef.current = true;
-
     try {
       while (audioQueueRef.current.length > 0) {
         const uri = audioQueueRef.current.shift();
         if (!uri) continue;
-
-        await safeSetAudioMode({ allowsRecordingIOS: false, playsInSilentModeIOS: true, shouldDuckAndroid: true, playThroughEarpieceAndroid: false, staysActiveInBackground: false });
-
-        const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
+        await safeSetAudioMode({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+        const { sound } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: true },
+        );
         soundRef.current = sound;
-
         await new Promise<void>((resolve) => {
           sound.setOnPlaybackStatusUpdate((s: any) => {
             if (s.isLoaded && s.didJustFinish) resolve();
           });
         });
-
         await sound.unloadAsync();
         soundRef.current = null;
       }
-    } catch (error) {
-      setLastError("Live audio playback failed.");
-      setDiagnostic(error instanceof Error ? error.message : "Unknown audio error.");
+    } catch (err) {
+      setLastError("Audio playback failed.");
+      setDiagnostic(
+        err instanceof Error ? err.message : "Unknown audio error.",
+      );
     } finally {
       isPlayingRef.current = false;
     }
   }, []);
 
-  const queueTurnAudio = useCallback(async () => {
+  const flushAudioTurn = useCallback(async () => {
     if (pcmChunksRef.current.length === 0) return;
     try {
-      const uri = pcmToWavDataUri(pcmChunksRef.current, pcmSampleRateRef.current);
-      audioQueueRef.current.push(uri);
+      const uri = pcmToWavDataUri(
+        pcmChunksRef.current,
+        pcmSampleRateRef.current,
+      );
       pcmChunksRef.current = [];
+      audioQueueRef.current.push(uri);
       await playQueue();
-    } catch (error) {
-      setLastError("Failed to decode Gemini audio.");
-      setDiagnostic(error instanceof Error ? error.message : "Unknown decode error.");
+    } catch {
+      setLastError("Failed to decode model audio.");
       pcmChunksRef.current = [];
     }
   }, [playQueue]);
 
+  // ── Session message handler ────────────────────────────────────────────────
+  const handleMessage = useCallback(
+    async (message: any) => {
+      if (!message) return;
+
+      if (message.serverContent?.interrupted === true) {
+        setInterrupted(true);
+        pcmChunksRef.current = [];
+        setStatus("connected");
+      }
+
+      const parts = message.serverContent?.modelTurn?.parts;
+      if (Array.isArray(parts)) {
+        for (const part of parts) {
+          const inlineData = part?.inlineData;
+          if (
+            !inlineData?.data ||
+            !inlineData.mimeType?.startsWith("audio/pcm")
+          )
+            continue;
+          pcmSampleRateRef.current = parseSampleRate(inlineData.mimeType);
+          try {
+            pcmChunksRef.current.push(base64ToBytes(inlineData.data));
+          } catch {}
+        }
+      }
+
+      if (message.serverContent?.inputTranscription?.text) {
+        setInputTranscript(message.serverContent.inputTranscription.text);
+      }
+      if (message.serverContent?.outputTranscription?.text) {
+        setOutputTranscript(message.serverContent.outputTranscription.text);
+        setStatus("responding");
+      }
+
+      if (message.serverContent?.turnComplete === true) {
+        await flushAudioTurn();
+        setStatus("connected");
+      }
+    },
+    [flushAudioTurn],
+  );
+
+  // ── Connect ────────────────────────────────────────────────────────────────
+  const connect = useCallback(async () => {
+    if (sessionRef.current) return;
+    setLastError("");
+    setDiagnostic("");
+    setInterrupted(false);
+    setStatus("connecting");
+
+    try {
+      const app = getApp();
+      const ai = getAI(app, { backend: new VertexAIBackend("us-central1") });
+
+      const liveModel = getLiveGenerativeModel(ai, {
+        model: "gemini-live-2.5-flash-native-audio",
+        liveGenerationConfig: {
+          responseModalities: [ResponseModality.AUDIO],
+          inputAudioTranscription: {},
+          outputAudioTranscription: {},
+        },
+        systemInstruction: {
+          parts: [
+            {
+              text: `You are HealthAI, a caring voice assistant for senior citizens 
+in Valenzuela City, Philippines (SCIA app). Speak simply and warmly. 
+Never diagnose — always recommend seeing a doctor for serious concerns. 
+If someone describes an emergency, tell them to call 911 or use the SOS button immediately.`,
+            },
+          ],
+        },
+      });
+
+      setDiagnostic("Connecting to Gemini Live...");
+      const session = await liveModel.connect();
+      sessionRef.current = session;
+      setStatus("connected");
+      setDiagnostic("Connected. Tap mic to speak.");
+
+      (async () => {
+        try {
+          for await (const message of session.receive()) {
+            await handleMessage(message);
+          }
+          if (sessionRef.current) {
+            sessionRef.current = null;
+            setStatus("idle");
+            setDiagnostic("Session ended.");
+          }
+        } catch (err) {
+          if (sessionRef.current) {
+            sessionRef.current = null;
+            setLastError(err instanceof Error ? err.message : "Session error.");
+            setStatus("error");
+          }
+        }
+      })();
+    } catch (err) {
+      sessionRef.current = null;
+      setLastError(err instanceof Error ? err.message : "Failed to connect.");
+      setDiagnostic("Connection failed.");
+      setStatus("error");
+    }
+  }, [handleMessage]);
+
+  // ── Disconnect ─────────────────────────────────────────────────────────────
   const disconnect = useCallback(() => {
-    clearSocketTimeout();
-    if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    try {
+      session?.close();
+    } catch {}
     void clearAudioState();
     setDiagnostic("");
     setStatus("idle");
@@ -336,170 +332,122 @@ export const useLiveVoice = () => {
 
   useEffect(() => {
     return () => {
-      clearSocketTimeout();
-      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+      const session = sessionRef.current;
+      sessionRef.current = null;
+      try {
+        session?.close();
+      } catch {}
       void clearAudioState();
     };
   }, [clearAudioState]);
 
-  const connect = useCallback(async () => {
-    if (wsRef.current) return;
+  // ── Start streaming mic → sendRealtimeAudio ────────────────────────────────
+  // Sends PCM chunks every 100ms to the Live API.
+  // Server VAD auto-detects silence → auto-triggers model response.
+  // User just taps once to start speaking, no tap-to-stop needed for sending.
+  const startMicRecording = useCallback(async (): Promise<boolean> => {
+    if (!sessionRef.current) {
+      setLastError("Connect first before recording.");
+      return false;
+    }
+    if (isRecording || streamSubRef.current) return true;
 
-    setLastError("");
-    setDiagnostic("");
-    setInterrupted(false);
-    setStatus("connecting");
+    if (!ExpoAudioStream) {
+      setLastError(
+        "expo-audio-stream not installed. Run: yarn add expo-audio-stream",
+      );
+      return false;
+    }
 
     try {
-      const abortController = new AbortController();
-      const tokenTimeout = setTimeout(() => abortController.abort(), TOKEN_TIMEOUT_MS);
+      const { granted } = await ExpoAudioStream.requestPermissionsAsync();
+      if (!granted) {
+        setLastError("Microphone permission is required.");
+        return false;
+      }
 
-      const tokenResponse = await fetch(LIVE_TOKEN_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: abortController.signal,
+      await safeSetAudioMode({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
       });
 
-      clearTimeout(tokenTimeout);
-
-      let tokenData: LiveTokenResponse = {};
-      try { tokenData = await tokenResponse.json(); }
-      catch { tokenData = { error: `Live token endpoint returned invalid JSON (${tokenResponse.status}).` }; }
-
-      if (!tokenResponse.ok || !tokenData?.token) {
-        const details = tokenData?.details ? ` (${tokenData.details})` : "";
-        throw new Error(tokenData?.error || `Failed to get live token (${tokenResponse.status})${details}.`);
-      }
-
-      const ws = new WebSocket(`${LIVE_WS_BASE_URL}?access_token=${encodeURIComponent(tokenData.token)}`);
-      wsRef.current = ws;
-
-      socketTimeoutRef.current = setTimeout(() => {
-        if (ws.readyState === WebSocket.CONNECTING) {
-          setLastError("Live WebSocket handshake timeout.");
-          setDiagnostic("Socket never left CONNECTING. Check internet/firewall.");
-          setStatus("error");
-          ws.close();
-          return;
-        }
-        if (ws.readyState === WebSocket.OPEN) {
-          setLastError("Live setup timeout (no setupComplete). Please retry.");
-          setDiagnostic("Socket opened but Gemini did not acknowledge setup within timeout.");
-          setStatus("error");
-          ws.close();
-        }
-      }, SOCKET_TIMEOUT_MS);
-
-      ws.onopen = () => {
-        const setupModelRaw = tokenData.model || LIVE_MODEL;
-        const setupModel = setupModelRaw.startsWith("models/") ? setupModelRaw : `models/${setupModelRaw}`;
-        setDiagnostic(`Socket opened. Sending setup for ${setupModel}...`);
-        ws.send(JSON.stringify({
-          setup: {
-            model: setupModel,
-            generationConfig: { responseModalities: ["AUDIO"] },
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
-          },
-        }));
-      };
-
-      ws.onmessage = async (event) => {
-        const raw = await decodeSocketMessageData(event.data);
-        const message = raw ? parseServerMessage(raw) : null;
-
-        if (!message) {
-          if (raw?.includes("setupComplete")) {
-            clearSocketTimeout();
-            setDiagnostic("setupComplete detected.");
-            setStatus("connected");
-            return;
+      const { subscription } = await ExpoAudioStream.startRecording({
+        sampleRate: MIC_SAMPLE_RATE, // 16kHz — required by Live API
+        channels: 1, // mono
+        encoding: "pcm_16bit", // 16-bit PCM
+        interval: 100, // fire onAudioStream every 100ms
+        onAudioStream: (event: { data: string }) => {
+          const session = sessionRef.current;
+          if (!session || !event?.data) return;
+          try {
+            // Stream each chunk directly — server VAD handles turn detection
+            session.sendRealtimeAudio({
+              data: event.data,
+              mimeType: `audio/pcm;rate=${MIC_SAMPLE_RATE}`,
+            });
+          } catch {
+            // Ignore individual chunk send errors
           }
-          if (raw) setDiagnostic(`Unparsed payload: ${raw.slice(0, 180)}`);
-          return;
-        }
+        },
+      });
 
-        if (message.setupComplete) {
-          clearSocketTimeout();
-          setDiagnostic("setupComplete received.");
-          setStatus("connected");
-          return;
-        }
-
-        if (message.error) {
-          clearSocketTimeout();
-          setLastError(message.error?.message || "Live API setup failed. Please reconnect.");
-          setDiagnostic(JSON.stringify(message).slice(0, 260));
-          setStatus("error");
-          ws.close();
-          return;
-        }
-
-        if (message.goAway) setDiagnostic(`Server goAway: ${JSON.stringify(message.goAway).slice(0, 180)}`);
-
-        const serverContent = message.serverContent;
-        if (!serverContent) return;
-
-        if (serverContent.interrupted === true) { setInterrupted(true); setStatus("connected"); }
-
-        const modelParts = serverContent.modelTurn?.parts;
-        if (Array.isArray(modelParts)) {
-          for (const part of modelParts) {
-            const inlineData = part?.inlineData;
-            const base64Audio = inlineData?.data;
-            const mimeType = inlineData?.mimeType;
-            if (!base64Audio || typeof base64Audio !== "string") continue;
-            if (!mimeType?.startsWith("audio/pcm")) continue;
-            pcmSampleRateRef.current = parseSampleRate(mimeType);
-            try { pcmChunksRef.current.push(base64ToBytes(base64Audio)); }
-            catch (error) { setLastError("Failed to decode Gemini audio chunk."); }
-          }
-        }
-
-        if (serverContent.inputTranscription?.text) setInputTranscript(serverContent.inputTranscription.text);
-        if (serverContent.outputTranscription?.text) { setOutputTranscript(serverContent.outputTranscription.text); setStatus("responding"); }
-        if (serverContent.turnComplete === true) { void queueTurnAudio(); setStatus("connected"); }
-      };
-
-      ws.onerror = () => {
-        clearSocketTimeout();
-        setLastError(`Live socket error (${wsStateLabel(ws.readyState)}).`);
-        setStatus("error");
-      };
-
-      ws.onclose = (event) => {
-        clearSocketTimeout();
-        wsRef.current = null;
-        if (event.code !== 1000) {
-          const reason = event.reason ? ` (${event.reason})` : "";
-          setLastError(`Live socket closed [${event.code}]${reason}`);
-          const hint = closeHint(event.code);
-          if (hint) setDiagnostic(hint);
-        }
-        setStatus((prev) => (prev === "error" ? "error" : "idle"));
-      };
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        setLastError("Token request timeout. Make sure backend is reachable.");
-        setDiagnostic("Token request aborted after timeout.");
-      } else {
-        setLastError(error instanceof Error ? error.message : "Failed to connect.");
-        setDiagnostic("Connection failed before setup completed.");
-      }
-      setStatus("error");
+      streamSubRef.current = subscription;
+      setIsRecording(true);
+      setInterrupted(false);
+      setDiagnostic("Listening… speak now. I'll respond automatically.");
+      return true;
+    } catch (err) {
+      setIsRecording(false);
+      streamSubRef.current = null;
+      setLastError("Failed to start microphone.");
+      setDiagnostic(
+        err instanceof Error ? err.message : "Unknown recording error.",
+      );
+      return false;
     }
-  }, []);
+  }, [isRecording]);
 
-  const sendRealtimeText = useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return false;
-    const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-    setInterrupted(false);
-    setStatus("responding");
-    ws.send(JSON.stringify({ realtimeInput: { text: trimmed } }));
-    return true;
-  }, []);
+  // ── Stop streaming mic ─────────────────────────────────────────────────────
+  // Manually stops the mic stream (e.g. user taps mic again to mute).
+  // The model has already been responding via VAD — this just stops sending audio.
+  const stopMicRecording = useCallback(async (): Promise<boolean> => {
+    if (!streamSubRef.current && !isRecording) return false;
+    try {
+      await ExpoAudioStream?.stopRecording?.();
+      streamSubRef.current = null;
+      setIsRecording(false);
+      await safeSetAudioMode({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+      setDiagnostic("Mic off.");
+      return true;
+    } catch (err) {
+      streamSubRef.current = null;
+      setIsRecording(false);
+      setLastError("Failed to stop microphone.");
+      return false;
+    }
+  }, [isRecording]);
+
+  // ── Toggle (mic button in Voice.tsx) ──────────────────────────────────────
+  const toggleMic = useCallback(async () => {
+    if (!isConnected) {
+      // Connect first, then auto-start mic
+      await connect();
+      setTimeout(() => startMicRecording(), 600);
+      return;
+    }
+    if (isRecording) {
+      await stopMicRecording();
+    } else {
+      await startMicRecording();
+    }
+  }, [isConnected, isRecording, connect, startMicRecording, stopMicRecording]);
 
   const resetSession = useCallback(() => {
     setInputTranscript("");
@@ -512,12 +460,36 @@ export const useLiveVoice = () => {
 
   return useMemo(
     () => ({
-      status, isConnected, inputTranscript, outputTranscript, interrupted,
-      lastError, diagnostic, isRecording, connect, disconnect, resetSession,
-      sendRealtimeText, startMicRecording, stopMicRecording,
+      status,
+      isConnected,
+      isRecording,
+      inputTranscript,
+      outputTranscript,
+      interrupted,
+      lastError,
+      diagnostic,
+      connect,
+      disconnect,
+      resetSession,
+      toggleMic,
+      startMicRecording,
+      stopMicRecording,
     }),
-    [connect, disconnect, inputTranscript, interrupted, isConnected, isRecording,
-      lastError, diagnostic, outputTranscript, resetSession, sendRealtimeText,
-      startMicRecording, stopMicRecording, status]
+    [
+      status,
+      isConnected,
+      isRecording,
+      inputTranscript,
+      outputTranscript,
+      interrupted,
+      lastError,
+      diagnostic,
+      connect,
+      disconnect,
+      resetSession,
+      toggleMic,
+      startMicRecording,
+      stopMicRecording,
+    ],
   );
 };

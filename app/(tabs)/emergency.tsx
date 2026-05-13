@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -9,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -18,12 +16,10 @@ import MapView, { Marker, UrlTile } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
-import { sendSOSAlert } from '../../lib/firebase';
-
-// MapViewDirections removed — requires valid Google Maps API key
-// If you add a real key, re-import MapViewDirections and uncomment the component below
+import { sendSOSAlert, subscribeToSOSAlert } from '../../lib/firebase';
 
 const HOLD_DURATION_MS = 5000;
+const COOLDOWN_MS = 5 * 60 * 1000;
 
 const valenzuelaBarangays = [
   { name: 'Bagbaguin',           lat: 14.7365, lng: 120.9920 },
@@ -73,14 +69,11 @@ const getBarangayFromCoords = (lat: number, lng: number): string => {
 export default function EmergencyScreen() {
   const { fontScale, t } = useSettings();
   const { user } = useAuth();
-  const [location, setLocation] = useState<any>(null);
 
+  const [location, setLocation] = useState<any>(null);
   const [name, setName] = useState('');
   const [fullAddress, setFullAddress] = useState('Fetching...');
   const [barangay, setBarangay] = useState('');
-
-  const [selectedEmergency, setSelectedEmergency] = useState('Fall');
-  const [otherEmergency, setOtherEmergency] = useState('');
 
   const [isHolding, setIsHolding] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(5);
@@ -92,11 +85,18 @@ export default function EmergencyScreen() {
   const [lastSOS, setLastSOS] = useState<number | null>(null);
   const [cooldownActive, setCooldownActive] = useState(false);
 
+  // Track the active SOS doc id and its dispatch status
+  const [activeSosId, setActiveSosId] = useState<string | null>(null);
+  const [dispatchStatus, setDispatchStatus] = useState<string | null>(null);
+  const sosUnsubRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     fetchLocation();
+    return () => {
+      sosUnsubRef.current?.();
+    };
   }, []);
 
-  // Load user name from AuthContext or AsyncStorage fallback
   useEffect(() => {
     if (user) {
       setName(`${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown');
@@ -106,6 +106,18 @@ export default function EmergencyScreen() {
       });
     }
   }, [user]);
+
+  // Subscribe to the SOS doc after sending
+  useEffect(() => {
+    if (!activeSosId) return;
+    sosUnsubRef.current?.();
+    sosUnsubRef.current = subscribeToSOSAlert(activeSosId, (data) => {
+      if (data.status && data.status !== 'pending') {
+        setDispatchStatus(data.status);
+      }
+    });
+    return () => sosUnsubRef.current?.();
+  }, [activeSosId]);
 
   const fetchLocation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -156,8 +168,6 @@ export default function EmergencyScreen() {
     animRef.current?.stop();
   };
 
-  const COOLDOWN_MS = 5 * 60 * 1000;
-
   const triggerSOS = async () => {
     if (!location) {
       Alert.alert('Location unavailable', 'Still fetching your location. Please wait a moment.');
@@ -170,18 +180,19 @@ export default function EmergencyScreen() {
     }
 
     try {
-      await sendSOSAlert({
+      const docId = await sendSOSAlert({
         name,
-        latitude:      location.latitude,
-        longitude:     location.longitude,
-        address:       fullAddress,
+        latitude:  location.latitude,
+        longitude: location.longitude,
+        address:   fullAddress,
         barangay,
-        emergencyType: selectedEmergency === 'Other' ? otherEmergency : selectedEmergency,
       });
+      setActiveSosId(docId);
+      setDispatchStatus(null);
       setLastSOS(now);
       setCooldownActive(true);
       setTimeout(() => setCooldownActive(false), COOLDOWN_MS);
-      Alert.alert('🚨 SOS Sent', 'Emergency alert has been sent. Help is on the way!');
+      Alert.alert('SOS Sent', 'Your location has been shared with responders. You will be notified when a responder is dispatched.');
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Failed to send SOS. Please try again.');
     }
@@ -191,6 +202,8 @@ export default function EmergencyScreen() {
     inputRange:  [0, 1],
     outputRange: ['0deg', '360deg'],
   });
+
+  const isDispatched = dispatchStatus && dispatchStatus !== 'pending';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -212,22 +225,32 @@ export default function EmergencyScreen() {
           </Pressable>
         </View>
 
-        {cooldownActive && (
-          <View style={styles.cooldownBanner}>
-            <Text style={styles.cooldownText}>✅ SOS alert was sent. Cooldown active (5 min).</Text>
+        {/* DISPATCH NOTIFICATION */}
+        {isDispatched && (
+          <View style={styles.dispatchBanner}>
+            <Ionicons name="checkmark-circle" size={20} color="#065F46" style={{ marginRight: 8 }} />
+            <Text style={styles.dispatchText}>
+              A responder has been dispatched to your location.
+            </Text>
           </View>
         )}
 
-        {/* MAP */}
+        {cooldownActive && !isDispatched && (
+          <View style={styles.cooldownBanner}>
+            <Text style={styles.cooldownText}>SOS alert sent. Waiting for responder dispatch...</Text>
+          </View>
+        )}
+
+        {/* MAP — OpenStreetMap, user pin only */}
         <View style={styles.mapWrapper}>
           {location ? (
             <MapView
               style={styles.map}
               mapType="none"
               region={{
-                latitude:      location.latitude,
-                longitude:     location.longitude,
-                latitudeDelta: 0.01,
+                latitude:       location.latitude,
+                longitude:      location.longitude,
+                latitudeDelta:  0.01,
                 longitudeDelta: 0.01,
               }}
             >
@@ -245,46 +268,30 @@ export default function EmergencyScreen() {
               <Text style={styles.mapPlaceholderText}>Fetching location...</Text>
             </View>
           )}
-          {/* Refresh location button */}
           <TouchableOpacity style={styles.refreshBtn} onPress={fetchLocation}>
             <Ionicons name="locate" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
 
-        {/* DROPDOWN */}
-        <Text style={[styles.label, { fontSize: 16 * fontScale }]}>{t('emergencyType')}</Text>
-        <View style={styles.dropdown}>
-          <Picker selectedValue={selectedEmergency} onValueChange={(val) => setSelectedEmergency(val)}>
-            <Picker.Item label={t('fall')}        value="Fall" />
-            <Picker.Item label={t('heartAttack')} value="Heart Attack" />
-            <Picker.Item label={t('stroke')}      value="Stroke" />
-            <Picker.Item label={t('other')}       value="Other" />
-          </Picker>
-        </View>
-
-        {selectedEmergency === 'Other' && (
-          <TextInput
-            placeholder={t('typeEmergency')}
-            value={otherEmergency}
-            onChangeText={setOtherEmergency}
-            style={styles.input}
-          />
-        )}
-
         {/* INFO CARD */}
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>📋 Alert Details</Text>
-          <Text style={styles.infoRow}>{t('infoName')} <Text style={styles.infoValue}>{name}</Text></Text>
-          <Text style={styles.infoRow}>{t('infoAddress')} <Text style={styles.infoValue}>{fullAddress}</Text></Text>
-          <Text style={styles.infoRow}>{t('infoBarangay')} <Text style={styles.infoValue}>{barangay}</Text></Text>
-          <Text style={styles.infoRow}>
-            {t('infoEmergency')} <Text style={styles.infoValue}>{selectedEmergency === 'Other' ? otherEmergency : selectedEmergency}</Text>
-          </Text>
+          <Text style={styles.infoTitle}>Alert Details</Text>
+          <Text style={styles.infoRow}>Name: <Text style={styles.infoValue}>{name}</Text></Text>
+          <Text style={styles.infoRow}>Address: <Text style={styles.infoValue}>{fullAddress}</Text></Text>
+          <Text style={styles.infoRow}>Barangay: <Text style={styles.infoValue}>{barangay}</Text></Text>
+          {activeSosId && (
+            <Text style={styles.infoRow}>
+              Status:{' '}
+              <Text style={[styles.infoValue, isDispatched && styles.statusDispatched]}>
+                {isDispatched ? dispatchStatus!.charAt(0).toUpperCase() + dispatchStatus!.slice(1) : 'Pending'}
+              </Text>
+            </Text>
+          )}
         </View>
 
         <View style={styles.instructionCard}>
           <Text style={styles.instructionText}>
-            🆘 Hold the red button for 5 seconds to send an emergency alert to responders.
+            Hold the red button for 5 seconds to send an emergency alert. Your pinned location will be shared with responders.
           </Text>
         </View>
       </ScrollView>
@@ -300,20 +307,20 @@ const styles = StyleSheet.create({
   ring:               { position: 'absolute', width: 220, height: 220, borderRadius: 110, borderWidth: 5, borderTopColor: '#CE2029', borderColor: 'transparent' },
   sosButton:          { width: 200, height: 200, borderRadius: 100, backgroundColor: '#CE2029', justifyContent: 'center', alignItems: 'center', elevation: 10, shadowColor: '#CE2029', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 8 },
   sosText:            { color: '#fff', fontSize: 26, fontWeight: 'bold' },
-  cooldownBanner:     { backgroundColor: '#D1FAE5', borderRadius: 12, padding: 12, marginBottom: 12, alignItems: 'center' },
-  cooldownText:       { color: '#065F46', fontWeight: '600', fontSize: 14 },
-  mapWrapper:         { height: 250, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
+  cooldownBanner:     { backgroundColor: '#FEF3C7', borderRadius: 12, padding: 12, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#F59E0B' },
+  cooldownText:       { color: '#92400E', fontWeight: '600', fontSize: 13 },
+  dispatchBanner:     { backgroundColor: '#D1FAE5', borderRadius: 12, padding: 14, marginBottom: 12, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#6EE7B7' },
+  dispatchText:       { color: '#065F46', fontWeight: '700', fontSize: 14, flex: 1 },
+  mapWrapper:         { height: 280, borderRadius: 20, overflow: 'hidden', borderWidth: 2, borderColor: '#CE2029', marginBottom: 20 },
   map:                { flex: 1 },
   mapPlaceholder:     { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6' },
   mapPlaceholderText: { color: '#9ca3af', fontSize: 14 },
   refreshBtn:         { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#CE2029', borderRadius: 20, padding: 8, elevation: 4 },
-  dropdown:           { backgroundColor: '#fff', borderRadius: 10, marginBottom: 10 },
-  input:              { backgroundColor: '#fff', padding: 10, marginTop: 10, borderRadius: 8 },
-  infoCard:           { backgroundColor: '#fff', padding: 16, marginTop: 16, borderRadius: 14, elevation: 2 },
-  infoTitle:          { fontSize: 16, fontWeight: 'bold', color: '#1F2937', marginBottom: 10 },
+  infoCard:           { backgroundColor: '#fff', padding: 16, borderRadius: 14, elevation: 2, marginBottom: 16 },
+  infoTitle:          { fontSize: 15, fontWeight: '700', color: '#1F2937', marginBottom: 10 },
   infoRow:            { fontSize: 14, color: '#6B7280', marginBottom: 4 },
   infoValue:          { color: '#111827', fontWeight: '600' },
-  label:              { fontSize: 16, fontWeight: 'bold', marginBottom: 6, color: '#374151' },
-  instructionCard:    { backgroundColor: '#FEF3C7', borderRadius: 12, padding: 14, marginTop: 16, borderWidth: 1, borderColor: '#F59E0B' },
-  instructionText:    { color: '#92400E', fontSize: 14, lineHeight: 20 },
+  statusDispatched:   { color: '#059669' },
+  instructionCard:    { backgroundColor: '#FEF3C7', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#F59E0B' },
+  instructionText:    { color: '#92400E', fontSize: 13, lineHeight: 20 },
 });

@@ -1,9 +1,15 @@
 // context/AuthContext.tsx
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db, COLLECTIONS } from '@/lib/firebase';
+import { COLLECTIONS } from "@/lib/firebase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getAuth, onAuthStateChanged } from "@react-native-firebase/auth";
+import { getFirestore } from "@react-native-firebase/firestore";
+import React, {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 
 export interface UserProfile {
   id: string;
@@ -35,11 +41,16 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  if (!context) throw new Error("useAuth must be used within AuthProvider");
   return context;
 };
 
-interface Props { children: ReactNode; }
+interface Props {
+  children: ReactNode;
+}
+
+const authInstance = getAuth();
+const db = getFirestore();
 
 export const AuthProvider: React.FC<Props> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -47,24 +58,33 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   const fetchUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
-      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
-      if (userDoc.exists()) {
+      const userDoc = await db
+        .collection(COLLECTIONS.USERS)
+        .doc(uid)
+        .get();
+      if (userDoc.exists) {
         const data = { id: userDoc.id, ...userDoc.data() } as UserProfile;
-        await AsyncStorage.setItem('user', JSON.stringify(data));
-        await AsyncStorage.setItem('userId', data.id);
-        await AsyncStorage.setItem('userName', `${data.firstName ?? ''} ${data.lastName ?? ''}`.trim());
-        await AsyncStorage.setItem('userBarangay', data.barangay ?? data.address ?? '');
-        await AsyncStorage.setItem('userDistrict', data.district ?? '');
+        await AsyncStorage.setItem("user", JSON.stringify(data));
+        await AsyncStorage.setItem("userId", data.id);
+        await AsyncStorage.setItem(
+          "userName",
+          `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim(),
+        );
+        await AsyncStorage.setItem(
+          "userBarangay",
+          data.barangay ?? data.address ?? "",
+        );
+        await AsyncStorage.setItem("userDistrict", data.district ?? "");
         return data;
       }
     } catch (e) {
-      console.error('fetchUserProfile error:', e);
+      console.error("fetchUserProfile error:", e);
     }
     return null;
   };
 
   const refreshUser = async () => {
-    const currentUser = auth.currentUser;
+    const currentUser = authInstance.currentUser;
     if (currentUser) {
       const profile = await fetchUserProfile(currentUser.uid);
       setUser(profile);
@@ -73,18 +93,28 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   const clearUser = () => {
     setUser(null);
-    AsyncStorage.multiRemove(['user', 'userId', 'userName', 'userBarangay', 'userDistrict']);
+    AsyncStorage.multiRemove([
+      "user",
+      "userId",
+      "userName",
+      "userBarangay",
+      "userDistrict",
+    ]);
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(authInstance, async (firebaseUser) => {
       if (firebaseUser) {
         const profile = await fetchUserProfile(firebaseUser.uid);
         setUser(profile);
       } else {
-        const stored = await AsyncStorage.getItem('user');
+        const stored = await AsyncStorage.getItem("user");
         if (stored) {
-          try { setUser(JSON.parse(stored)); } catch { setUser(null); }
+          try {
+            setUser(JSON.parse(stored));
+          } catch {
+            setUser(null);
+          }
         } else {
           setUser(null);
         }

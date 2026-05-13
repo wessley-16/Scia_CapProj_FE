@@ -8,7 +8,8 @@
     "scheme": "scia",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -30,6 +31,14 @@
       "favicon": "./assets/images/Logo.png"
     },
     "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "expo-build-properties",
+        {
+          "ios": { "useFrameworks": "static" }
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -44,6 +53,7 @@
           "microphonePermission": "Allow SCIA to access your microphone for real-time voice assistant."
         }
       ],
+      "@siteed/audio-studio",
       "@react-native-community/datetimepicker",
       [
         "expo-notifications",
@@ -53,8 +63,7 @@
           "sounds": [],
           "mode": "production"
         }
-      ],
-      "@react-native-firebase/app"
+      ]
     ],
     "experiments": {
       "typedRoutes": true

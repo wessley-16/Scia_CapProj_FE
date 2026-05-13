@@ -1,22 +1,21 @@
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import {
-    ActivityIndicator,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useLiveVoice } from "@/hooks/useLiveVoice";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import React from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Voice() {
   const router = useRouter();
   const { t } = useSettings();
-  const [prompt, setPrompt] = useState("");
+
   const {
     status,
     isConnected,
@@ -28,9 +27,7 @@ export default function Voice() {
     isRecording,
     connect,
     disconnect,
-    sendRealtimeText,
-    startMicRecording,
-    stopMicRecording,
+    toggleMic,
   } = useLiveVoice();
 
   const isBusy = status === "connecting";
@@ -48,27 +45,6 @@ export default function Voice() {
           : status === "error"
             ? t("connectionErrorStatus")
             : t("notConnectedStatus");
-
-  const toggleListening = async () => {
-    if (!isConnected) {
-      connect();
-      return;
-    }
-
-    if (isRecording) {
-      await stopMicRecording();
-      return;
-    }
-
-    await startMicRecording();
-  };
-
-  const handleSend = () => {
-    const ok = sendRealtimeText(prompt);
-    if (ok) {
-      setPrompt("");
-    }
-  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
@@ -96,6 +72,7 @@ export default function Voice() {
             {isListening ? t("liveSessionActive") : t("howCanIHelp")}
           </Text>
           <Text style={styles.statusText}>{liveStatusLabel}</Text>
+
           <View style={styles.connectionButtonsRow}>
             <TouchableOpacity
               style={[
@@ -111,6 +88,7 @@ export default function Voice() {
               </Text>
             </TouchableOpacity>
           </View>
+
           {interrupted && (
             <Text style={styles.interruptedText}>
               Response interrupted by new activity.
@@ -139,34 +117,12 @@ export default function Voice() {
           </Text>
         </View>
 
-        <View style={styles.promptRow}>
-          <TextInput
-            value={prompt}
-            onChangeText={setPrompt}
-            placeholder={t("sendRealtimeTextPlaceholder")}
-            placeholderTextColor="#9CA3AF"
-            style={styles.promptInput}
-            editable={isConnected}
-            onSubmitEditing={handleSend}
-          />
-          <TouchableOpacity
-            style={[
-              styles.sendButton,
-              (!isConnected || !prompt.trim()) && styles.sendButtonDisabled,
-            ]}
-            onPress={handleSend}
-            disabled={!isConnected || !prompt.trim()}
-          >
-            <Ionicons name="send" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
         {/* MICROPHONE BUTTON */}
         <View style={styles.micContainer}>
           {isListening && <View style={styles.rippleEffect} />}
           <TouchableOpacity
             style={[styles.micButton, isListening && styles.micButtonActive]}
-            onPress={toggleListening}
+            onPress={toggleMic}
             activeOpacity={0.8}
           >
             {isBusy ? (
@@ -306,33 +262,6 @@ const styles = StyleSheet.create({
   activeText: {
     color: "#111827",
     fontWeight: "500",
-  },
-  promptRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  promptInput: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: "#111827",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sendButtonDisabled: {
-    backgroundColor: "#9CA3AF",
   },
   micContainer: {
     alignItems: "center",

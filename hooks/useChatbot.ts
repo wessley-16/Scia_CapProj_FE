@@ -1,15 +1,14 @@
 // hooks/useChatbot.ts
+import {
+  CHATBOT_STORAGE_KEY,
+  MAX_CHATBOT_MESSAGES,
+} from "@/constants/constants";
+import {
+  createNativeChatSession,
+  type ChatHistoryItem,
+} from "@/lib/firebaseAI";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useState } from "react";
-import { CHATBOT_STORAGE_KEY, MAX_CHATBOT_MESSAGES } from "@/constants/constants";
-
-const GEMINI_API_KEY = "AIzaSyCc99gQYUA-JqX-nlsF3yp6PCikbOOJ2fc";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_API_KEY}`;
-
-const SYSTEM_PROMPT = `You are HealthAI, a caring health assistant for senior citizens 
-in Valenzuela City, Philippines (SCIA app). Answer health questions simply and warmly. 
-Never diagnose — always recommend seeing a doctor for serious concerns. 
-If someone describes an emergency, tell them to call 911 or use the SOS button immediately.`;
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type ChatMessage = {
   id: string;
@@ -27,101 +26,131 @@ const INITIAL_MESSAGE: ChatMessage = {
   text: "Hello! I'm HealthAI, your personal health assistant. How can I help you today? 😊",
 };
 
-const getTrimmedMessages = (msgs: ChatMessage[]) => msgs.slice(-MAX_CHATBOT_MESSAGES);
+const getTrimmedMessages = (msgs: ChatMessage[]) =>
+  msgs.slice(-MAX_CHATBOT_MESSAGES);
 
 type StoredMsg = Omit<ChatMessage, "id"> & { id?: string };
 const isValidArray = (v: unknown): v is StoredMsg[] =>
   Array.isArray(v) &&
-  v.every((i) => i && (i.role === "user" || i.role === "assistant") && typeof i.text === "string");
+  v.every(
+    (i) =>
+      i &&
+      (i.role === "user" || i.role === "assistant") &&
+      typeof i.text === "string",
+  );
+
+function toFirebaseHistory(messages: ChatMessage[]): ChatHistoryItem[] {
+  const mapped: ChatHistoryItem[] = messages
+    .filter((m) => m.id !== "initial") // drop the static greeting — it's not a real turn
+    .slice(-MAX_CONTEXT_MESSAGES)
+    .map((m) => ({
+      role: m.role === "assistant" ? ("model" as const) : ("user" as const),
+      parts: [{ text: m.text }],
+    }));
+
+  // Firebase requires history to START with a "user" turn.
+  // Slice off any leading "model" entries to avoid the invalid-content error.
+  const firstUserIndex = mapped.findIndex((m) => m.role === "user");
+  if (firstUserIndex === -1) return []; // no real user messages yet — pass empty history
+  return mapped.slice(firstUserIndex);
+}
+
+// Safe session creator — never throws, returns null on failure
+function safeCreateSession(history: ChatHistoryItem[]) {
+  try {
+    return createNativeChatSession(history);
+  } catch (e) {
+    console.warn("Chat session creation failed:", e);
+    return null;
+  }
+}
 
 export const useChatbot = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([INITIAL_MESSAGE]);
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const chatRef = useRef<ReturnType<typeof createNativeChatSession> | null>(null);
 
+  // Hydrate from storage on mount — session created lazily on first send
   useEffect(() => {
     AsyncStorage.getItem(CHATBOT_STORAGE_KEY)
       .then((stored) => {
         if (stored) {
           const parsed: unknown = JSON.parse(stored);
           if (isValidArray(parsed) && parsed.length > 0) {
-            setMessages(
-              getTrimmedMessages(parsed.map((m) => ({ ...m, id: m.id ?? generateId() })))
+            const restored = getTrimmedMessages(
+              parsed.map((m) => ({ ...m, id: m.id ?? generateId() })),
             );
+            setMessages(restored);
           }
         }
-        setHydrated(true);
       })
-      .catch(() => setHydrated(true));
+      .catch(() => {})
+      .finally(() => setHydrated(true));
   }, []);
 
+  // Persist messages to storage whenever they change
   useEffect(() => {
     if (!hydrated) return;
     AsyncStorage.setItem(
       CHATBOT_STORAGE_KEY,
-      JSON.stringify(getTrimmedMessages(messages))
+      JSON.stringify(getTrimmedMessages(messages)),
     ).catch(() => {});
   }, [hydrated, messages]);
 
   const addMessage = useCallback((role: ChatMessage["role"], text: string) => {
-    setMessages((prev) => getTrimmedMessages([...prev, { id: generateId(), role, text }]));
+    setMessages((prev) =>
+      getTrimmedMessages([...prev, { id: generateId(), role, text }]),
+    );
   }, []);
 
   const sendMessage = async (message: string) => {
     const trimmed = message.trim();
     if (!trimmed || loading) return;
 
+    // Create session lazily on first send
+    if (!chatRef.current) {
+      chatRef.current = safeCreateSession(toFirebaseHistory(messages));
+    }
+
+    if (!chatRef.current) {
+      addMessage(
+        "assistant",
+        "Could not connect to HealthAI. Please restart the app and try again. 😊",
+      );
+      return;
+    }
+
     addMessage("user", trimmed);
     setLoading(true);
 
     try {
-      type GeminiPart = { text: string };
-      type GeminiContent = { role: "user" | "model"; parts: GeminiPart[] };
+      // Try streaming first for a responsive feel
+      const result = await chatRef.current.sendMessageStream(trimmed);
 
-      const history: GeminiContent[] = messages
-        .slice(-MAX_CONTEXT_MESSAGES)
-        .filter((m) => m.id !== "initial")
-        .map((m) => ({
-          role: m.role === "assistant" ? "model" : "user",
-          parts: [{ text: m.text }],
-        }));
-
-      // Gemini requires history to start with a user turn
-      while (history.length > 0 && history[0].role === "model") history.shift();
-
-      // Append the new user message
-      history.push({ role: "user", parts: [{ text: trimmed }] });
-
-      const response = await fetch(GEMINI_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: SYSTEM_PROMPT }],
-          },
-          contents: history,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err?.error?.message ?? `HTTP ${response.status}`);
+      let reply = "";
+      for await (const chunk of result.stream) {
+        reply += chunk.text();
       }
 
-      const data = await response.json();
-      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No response.";
+      addMessage("assistant", reply.trim() || "No response.");
+    } catch (streamErr) {
+      console.warn("Stream failed, trying non-stream:", streamErr);
 
-      addMessage("assistant", reply);
-    } catch (err: unknown) {
-      console.error("HealthAI error:", err);
-      addMessage(
-        "assistant",
-        "I'm having trouble connecting. Please check your internet and try again. 😊"
-      );
+      // Fallback to non-streaming
+      try {
+        const result = await chatRef.current.sendMessage(trimmed);
+        const reply = result.response.text();
+        addMessage("assistant", reply.trim() || "No response.");
+      } catch (err) {
+        console.error("HealthAI error:", err);
+        // Reset broken session — fresh one on next send
+        chatRef.current = null;
+        addMessage(
+          "assistant",
+          "I'm having trouble connecting. Please check your internet and try again. 😊",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -129,6 +158,7 @@ export const useChatbot = () => {
 
   const clearConversation = async () => {
     setMessages([INITIAL_MESSAGE]);
+    chatRef.current = null;
     await AsyncStorage.removeItem(CHATBOT_STORAGE_KEY).catch(() => {});
   };
 
