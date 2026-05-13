@@ -1,15 +1,11 @@
 /**
  * useLiveVoice — Firebase AI Logic Live voice session
  *
+ * Uses @siteed/expo-audio-studio (formerly expo-audio-stream) for real-time PCM.
+ * The correct import is ExpoAudioStreamModule from @siteed/expo-audio-studio.
+ *
  * Architecture: stream raw PCM chunks → session.sendRealtimeAudio() in real-time
  * so the server's built-in VAD detects when the user stops talking and auto-responds.
- *
- * NO manual "tap to stop" needed — just tap once to start, speak, and the model
- * replies automatically when it detects silence.
- *
- * Requires: expo-audio-stream (yarn add expo-audio-stream)
- * which gives us raw PCM callbacks while recording — unlike expo-av which only
- * gives a file after recording stops.
  */
 
 import {
@@ -21,12 +17,20 @@ import {
 import { getApp } from "@react-native-firebase/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// ── expo-audio-stream for real-time PCM chunks ────────────────────────────────
-let ExpoAudioStream: any = null;
+// ── @siteed/expo-audio-studio for real-time PCM chunks ────────────────────────
+// Formerly known as expo-audio-stream / @siteed/expo-audio-stream.
+// The module exposes ExpoAudioStreamModule for permissions + startRecording.
+let ExpoAudioStreamModule: any = null;
 try {
-  ExpoAudioStream = require("expo-audio-stream");
+  const studio = require("@siteed/expo-audio-studio");
+  // The module can be at .ExpoAudioStreamModule or .default.ExpoAudioStreamModule
+  ExpoAudioStreamModule =
+    studio.ExpoAudioStreamModule ?? studio.default?.ExpoAudioStreamModule ?? null;
 } catch {
-  console.warn("expo-audio-stream not available.");
+  console.warn(
+    "@siteed/expo-audio-studio not available. " +
+      "Run: npx expo install @siteed/expo-audio-studio"
+  );
 }
 
 // ── Playback: prefer expo-audio (SDK 54+), fall back to expo-av ───────────────
@@ -120,7 +124,8 @@ const safeSetAudioMode = async (opts: Record<string, unknown>) => {
 export const useLiveVoice = () => {
   const sessionRef = useRef<any>(null);
   const soundRef = useRef<any>(null);
-  const streamSubRef = useRef<any>(null); // expo-audio-stream subscription
+  // Subscription/stop handle returned by startRecording
+  const recordingHandleRef = useRef<any>(null);
   const pcmChunksRef = useRef<Uint8Array[]>([]);
   const pcmSampleRateRef = useRef(OUTPUT_SAMPLE_RATE);
   const audioQueueRef = useRef<string[]>([]);
@@ -138,11 +143,12 @@ export const useLiveVoice = () => {
 
   // ── Teardown ───────────────────────────────────────────────────────────────
   const clearAudioState = useCallback(async () => {
-    if (streamSubRef.current) {
+    if (recordingHandleRef.current) {
       try {
-        await ExpoAudioStream?.stopRecording?.();
+        // @siteed/expo-audio-studio: stopRecording can be called on the module
+        await ExpoAudioStreamModule?.stopRecording?.();
       } catch {}
-      streamSubRef.current = null;
+      recordingHandleRef.current = null;
     }
     pcmChunksRef.current = [];
     audioQueueRef.current = [];
@@ -175,7 +181,7 @@ export const useLiveVoice = () => {
         });
         const { sound } = await Audio.Sound.createAsync(
           { uri },
-          { shouldPlay: true },
+          { shouldPlay: true }
         );
         soundRef.current = sound;
         await new Promise<void>((resolve) => {
@@ -189,7 +195,7 @@ export const useLiveVoice = () => {
     } catch (err) {
       setLastError("Audio playback failed.");
       setDiagnostic(
-        err instanceof Error ? err.message : "Unknown audio error.",
+        err instanceof Error ? err.message : "Unknown audio error."
       );
     } finally {
       isPlayingRef.current = false;
@@ -201,7 +207,7 @@ export const useLiveVoice = () => {
     try {
       const uri = pcmToWavDataUri(
         pcmChunksRef.current,
-        pcmSampleRateRef.current,
+        pcmSampleRateRef.current
       );
       pcmChunksRef.current = [];
       audioQueueRef.current.push(uri);
@@ -252,7 +258,7 @@ export const useLiveVoice = () => {
         setStatus("connected");
       }
     },
-    [flushAudioTurn],
+    [flushAudioTurn]
   );
 
   // ── Connect ────────────────────────────────────────────────────────────────
@@ -277,10 +283,7 @@ export const useLiveVoice = () => {
         systemInstruction: {
           parts: [
             {
-              text: `You are HealthAI, a caring voice assistant for senior citizens 
-in Valenzuela City, Philippines (SCIA app). Speak simply and warmly. 
-Never diagnose — always recommend seeing a doctor for serious concerns. 
-If someone describes an emergency, tell them to call 911 or use the SOS button immediately.`,
+              text: `You are HealthAI, a caring voice assistant for senior citizens \nin Valenzuela City, Philippines (SCIA app). Speak simply and warmly. \nNever diagnose — always recommend seeing a doctor for serious concerns. \nIf someone describes an emergency, tell them to call 911 or use the SOS button immediately.`,
             },
           ],
         },
@@ -342,25 +345,27 @@ If someone describes an emergency, tell them to call 911 or use the SOS button i
   }, [clearAudioState]);
 
   // ── Start streaming mic → sendRealtimeAudio ────────────────────────────────
-  // Sends PCM chunks every 100ms to the Live API.
-  // Server VAD auto-detects silence → auto-triggers model response.
-  // User just taps once to start speaking, no tap-to-stop needed for sending.
   const startMicRecording = useCallback(async (): Promise<boolean> => {
     if (!sessionRef.current) {
       setLastError("Connect first before recording.");
       return false;
     }
-    if (isRecording || streamSubRef.current) return true;
+    if (isRecording || recordingHandleRef.current) return true;
 
-    if (!ExpoAudioStream) {
+    if (!ExpoAudioStreamModule) {
       setLastError(
-        "expo-audio-stream not installed. Run: yarn add expo-audio-stream",
+        "@siteed/expo-audio-studio not installed. Run: npx expo install @siteed/expo-audio-studio"
       );
       return false;
     }
 
     try {
-      const { granted } = await ExpoAudioStream.requestPermissionsAsync();
+      // ── Request mic permission via ExpoAudioStreamModule ──────────────────
+      // @siteed/expo-audio-studio exposes requestPermissionsAsync on the module.
+      const permResult =
+        await ExpoAudioStreamModule.requestPermissionsAsync();
+      const granted =
+        permResult?.granted === true || permResult?.status === "granted";
       if (!granted) {
         setLastError("Microphone permission is required.");
         return false;
@@ -373,16 +378,16 @@ If someone describes an emergency, tell them to call 911 or use the SOS button i
         playThroughEarpieceAndroid: false,
       });
 
-      const { subscription } = await ExpoAudioStream.startRecording({
+      // ── Start recording with real-time PCM stream callback ────────────────
+      const result = await ExpoAudioStreamModule.startRecording({
         sampleRate: MIC_SAMPLE_RATE, // 16kHz — required by Live API
-        channels: 1, // mono
-        encoding: "pcm_16bit", // 16-bit PCM
-        interval: 100, // fire onAudioStream every 100ms
+        channels: 1,                 // mono
+        encoding: "pcm_16bit",       // 16-bit PCM
+        interval: 100,               // fire onAudioStream every 100ms
         onAudioStream: (event: { data: string }) => {
           const session = sessionRef.current;
           if (!session || !event?.data) return;
           try {
-            // Stream each chunk directly — server VAD handles turn detection
             session.sendRealtimeAudio({
               data: event.data,
               mimeType: `audio/pcm;rate=${MIC_SAMPLE_RATE}`,
@@ -393,30 +398,29 @@ If someone describes an emergency, tell them to call 911 or use the SOS button i
         },
       });
 
-      streamSubRef.current = subscription;
+      // startRecording returns either a subscription object or { subscription }
+      recordingHandleRef.current = result?.subscription ?? result ?? true;
       setIsRecording(true);
       setInterrupted(false);
       setDiagnostic("Listening… speak now. I'll respond automatically.");
       return true;
     } catch (err) {
       setIsRecording(false);
-      streamSubRef.current = null;
+      recordingHandleRef.current = null;
       setLastError("Failed to start microphone.");
       setDiagnostic(
-        err instanceof Error ? err.message : "Unknown recording error.",
+        err instanceof Error ? err.message : "Unknown recording error."
       );
       return false;
     }
   }, [isRecording]);
 
   // ── Stop streaming mic ─────────────────────────────────────────────────────
-  // Manually stops the mic stream (e.g. user taps mic again to mute).
-  // The model has already been responding via VAD — this just stops sending audio.
   const stopMicRecording = useCallback(async (): Promise<boolean> => {
-    if (!streamSubRef.current && !isRecording) return false;
+    if (!recordingHandleRef.current && !isRecording) return false;
     try {
-      await ExpoAudioStream?.stopRecording?.();
-      streamSubRef.current = null;
+      await ExpoAudioStreamModule?.stopRecording?.();
+      recordingHandleRef.current = null;
       setIsRecording(false);
       await safeSetAudioMode({
         allowsRecordingIOS: false,
@@ -427,7 +431,7 @@ If someone describes an emergency, tell them to call 911 or use the SOS button i
       setDiagnostic("Mic off.");
       return true;
     } catch (err) {
-      streamSubRef.current = null;
+      recordingHandleRef.current = null;
       setIsRecording(false);
       setLastError("Failed to stop microphone.");
       return false;
@@ -437,7 +441,6 @@ If someone describes an emergency, tell them to call 911 or use the SOS button i
   // ── Toggle (mic button in Voice.tsx) ──────────────────────────────────────
   const toggleMic = useCallback(async () => {
     if (!isConnected) {
-      // Connect first, then auto-start mic
       await connect();
       setTimeout(() => startMicRecording(), 600);
       return;
@@ -490,6 +493,6 @@ If someone describes an emergency, tell them to call 911 or use the SOS button i
       toggleMic,
       startMicRecording,
       stopMicRecording,
-    ],
+    ]
   );
 };
