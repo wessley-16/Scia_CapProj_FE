@@ -1,18 +1,15 @@
 /**
  * useLiveVoice — Firebase AI Logic Live voice session
  *
- * Architecture: stream raw PCM chunks → session.sendRealtimeAudio() in real-time
- * so the server's built-in VAD detects when the user stops talking and auto-responds.
+ * Status flow:
+ *   idle → connecting → connected → listening → responding → connected (loop)
  *
- * NO manual "tap to stop" needed — just tap once to start, speak, and the model
- * replies automatically when it detects silence.
+ * One-tap UX: tap mic once to connect + start listening.
+ * Server-side VAD fires turnComplete automatically → model replies.
  *
- * Uses @siteed/audio-studio (formerly expo-audio-stream).
- * Correct API:
- *   - ExpoAudioStreamModule.requestPermissionsAsync() → { status: 'granted' | ... }
- *   - startRecording({ ..., onAudioStream: (event) => {} }) — callback is in the config
- *   - stopRecording()
- *   All imported from '@siteed/audio-studio'
+ * REQUIREMENTS (must native-build, not Expo Go):
+ *   yarn add @siteed/audio-studio
+ *   npx expo run:android   (or run:ios)
  */
 
 import {
@@ -22,479 +19,476 @@ import {
   getLiveGenerativeModel,
 } from "@react-native-firebase/ai";
 import { getApp } from "@react-native-firebase/app";
+import { Audio } from "expo-av";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// ── @siteed/audio-studio ──────────────────────────────────────────────────────
-// The package exports:
-//   ExpoAudioStreamModule  — native module (has requestPermissionsAsync)
-//   startRecording         — standalone function (config includes onAudioStream callback)
-//   stopRecording          — standalone function
-let AudioStudioModule: any = null;
-let audioStudioStartRecording: ((config: any) => Promise<any>) | null = null;
-let audioStudioStopRecording: (() => Promise<any>) | null = null;
+// ─── @siteed/audio-studio — resolved once at module load ─────────────────────
+// We resolve at load time so errors surface immediately on mount,
+// not buried inside an async callback.
+const _pkg = (() => {
+  try {
+    return require("@siteed/audio-studio");
+  } catch {
+    return null;
+  }
+})();
 
-try {
-  const AudioStudio = require("@siteed/audio-studio");
-  // The native module is the correct place for permissions
-  AudioStudioModule =
-    AudioStudio.ExpoAudioStreamModule ??
-    AudioStudio.default?.ExpoAudioStreamModule ??
-    null;
-  audioStudioStartRecording =
-    AudioStudio.startRecording ??
-    AudioStudio.default?.startRecording ??
-    null;
-  audioStudioStopRecording =
-    AudioStudio.stopRecording ??
-    AudioStudio.default?.stopRecording ??
-    null;
-} catch (e) {
-  console.warn("@siteed/audio-studio not available:", e);
+const ExpoAudioStreamModule = _pkg?.ExpoAudioStreamModule ?? _pkg?.default?.ExpoAudioStreamModule ?? null;
+const _startRecording       = _pkg?.startRecording       ?? _pkg?.default?.startRecording       ?? null;
+const _stopRecording        = _pkg?.stopRecording        ?? _pkg?.default?.stopRecording        ?? null;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+const MIC_SAMPLE_RATE = 16_000;   // Gemini Live API requires 16 kHz input
+const OUT_SAMPLE_RATE = 24_000;   // Gemini Live API outputs 24 kHz
+const VERTEX_REGION   = "us-central1";
+const LIVE_MODEL      = "gemini-live-2.5-flash-native-audio";
+
+const SYSTEM_INSTRUCTION = {
+  parts: [{
+    text:
+      "You are HealthAI, a warm and caring voice assistant for senior citizens " +
+      "in Valenzuela City, Philippines (the SCIA app). " +
+      "Speak simply, patiently, and in a friendly tone. " +
+      "Keep responses short — one to three sentences unless more detail is requested. " +
+      "Never diagnose; always recommend seeing a doctor for serious health concerns. " +
+      "If someone describes an emergency, immediately tell them to call 911 " +
+      "or tap the SOS button in the app.",
+  }],
+};
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+export type LiveStatus =
+  | "idle"
+  | "connecting"
+  | "connected"   // session open, mic idle
+  | "listening"   // mic streaming to model
+  | "responding"  // model sending audio back
+  | "error";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function parseSampleRate(mimeType?: string): number {
+  const m = mimeType?.match(/rate=(\d+)/i);
+  const n = m ? parseInt(m[1], 10) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : OUT_SAMPLE_RATE;
 }
 
-// ── Playback: prefer expo-audio (SDK 54+), fall back to expo-av ───────────────
-let AudioModule: any = null;
-try {
-  AudioModule = require("expo-audio");
-} catch {
-  try {
-    AudioModule = require("expo-av").Audio;
-  } catch {
-    console.warn("No audio playback module available.");
-  }
+function b64ToU8(b64: string): Uint8Array {
+  const bin = globalThis.atob(b64);
+  const u8  = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
 }
-const Audio = AudioModule;
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-type LiveStatus = "idle" | "connecting" | "connected" | "responding" | "error";
+function u8ToB64(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return globalThis.btoa(out);
+}
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-const MIC_SAMPLE_RATE = 16000;   // Live API input: 16kHz mono PCM
-const OUTPUT_SAMPLE_RATE = 24000; // Live API output: 24kHz mono PCM
+function buildWavUri(chunks: Uint8Array[], sampleRate: number): string {
+  const pcmLen = chunks.reduce((s, c) => s + c.length, 0);
+  const wav    = new Uint8Array(44 + pcmLen);
+  const dv     = new DataView(wav.buffer);
+  const str    = (o: number, s: string) =>
+    s.split("").forEach((c, i) => dv.setUint8(o + i, c.charCodeAt(0)));
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const parseSampleRate = (mimeType?: string): number => {
-  if (!mimeType) return OUTPUT_SAMPLE_RATE;
-  const match = mimeType.match(/rate=(\d+)/i);
-  if (!match) return OUTPUT_SAMPLE_RATE;
-  const parsed = parseInt(match[1], 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : OUTPUT_SAMPLE_RATE;
-};
+  str(0, "RIFF"); dv.setUint32(4,  36 + pcmLen,    true);
+  str(8, "WAVE"); str(12, "fmt ");
+  dv.setUint32(16, 16,             true);
+  dv.setUint16(20,  1,             true); // PCM
+  dv.setUint16(22,  1,             true); // mono
+  dv.setUint32(24, sampleRate,     true);
+  dv.setUint32(28, sampleRate * 2, true);
+  dv.setUint16(32,  2,             true);
+  dv.setUint16(34, 16,             true);
+  str(36, "data"); dv.setUint32(40, pcmLen, true);
 
-const base64ToBytes = (base64: string): Uint8Array => {
-  const binary = globalThis.atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-};
+  let off = 44;
+  for (const c of chunks) { wav.set(c, off); off += c.length; }
+  return `data:audio/wav;base64,${u8ToB64(wav)}`;
+}
 
-const bytesToBase64 = (bytes: Uint8Array): string => {
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return globalThis.btoa(binary);
-};
+// ─── Hook ─────────────────────────────────────────────────────────────────────
+export function useLiveVoice() {
+  const sessionRef     = useRef<any>(null);
+  const soundRef       = useRef<Audio.Sound | null>(null);
+  const isRecordingRef = useRef(false);
+  const deadRef        = useRef(false);
+  const pcmChunksRef   = useRef<Uint8Array[]>([]);
+  const pcmRateRef     = useRef(OUT_SAMPLE_RATE);
+  const audioQueueRef  = useRef<string[]>([]);
+  const isPlayingRef   = useRef(false);
 
-const pcmToWavDataUri = (chunks: Uint8Array[], sampleRate: number): string => {
-  const pcmByteLength = chunks.reduce((sum, c) => sum + c.length, 0);
-  const wavBytes = new Uint8Array(44 + pcmByteLength);
-  const view = new DataView(wavBytes.buffer);
-  const writeString = (offset: number, s: string) => {
-    for (let i = 0; i < s.length; i++)
-      view.setUint8(offset + i, s.charCodeAt(i));
-  };
-  writeString(0, "RIFF");
-  view.setUint32(4, 36 + pcmByteLength, true);
-  writeString(8, "WAVE");
-  writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, 1, true); // Mono
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true);
-  view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true);
-  writeString(36, "data");
-  view.setUint32(40, pcmByteLength, true);
-  let offset = 44;
-  for (const chunk of chunks) {
-    wavBytes.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return `data:audio/wav;base64,${bytesToBase64(wavBytes)}`;
-};
-
-const safeSetAudioMode = async (opts: Record<string, unknown>) => {
-  if (!Audio) return;
-  try {
-    if (typeof Audio.setAudioModeAsync === "function") {
-      await Audio.setAudioModeAsync(opts);
-    }
-  } catch {
-    /* noop */
-  }
-};
-
-// ── Hook ──────────────────────────────────────────────────────────────────────
-export const useLiveVoice = () => {
-  const sessionRef       = useRef<any>(null);
-  const soundRef         = useRef<any>(null);
-  const isRecordingRef   = useRef(false); // tracks native recording state
-  const pcmChunksRef     = useRef<Uint8Array[]>([]);
-  const pcmSampleRateRef = useRef(OUTPUT_SAMPLE_RATE);
-  const audioQueueRef    = useRef<string[]>([]);
-  const isPlayingRef     = useRef(false);
-
-  const [status, setStatus]                     = useState<LiveStatus>("idle");
-  const [inputTranscript, setInputTranscript]   = useState("");
+  const [status,           setStatus]           = useState<LiveStatus>("idle");
+  const [isRecording,      setIsRecording]      = useState(false);
+  const [inputTranscript,  setInputTranscript]  = useState("");
   const [outputTranscript, setOutputTranscript] = useState("");
-  const [lastError, setLastError]               = useState("");
-  const [diagnostic, setDiagnostic]             = useState("");
-  const [interrupted, setInterrupted]           = useState(false);
-  const [isRecording, setIsRecording]           = useState(false);
+  const [lastError,        setLastError]        = useState("");
+  const [diagnostic,       setDiagnostic]       = useState("");
+  const [interrupted,      setInterrupted]      = useState(false);
 
-  const isConnected = status === "connected" || status === "responding";
+  const isConnected =
+    status === "connected" || status === "listening" || status === "responding";
 
-  // ── Teardown ───────────────────────────────────────────────────────────────
-  const clearAudioState = useCallback(async () => {
+  // ── Safe setters (no-op after component unmounts) ────────────────────────
+  const safe = useMemo(() => ({
+    status:      (v: LiveStatus) => { if (!deadRef.current) setStatus(v);           },
+    recording:   (v: boolean)    => { if (!deadRef.current) setIsRecording(v);      },
+    inTx:        (v: string)     => { if (!deadRef.current) setInputTranscript(v);  },
+    outTx:       (v: string)     => { if (!deadRef.current) setOutputTranscript(v); },
+    error:       (v: string)     => { if (!deadRef.current) setLastError(v);        },
+    diag:        (v: string)     => { if (!deadRef.current) setDiagnostic(v);       },
+    interrupted: (v: boolean)    => { if (!deadRef.current) setInterrupted(v);      },
+  }), []);
+
+  // ── Tear down all audio I/O ──────────────────────────────────────────────
+  const clearAudio = useCallback(async () => {
     if (isRecordingRef.current) {
-      try { await audioStudioStopRecording?.(); } catch {}
       isRecordingRef.current = false;
+      try { await _stopRecording?.(); } catch {}
     }
-    pcmChunksRef.current = [];
+    safe.recording(false);
+    isPlayingRef.current  = false;
     audioQueueRef.current = [];
-    isPlayingRef.current = false;
+    pcmChunksRef.current  = [];
     if (soundRef.current) {
-      try { await soundRef.current.stopAsync(); } catch {}
+      try { await soundRef.current.stopAsync();   } catch {}
       try { await soundRef.current.unloadAsync(); } catch {}
       soundRef.current = null;
     }
-    setIsRecording(false);
-  }, []);
+  }, [safe]);
 
-  // ── Playback queue ─────────────────────────────────────────────────────────
-  const playQueue = useCallback(async () => {
-    if (isPlayingRef.current || !Audio) return;
+  // ── Drain WAV playback queue sequentially ────────────────────────────────
+  const drainQueue = useCallback(async () => {
+    if (isPlayingRef.current) return;
     isPlayingRef.current = true;
     try {
       while (audioQueueRef.current.length > 0) {
-        const uri = audioQueueRef.current.shift();
-        if (!uri) continue;
-        await safeSetAudioMode({
-          allowsRecordingIOS: false,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
+        const uri = audioQueueRef.current.shift()!;
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS:         false,
+          playsInSilentModeIOS:       true,
+          shouldDuckAndroid:          true,
           playThroughEarpieceAndroid: false,
         });
         const { sound } = await Audio.Sound.createAsync(
           { uri },
-          { shouldPlay: true },
+          { shouldPlay: true, volume: 1.0 },
         );
         soundRef.current = sound;
         await new Promise<void>((resolve) => {
-          sound.setOnPlaybackStatusUpdate((s: any) => {
-            if (s.isLoaded && s.didJustFinish) resolve();
+          sound.setOnPlaybackStatusUpdate((s) => {
+            if (s.isLoaded && (s.didJustFinish || ("error" in s && s.error)))
+              resolve();
           });
         });
-        await sound.unloadAsync();
+        try { await sound.unloadAsync(); } catch {}
         soundRef.current = null;
       }
     } catch (err) {
-      setLastError("Audio playback failed.");
-      setDiagnostic(err instanceof Error ? err.message : "Unknown audio error.");
+      safe.error("Audio playback error. Please try again.");
     } finally {
       isPlayingRef.current = false;
     }
-  }, []);
+  }, [safe]);
 
-  const flushAudioTurn = useCallback(async () => {
+  const flushTurn = useCallback(async () => {
     if (pcmChunksRef.current.length === 0) return;
-    try {
-      const uri = pcmToWavDataUri(pcmChunksRef.current, pcmSampleRateRef.current);
-      pcmChunksRef.current = [];
-      audioQueueRef.current.push(uri);
-      await playQueue();
-    } catch {
-      setLastError("Failed to decode model audio.");
-      pcmChunksRef.current = [];
+    const uri = buildWavUri(pcmChunksRef.current, pcmRateRef.current);
+    pcmChunksRef.current = [];
+    audioQueueRef.current.push(uri);
+    await drainQueue();
+  }, [drainQueue]);
+
+  // ── Handle server messages ───────────────────────────────────────────────
+  const handleMessage = useCallback(async (msg: any) => {
+    const sc = msg?.serverContent;
+    if (!sc) return;
+
+    // Model was interrupted by user speaking
+    if (sc.interrupted === true) {
+      safe.interrupted(true);
+      pcmChunksRef.current  = [];
+      audioQueueRef.current = [];
+      isPlayingRef.current  = false;
+      try { await soundRef.current?.stopAsync();   } catch {}
+      try { await soundRef.current?.unloadAsync(); } catch {}
+      soundRef.current = null;
+      safe.status(isRecordingRef.current ? "listening" : "connected");
+      return;
     }
-  }, [playQueue]);
 
-  // ── Session message handler ────────────────────────────────────────────────
-  const handleMessage = useCallback(async (message: any) => {
-    if (!message) return;
-
-    if (message.serverContent?.interrupted === true) {
-      setInterrupted(true);
-      pcmChunksRef.current = [];
-      setStatus("connected");
-    }
-
-    const parts = message.serverContent?.modelTurn?.parts;
-    if (Array.isArray(parts)) {
-      for (const part of parts) {
-        const inlineData = part?.inlineData;
-        if (!inlineData?.data || !inlineData.mimeType?.startsWith("audio/pcm"))
-          continue;
-        pcmSampleRateRef.current = parseSampleRate(inlineData.mimeType);
-        try { pcmChunksRef.current.push(base64ToBytes(inlineData.data)); } catch {}
+    // Buffer incoming PCM audio from the model
+    for (const part of (sc.modelTurn?.parts ?? []) as any[]) {
+      const id = part?.inlineData;
+      if (id?.data && id.mimeType?.startsWith("audio/pcm")) {
+        pcmRateRef.current = parseSampleRate(id.mimeType);
+        try { pcmChunksRef.current.push(b64ToU8(id.data)); } catch {}
       }
     }
 
-    if (message.serverContent?.inputTranscription?.text) {
-      setInputTranscript(message.serverContent.inputTranscription.text);
-    }
-    if (message.serverContent?.outputTranscription?.text) {
-      setOutputTranscript(message.serverContent.outputTranscription.text);
-      setStatus("responding");
+    if (sc.inputTranscription?.text)  safe.inTx(sc.inputTranscription.text);
+    if (sc.outputTranscription?.text) {
+      safe.outTx(sc.outputTranscription.text);
+      safe.status("responding");
     }
 
-    if (message.serverContent?.turnComplete === true) {
-      await flushAudioTurn();
-      setStatus("connected");
+    if (sc.turnComplete === true) {
+      await flushTurn();
+      safe.status(isRecordingRef.current ? "listening" : "connected");
     }
-  }, [flushAudioTurn]);
+  }, [flushTurn, safe]);
 
-  // ── Connect ────────────────────────────────────────────────────────────────
+  // ── Open Gemini Live session ─────────────────────────────────────────────
   const connect = useCallback(async () => {
     if (sessionRef.current) return;
-    setLastError("");
-    setDiagnostic("");
-    setInterrupted(false);
-    setStatus("connecting");
+    safe.error(""); safe.diag(""); safe.interrupted(false);
+    safe.status("connecting");
 
     try {
-      const app = getApp();
-      const ai = getAI(app, { backend: new VertexAIBackend("us-central1") });
-
+      const ai = getAI(getApp(), { backend: new VertexAIBackend(VERTEX_REGION) });
       const liveModel = getLiveGenerativeModel(ai, {
-        model: "gemini-live-2.5-flash-native-audio",
+        model: LIVE_MODEL,
         liveGenerationConfig: {
-          responseModalities: [ResponseModality.AUDIO],
-          inputAudioTranscription: {},
+          responseModalities:       [ResponseModality.AUDIO],
+          inputAudioTranscription:  {},
           outputAudioTranscription: {},
         },
-        systemInstruction: {
-          parts: [{
-            text: `You are HealthAI, a caring voice assistant for senior citizens 
-in Valenzuela City, Philippines (SCIA app). Speak simply and warmly. 
-Never diagnose — always recommend seeing a doctor for serious concerns. 
-If someone describes an emergency, tell them to call 911 or use the SOS button immediately.`,
-          }],
-        },
+        systemInstruction: SYSTEM_INSTRUCTION,
       });
 
-      setDiagnostic("Connecting to Gemini Live...");
+      safe.diag("Connecting to Gemini Live…");
       const session = await liveModel.connect();
-      sessionRef.current = session;
-      setStatus("connected");
-      setDiagnostic("Connected. Tap mic to speak.");
+      if (deadRef.current) { session.close(); return; }
 
+      sessionRef.current = session;
+      safe.status("connected");
+      safe.diag("Connected — tap the mic to speak.");
+
+      // Async receive loop — runs until session closes
       (async () => {
         try {
           for await (const message of session.receive()) {
+            if (deadRef.current || !sessionRef.current) break;
             await handleMessage(message);
           }
-          if (sessionRef.current) {
+          // Session ended gracefully
+          if (!deadRef.current && sessionRef.current) {
             sessionRef.current = null;
-            setStatus("idle");
-            setDiagnostic("Session ended.");
+            safe.status("idle");
+            safe.diag("Session ended.");
           }
-        } catch (err) {
-          if (sessionRef.current) {
+        } catch (err: any) {
+          if (!deadRef.current && sessionRef.current) {
             sessionRef.current = null;
-            setLastError(err instanceof Error ? err.message : "Session error.");
-            setStatus("error");
+            safe.error(err?.message ?? "Session error.");
+            safe.status("error");
+            safe.diag("Tap the mic to reconnect.");
           }
         }
       })();
-    } catch (err) {
+
+    } catch (err: any) {
       sessionRef.current = null;
-      setLastError(err instanceof Error ? err.message : "Failed to connect.");
-      setDiagnostic("Connection failed.");
-      setStatus("error");
+      safe.error(err?.message ?? "Failed to connect to Gemini Live.");
+      safe.status("error");
+      safe.diag("Connection failed. Tap the mic to retry.");
     }
-  }, [handleMessage]);
+  }, [handleMessage, safe]);
 
-  // ── Disconnect ─────────────────────────────────────────────────────────────
+  // ── Close session ────────────────────────────────────────────────────────
   const disconnect = useCallback(() => {
-    const session = sessionRef.current;
+    const s = sessionRef.current;
     sessionRef.current = null;
-    try { session?.close(); } catch {}
-    void clearAudioState();
-    setDiagnostic("");
-    setStatus("idle");
-  }, [clearAudioState]);
+    try { s?.close(); } catch {}
+    void clearAudio();
+    safe.status("idle");
+    safe.diag("");
+  }, [clearAudio, safe]);
 
+  // ── Cleanup on unmount ───────────────────────────────────────────────────
   useEffect(() => {
+    deadRef.current = false;
     return () => {
-      const session = sessionRef.current;
+      deadRef.current = true;
+      const s = sessionRef.current;
       sessionRef.current = null;
-      try { session?.close(); } catch {}
-      void clearAudioState();
+      try { s?.close(); } catch {}
+      isRecordingRef.current = false;
+      try { _stopRecording?.(); } catch {}
+      soundRef.current?.stopAsync().catch(() => {});
+      soundRef.current?.unloadAsync().catch(() => {});
     };
-  }, [clearAudioState]);
+  }, []);
 
-  // ── Start streaming mic → sendRealtimeAudio ────────────────────────────────
-  //
-  // KEY FIX: @siteed/audio-studio API
-  //   - Permissions: ExpoAudioStreamModule.requestPermissionsAsync()
-  //     returns { status: 'granted' | 'denied' | 'undetermined' }
-  //     (NOT { granted: boolean } like expo-av)
-  //   - Recording: startRecording({ ..., onAudioStream: callback })
-  //     The PCM stream callback goes INSIDE the config object, not via addAudioEventListener
-  //
+  // ── Start mic → stream PCM to Gemini Live ────────────────────────────────
   const startMicRecording = useCallback(async (): Promise<boolean> => {
     if (!sessionRef.current) {
-      setLastError("Connect first before recording.");
+      safe.error("Not connected — tap the mic button to connect first.");
       return false;
     }
-    if (isRecordingRef.current) return true;
+    if (isRecordingRef.current) return true; // already recording
 
-    if (!AudioStudioModule || !audioStudioStartRecording) {
-      setLastError(
-        "@siteed/audio-studio not available. Run: yarn add @siteed/audio-studio"
+    // ── Check that the native module is available ──────────────────────────
+    // If this error appears, the app needs a native rebuild:
+    //   npx expo run:android
+    // @siteed/audio-studio is a native module and won't work in Expo Go.
+    if (!ExpoAudioStreamModule || typeof _startRecording !== "function") {
+      safe.error(
+        "Microphone module not ready.\n\n" +
+        "Run: npx expo run:android\n" +
+        "Then restart the app.",
       );
+      safe.diag("Native rebuild required for microphone support.");
       return false;
     }
 
+    // ── Request microphone permission ──────────────────────────────────────
+    let granted = false;
     try {
-      // ── Request permissions ────────────────────────────────────────────────
-      // ExpoAudioStreamModule.requestPermissionsAsync() returns { status: string }
-      const permResult = await AudioStudioModule.requestPermissionsAsync();
-      const granted =
-        permResult?.status === "granted" ||
-        permResult?.granted === true; // fallback for older versions
-      if (!granted) {
-        setLastError("Microphone permission is required.");
-        return false;
-      }
+      const perm = await ExpoAudioStreamModule.requestPermissionsAsync();
+      granted = perm?.status === "granted" || perm?.granted === true;
+    } catch (err) {
+      safe.error("Failed to request microphone permission.");
+      return false;
+    }
 
-      await safeSetAudioMode({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
+    if (!granted) {
+      safe.error("Microphone permission denied. Enable it in device Settings → Apps → SCIA → Permissions.");
+      return false;
+    }
+
+    // ── Set audio mode for recording ───────────────────────────────────────
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS:         true,
+        playsInSilentModeIOS:       true,
+        shouldDuckAndroid:          true,
         playThroughEarpieceAndroid: false,
       });
+    } catch {
+      // Non-fatal — continue anyway
+    }
 
-      // ── Start recording with inline onAudioStream callback ─────────────────
-      // @siteed/audio-studio delivers PCM chunks via onAudioStream in the config.
-      // event.data is a base64-encoded PCM string, same format the Live API expects.
-      await audioStudioStartRecording({
-        sampleRate: MIC_SAMPLE_RATE,  // 16kHz — required by Gemini Live API
-        channels: 1,                  // mono
-        encoding: "pcm_16bit",        // 16-bit PCM
-        interval: 100,                // fire onAudioStream every 100ms
-        onAudioStream: async (event: { data: string; position?: number }) => {
+    // ── Begin streaming mic PCM to the session ─────────────────────────────
+    try {
+      await _startRecording({
+        sampleRate: MIC_SAMPLE_RATE,  // 16 kHz — required by Gemini Live
+        channels:   1,                // mono
+        encoding:   "pcm_16bit",
+        interval:   100,              // emit chunk every 100 ms
+        onAudioStream: (event: { data: string }) => {
           const session = sessionRef.current;
           if (!session || !event?.data) return;
           try {
             session.sendRealtimeAudio({
-              data: event.data,
+              data:     event.data,
               mimeType: `audio/pcm;rate=${MIC_SAMPLE_RATE}`,
             });
           } catch {
-            // Ignore individual chunk send errors — network hiccups are recoverable
+            // Ignore individual chunk errors — transient network blip
           }
         },
       });
-
-      isRecordingRef.current = true;
-      setIsRecording(true);
-      setInterrupted(false);
-      setDiagnostic("Listening… speak now. I'll respond automatically.");
-      return true;
-    } catch (err) {
-      isRecordingRef.current = false;
-      setIsRecording(false);
-      setLastError("Failed to start microphone.");
-      setDiagnostic(
-        err instanceof Error ? err.message : "Unknown recording error."
-      );
+    } catch (err: any) {
+      safe.error("Failed to start microphone recording.");
+      safe.diag(err?.message ?? "Unknown recording error.");
       return false;
     }
-  }, []);
 
-  // ── Stop streaming mic ─────────────────────────────────────────────────────
+    isRecordingRef.current = true;
+    safe.recording(true);
+    safe.interrupted(false);
+    safe.status("listening");
+    safe.diag("Listening… speak now. I'll reply when you stop.");
+    return true;
+  }, [safe]);
+
+  // ── Stop mic ─────────────────────────────────────────────────────────────
   const stopMicRecording = useCallback(async (): Promise<boolean> => {
     if (!isRecordingRef.current) return false;
+    isRecordingRef.current = false;
+    try { await _stopRecording?.(); } catch {}
+    safe.recording(false);
+    safe.status(sessionRef.current ? "connected" : "idle");
     try {
-      await audioStudioStopRecording?.();
-      isRecordingRef.current = false;
-      setIsRecording(false);
-      await safeSetAudioMode({
-        allowsRecordingIOS: false,
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS:   false,
         playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
+        shouldDuckAndroid:    true,
       });
-      setDiagnostic("Mic off.");
-      return true;
-    } catch (err) {
-      isRecordingRef.current = false;
-      setIsRecording(false);
-      setLastError("Failed to stop microphone.");
-      return false;
-    }
-  }, []);
+    } catch {}
+    safe.diag("Mic off — waiting for response…");
+    return true;
+  }, [safe]);
 
-  // ── Toggle (mic button in Voice.tsx) ──────────────────────────────────────
+  // ── Main tap handler ─────────────────────────────────────────────────────
+  // Behavior:
+  //   • Not connected → connect, then start mic once session is ready
+  //   • Recording     → stop mic
+  //   • Connected     → start mic
   const toggleMic = useCallback(async () => {
     if (!isConnected) {
+      // Connect first, then wait for the session ref to be populated before
+      // starting the mic. Polling is safer than a fixed setTimeout.
       await connect();
-      setTimeout(() => startMicRecording(), 600);
+
+      // Wait up to 8 s for the session to open
+      let waited = 0;
+      const POLL_MS  = 100;
+      const LIMIT_MS = 8_000;
+      await new Promise<void>((resolve) => {
+        const check = () => {
+          if (sessionRef.current || deadRef.current || waited >= LIMIT_MS) {
+            resolve();
+          } else {
+            waited += POLL_MS;
+            setTimeout(check, POLL_MS);
+          }
+        };
+        setTimeout(check, POLL_MS);
+      });
+
+      if (sessionRef.current) {
+        await startMicRecording();
+      }
       return;
     }
-    if (isRecording) {
+
+    if (isRecordingRef.current) {
       await stopMicRecording();
     } else {
       await startMicRecording();
     }
-  }, [isConnected, isRecording, connect, startMicRecording, stopMicRecording]);
+  }, [isConnected, connect, startMicRecording, stopMicRecording]);
 
-  const resetSession = useCallback(() => {
-    setInputTranscript("");
-    setOutputTranscript("");
-    setInterrupted(false);
-    setLastError("");
-    setDiagnostic("");
-    void clearAudioState();
-  }, [clearAudioState]);
+  // ── Reset transcripts / errors (for the header refresh button) ───────────
+  const resetTranscripts = useCallback(() => {
+    safe.inTx(""); safe.outTx("");
+    safe.interrupted(false); safe.error(""); safe.diag("");
+  }, [safe]);
 
-  return useMemo(
-    () => ({
-      status,
-      isConnected,
-      isRecording,
-      inputTranscript,
-      outputTranscript,
-      interrupted,
-      lastError,
-      diagnostic,
-      connect,
-      disconnect,
-      resetSession,
-      toggleMic,
-      startMicRecording,
-      stopMicRecording,
-    }),
-    [
-      status,
-      isConnected,
-      isRecording,
-      inputTranscript,
-      outputTranscript,
-      interrupted,
-      lastError,
-      diagnostic,
-      connect,
-      disconnect,
-      resetSession,
-      toggleMic,
-      startMicRecording,
-      stopMicRecording,
-    ],
-  );
-};
+  return useMemo(() => ({
+    status,
+    isConnected,
+    isRecording,
+    inputTranscript,
+    outputTranscript,
+    interrupted,
+    lastError,
+    diagnostic,
+    connect,
+    disconnect,
+    toggleMic,
+    startMicRecording,
+    stopMicRecording,
+    resetTranscripts,
+  }), [
+    status, isConnected, isRecording,
+    inputTranscript, outputTranscript,
+    interrupted, lastError, diagnostic,
+    connect, disconnect, toggleMic,
+    startMicRecording, stopMicRecording, resetTranscripts,
+  ]);
+}
