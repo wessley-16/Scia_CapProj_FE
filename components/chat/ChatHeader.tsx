@@ -3,7 +3,13 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-export default function ChatHeader({ fontScale }: { fontScale: number }) {
+export default function ChatHeader({
+  fontScale,
+  onHistoryPress,
+}: {
+  fontScale: number;
+  onHistoryPress: () => void;
+}) {
   const router = useRouter();
 
   return (
@@ -21,8 +27,12 @@ export default function ChatHeader({ fontScale }: { fontScale: number }) {
         <Text style={[styles.title, { fontSize: 18 * fontScale }]}>HealthAI Assistant</Text>
       </View>
 
-      <TouchableOpacity style={styles.iconButton}>
-        <Ionicons name="settings-sharp" size={24} color="#6b7280" />
+      <TouchableOpacity
+        style={styles.iconButton}
+        onPress={onHistoryPress}
+        accessibilityLabel="Chat history"
+      >
+        <Ionicons name="time-outline" size={24} color="#6b7280" />
       </TouchableOpacity>
     </View>
   );

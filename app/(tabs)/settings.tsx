@@ -1,9 +1,10 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
+import { useAuth } from "@/context/AuthContext";
+import { logoutUser } from "@/lib/firebase";
 
 const fontOptions = [
   { labelKey: "small", value: 0.75 },
@@ -19,6 +20,7 @@ const languageOptions = [
 export default function SettingsScreen() {
   const router = useRouter();
   const { fontScale, language, setFontScale, setLanguage, t } = useSettings();
+  const { clearUser } = useAuth();
 
   const handleSaveChanges = () => {
     // All changes are automatically persisted via AsyncStorage
@@ -34,13 +36,8 @@ export default function SettingsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await AsyncStorage.multiRemove([
-              "userName",
-              "userBarangay",
-              "userId",
-              "userImage",
-            ]);
-
+            await logoutUser(); // sign out of Firebase — this was previously missing,
+            clearUser();        // which left the session active behind the scenes
             router.replace("/"); // go back to login
           } catch (error) {
             console.log("Logout error:", error);

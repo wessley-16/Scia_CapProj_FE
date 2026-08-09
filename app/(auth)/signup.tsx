@@ -1,9 +1,10 @@
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { registerUser, submitIDRequest } from "@/lib/firebase";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -21,7 +22,23 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Signup() {
   const router = useRouter();
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const { t } = useSettings();
+
+  // This screen is a real route and can be reached directly (deep link, a
+  // stale nav stack, etc.), not just via the "Sign-up" button on the login
+  // screen — so it needs its own guard against creating a second account
+  // while one is already signed in, rather than relying on the caller to
+  // have checked first.
+  useEffect(() => {
+    if (user) {
+      Alert.alert(
+        t("alreadySignedInTitle"),
+        `${t("alreadySignedInPrefix")} ${`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.idNumber}. ${t("pleaseLogOutFirst")}`,
+      );
+      router.replace("/");
+    }
+  }, [user]);
 
   const [idImage, setIdImage] = useState<any>(null);
   const [firstName, setFirstName] = useState("");
@@ -72,6 +89,13 @@ export default function Signup() {
   const formatStoredDate = (date: Date) => date.toLocaleDateString();
 
   const handleSignup = async () => {
+    if (user) {
+      Alert.alert(
+        t("alreadySignedInTitle"),
+        `${t("alreadySignedInPrefix")} ${`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.idNumber}. ${t("pleaseLogOutFirst")}`,
+      );
+      return;
+    }
     if (
       !firstName ||
       !midName ||

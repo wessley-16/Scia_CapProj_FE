@@ -2,8 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -66,35 +69,22 @@ const getBarangayFromCoords = (lat: number, lng: number): string => {
   return closest.name;
 };
 
-const buildLeafletHTML = (lat: number, lng: number) => `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body, #map { width: 100%; height: 100%; }
-  </style>
-</head>
-<body>
-  <div id="map"></div>
-  <script>
-    var map = L.map('map', { zoomControl: true, attributionControl: false })
-               .setView([${lat}, ${lng}], 16);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-    var redIcon = L.icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-      iconSize: [25, 41], iconAnchor: [12, 41], shadowSize: [41, 41],
-    });
-    L.marker([${lat}, ${lng}], { icon: redIcon }).addTo(map).bindPopup('Your Location').openPopup();
-  </script>
-</body>
-</html>
-`;
+// Google's own free "embed" endpoint — no API key needed. It's a single,
+// self-contained page from Google's own servers, unlike the old Leaflet
+// setup which had to separately load leaflet.js, leaflet.css, tile images,
+// and marker-icon images from three different third-party CDNs (unpkg,
+// OpenStreetMap, GitHub, cdnjs) — if any one of those failed to load on a
+// spotty connection, the marker or the whole map showed up as a broken image.
+const buildGoogleMapsEmbedUrl = (lat: number, lng: number) =>
+  `https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
+
+const buildGoogleMapsAppUrl = (lat: number, lng: number) =>
+  Platform.OS === 'ios'
+    ? `maps:0,0?q=${lat},${lng}`
+    : `geo:${lat},${lng}?q=${lat},${lng}(SOS+Location)`;
+
+const buildGoogleMapsWebUrl = (lat: number, lng: number) =>
+  `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
 export default function EmergencyScreen() {
   const { fontScale, t } = useSettings();
@@ -120,6 +110,7 @@ export default function EmergencyScreen() {
   const sosUnsubRef = useRef<(() => void) | null>(null);
 
   const [mapKey, setMapKey] = useState(0);
+  const [mapLoadFailed, setMapLoadFailed] = useState(false);
 
   useEffect(() => {
     fetchLocation();
@@ -152,6 +143,7 @@ export default function EmergencyScreen() {
     const loc = await Location.getCurrentPositionAsync({});
     const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
     setLocation(coords);
+    setMapLoadFailed(false);
     setMapKey(k => k + 1);
 
     const geo = await Location.reverseGeocodeAsync(loc.coords);
@@ -160,6 +152,19 @@ export default function EmergencyScreen() {
       setFullAddress(`${place.street || ''}, ${place.city || ''}`);
       setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
     }
+  };
+
+  const handleRetryMap = () => {
+    setMapLoadFailed(false);
+    setMapKey(k => k + 1);
+  };
+
+  const openInMapsApp = () => {
+    if (!location) return;
+    const appUrl = buildGoogleMapsAppUrl(location.latitude, location.longitude);
+    Linking.openURL(appUrl).catch(() => {
+      Linking.openURL(buildGoogleMapsWebUrl(location.latitude, location.longitude));
+    });
   };
 
   const startHold = () => {
@@ -286,16 +291,41 @@ export default function EmergencyScreen() {
             <Ionicons name="location-outline" size={14} color="#C0181F" /> Your pinned location
           </Text>
           <View style={styles.mapWrapper}>
-            {location ? (
+            {mapLoadFailed ? (
+              <View style={styles.mapPlaceholder}>
+                <Ionicons name="cloud-offline-outline" size={36} color="#C0181F" style={{ opacity: 0.5, marginBottom: 8 }} />
+                <Text style={[styles.mapPlaceholderText, { fontSize: 14 * fontScale, textAlign: 'center', paddingHorizontal: 16 }]}>
+                  {t('mapLoadFailed')}
+                </Text>
+                <View style={styles.mapRetryRow}>
+                  <TouchableOpacity style={styles.mapRetryBtn} onPress={handleRetryMap}>
+                    <Ionicons name="refresh" size={16} color="#C0181F" />
+                    <Text style={[styles.mapRetryBtnText, { fontSize: 13 * fontScale }]}>{t('retry')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.mapRetryBtn} onPress={openInMapsApp}>
+                    <Ionicons name="open-outline" size={16} color="#C0181F" />
+                    <Text style={[styles.mapRetryBtnText, { fontSize: 13 * fontScale }]}>{t('openInMaps')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : location ? (
               <WebView
                 key={mapKey}
-                source={{ html: buildLeafletHTML(location.latitude, location.longitude) }}
+                source={{ uri: buildGoogleMapsEmbedUrl(location.latitude, location.longitude) }}
                 style={styles.map}
                 originWhitelist={['*']}
                 javaScriptEnabled
                 domStorageEnabled
                 scrollEnabled={false}
                 overScrollMode="never"
+                startInLoadingState
+                renderLoading={() => (
+                  <View style={styles.mapPlaceholder}>
+                    <ActivityIndicator color="#C0181F" />
+                  </View>
+                )}
+                onError={() => setMapLoadFailed(true)}
+                onHttpError={() => setMapLoadFailed(true)}
               />
             ) : (
               <View style={styles.mapPlaceholder}>
@@ -415,6 +445,9 @@ const styles = StyleSheet.create({
   map:                  { flex: 1 },
   mapPlaceholder:       { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
   mapPlaceholderText:   { color: '#9CA3AF', fontSize: 14 },
+  mapRetryRow:          { flexDirection: 'row', marginTop: 12, gap: 10 },
+  mapRetryBtn:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#C0181F', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
+  mapRetryBtnText:      { color: '#C0181F', fontWeight: '700' },
   refreshBtn:           { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#C0181F', borderRadius: 22, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', elevation: 4 },
 
   // Info card

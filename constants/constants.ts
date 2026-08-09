@@ -18,8 +18,10 @@ export const REGISTER_API_URL = `${BASE_URL}/api/users/register`;
 
 // Chat
 export const CHATBOT_API_URL = `${BASE_URL}/api/chat`;
-export const CHATBOT_STORAGE_KEY = "@scia/chatbot/conversation";
-export const MAX_CHATBOT_MESSAGES = 60;
+export const CHATBOT_STORAGE_KEY = "@scia/chatbot/conversation"; // legacy single-thread key, kept only for one-time migration
+export const CHATBOT_SESSIONS_KEY_PREFIX = "@scia/chatbot/sessions/"; // + scope (uid or "guest")
+export const MAX_CHATBOT_MESSAGES = 60; // cap per conversation
+export const MAX_CHAT_SESSIONS = 30; // cap on saved conversations per account
 
 // Emergency
 export const EMERGENCY_SMS_URL = `${BASE_URL}/api/emergency/send-sms`;

@@ -29,7 +29,7 @@ interface SettingsProviderProps {
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
   const [fontScale, setFontScaleState] = useState<number>(1); // Default to medium
-  const [language, setLanguageState] = useState<string>('en'); // Default to English
+  const [language, setLanguageState] = useState<string>('tl'); // Default to Tagalog — most SCIA users are Filipino seniors
 
   // Persistence logic (unchanged)
   useEffect(() => {
@@ -172,6 +172,41 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         scheduleLabel: 'Schedule:',
         nextDose: 'Next Dose:',
         markTakenNow: 'Mark as Taken Now',
+        // Login / welcome screen
+        logIn: 'Log In',
+        submit: 'Submit',
+        signUp: 'Sign-up',
+        guest: 'Guest',
+        idOrNamePlaceholder: 'ID Number, Full Name, or Phone Number',
+        passwordPlaceholder: 'Password',
+        loginHintTitle: '💡 You can log in using your:',
+        loginHintId: '• 6-digit OSCA ID number',
+        loginHintPhone: '• Phone number (e.g. 09955015206)',
+        loginHintFullName: '• Full name (e.g. Juan Santos Cruz)',
+        loginHintFirstLast: '• First + Last name (e.g. Juan Cruz)',
+        welcomeBack: 'Welcome back!',
+        continueAs: 'Continue as',
+        continueButton: 'Continue',
+        notYouLogOut: 'Not you? Log out',
+        logOutConfirmTitle: 'Log Out',
+        logOutConfirmMessage: 'Log out from this account?',
+        // Already-signed-in guard
+        alreadySignedInTitle: 'Already Signed In',
+        alreadySignedInPrefix: "You're already signed in as",
+        pleaseLogOutFirst: 'Please log out first to continue.',
+        // Exit-app dialog
+        exitAppTitle: 'Exit SCIA?',
+        exitAppMessageLoggedIn: 'Do you want to log out before exiting?',
+        exitAppMessageGuest: 'Are you sure you want to exit?',
+        exitWithoutLogout: 'Exit Without Logging Out',
+        logOutAndExit: 'Log Out & Exit',
+        exitApp: 'Exit',
+        // Settings-from-login button
+        languageAndFont: 'Language & Font',
+        // Map fallback
+        mapLoadFailed: 'Map could not load. Check your internet connection.',
+        retry: 'Retry',
+        openInMaps: 'Open in Maps',
       },
       tl: {
         fontSize: 'Laki ng Font',
@@ -277,6 +312,41 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         scheduleLabel: 'Schedule:',
         nextDose: 'Next Dose:',
         markTakenNow: 'Markahan na nainom na',
+        // Login / welcome screen
+        logIn: 'Mag-log In',
+        submit: 'I-submit',
+        signUp: 'Mag-sign Up',
+        guest: 'Bisita',
+        idOrNamePlaceholder: 'ID Number, Buong Pangalan, o Numero ng Telepono',
+        passwordPlaceholder: 'Password',
+        loginHintTitle: '💡 Maaari kang mag-log in gamit ang:',
+        loginHintId: '• 6-digit na numero ng OSCA ID',
+        loginHintPhone: '• Numero ng telepono (hal. 09955015206)',
+        loginHintFullName: '• Buong pangalan (hal. Juan Santos Cruz)',
+        loginHintFirstLast: '• Pangalan + Apelyido (hal. Juan Cruz)',
+        welcomeBack: 'Maligayang pagbabalik!',
+        continueAs: 'Magpatuloy bilang',
+        continueButton: 'Magpatuloy',
+        notYouLogOut: 'Hindi ikaw? Mag-log out',
+        logOutConfirmTitle: 'Mag-log Out',
+        logOutConfirmMessage: 'Mag-log out mula sa account na ito?',
+        // Already-signed-in guard
+        alreadySignedInTitle: 'May Naka-sign In Na',
+        alreadySignedInPrefix: 'Naka-sign in ka na bilang',
+        pleaseLogOutFirst: 'Mangyaring mag-log out muna para magpatuloy.',
+        // Exit-app dialog
+        exitAppTitle: 'Lumabas sa SCIA?',
+        exitAppMessageLoggedIn: 'Gusto mo bang mag-log out bago lumabas?',
+        exitAppMessageGuest: 'Sigurado ka bang gusto mong lumabas?',
+        exitWithoutLogout: 'Lumabas Nang Hindi Nag-log Out',
+        logOutAndExit: 'Mag-log Out at Lumabas',
+        exitApp: 'Lumabas',
+        // Settings-from-login button
+        languageAndFont: 'Wika at Font',
+        // Map fallback
+        mapLoadFailed: 'Hindi ma-load ang mapa. I-check ang iyong internet connection.',
+        retry: 'Subukan Muli',
+        openInMaps: 'Buksan sa Maps',
       },
     };
     const langMap = translations[language] || translations.en;

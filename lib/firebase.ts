@@ -22,10 +22,15 @@ import {
   FieldValue,
 } from "@react-native-firebase/firestore";
 import { getStorage } from "@react-native-firebase/storage";
+import { initAppCheck } from "./appCheck";
 
 const auth = getAuth();
 const db = getFirestore();
 export const storage = getStorage();
+
+// Must run before any AI Logic (Gemini) call — see lib/appCheck.ts for the
+// remaining console-side setup this still needs.
+initAppCheck();
 
 // ── Helper: build a synthetic email from idNumber ────────────────────────────
 export const idToEmail = (idNumber: string) => {

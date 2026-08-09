@@ -4,11 +4,11 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
-import { Animated, Dimensions, Image, ImageBackground, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — replaces http://10.142.254.160:3000/api/events
-import { subscribeToEvents, Event as FirebaseEvent } from "@/lib/firebase";
+import { subscribeToEvents, Event as FirebaseEvent, logoutUser } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Medicine } from "@/interfaces/interfaces";
 
@@ -16,7 +16,7 @@ const background = require("../../assets/images/Foreground.png");
 
 export default function Home() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest, clearUser } = useAuth();
   const name = user ? (`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Sa inyo") : "Sa inyo";
   const idNumber = user?.idNumber ?? "No ID";
   const tabBarHeight = useBottomTabBarHeight();
@@ -249,6 +249,55 @@ export default function Home() {
       loadJoinedEvents();
       loadNotifications();
     }, [loadProfileImage, loadNextMedicine, loadEvents])
+  );
+
+  /* ---------------- EXIT CONFIRMATION (hardware back button) ---------------- */
+  // Home is the app's root screen — pressing back here would otherwise close
+  // SCIA immediately with no chance to log out first. Android only; iOS has
+  // no hardware back button so this listener simply never fires there.
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== "android") return;
+
+      const onBackPress = () => {
+        if (user && !isGuest) {
+          Alert.alert(t("exitAppTitle"), t("exitAppMessageLoggedIn"), [
+            { text: t("cancel"), style: "cancel" },
+            {
+              text: t("exitWithoutLogout"),
+              style: "default",
+              onPress: () => {
+                // Do nothing to the session — Firebase keeps it persisted so
+                // the account is still there ("Welcome back") next launch.
+                BackHandler.exitApp();
+              },
+            },
+            {
+              text: t("logOutAndExit"),
+              style: "destructive",
+              onPress: async () => {
+                await logoutUser();
+                clearUser();
+                BackHandler.exitApp();
+              },
+            },
+          ]);
+        } else {
+          Alert.alert(t("exitAppTitle"), t("exitAppMessageGuest"), [
+            { text: t("cancel"), style: "cancel" },
+            {
+              text: t("exitApp"),
+              style: "destructive",
+              onPress: () => BackHandler.exitApp(),
+            },
+          ]);
+        }
+        return true; // prevent default back behavior (which would exit silently)
+      };
+
+      const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+      return () => subscription.remove();
+    }, [user, isGuest])
   );
 
   /* ---------------- UI ---------------- */

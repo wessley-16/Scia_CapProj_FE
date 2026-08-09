@@ -33,9 +33,27 @@ export interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
+  isGuest: boolean;
   refreshUser: () => Promise<void>;
   clearUser: () => void;
+  enterGuestMode: () => Promise<void>;
 }
+
+// All AsyncStorage keys that cache data belonging to a specific signed-in
+// account. These must be wiped whenever we sign out or switch to Guest mode,
+// otherwise the next person to use the device (or Guest mode itself) can see
+// the previous user's cached name/barangay/medicines/etc.
+const USER_CACHE_KEYS = [
+  "user",
+  "userId",
+  "userName",
+  "userBarangay",
+  "userDistrict",
+  "profileImage",
+  "notifications",
+  "medicines",
+  "joinedEvents",
+];
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -55,6 +73,7 @@ const db = getFirestore();
 export const AuthProvider: React.FC<Props> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
 
   const fetchUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
@@ -93,31 +112,35 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   const clearUser = () => {
     setUser(null);
-    AsyncStorage.multiRemove([
-      "user",
-      "userId",
-      "userName",
-      "userBarangay",
-      "userDistrict",
-    ]);
+    setIsGuest(false);
+    AsyncStorage.multiRemove(USER_CACHE_KEYS);
+  };
+
+  // Explicitly enter Guest mode. This is only ever safe to call when there is
+  // no active Firebase session (callers must check `user` first) — it wipes
+  // any leftover cached profile data so Guest mode never shows a previous
+  // account's name, barangay, medicines, etc.
+  const enterGuestMode = async () => {
+    setUser(null);
+    setIsGuest(true);
+    await AsyncStorage.multiRemove(USER_CACHE_KEYS);
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(authInstance, async (firebaseUser) => {
       if (firebaseUser) {
+        // A real account is authenticated with Firebase — Guest mode can't
+        // coexist with a signed-in session.
+        setIsGuest(false);
         const profile = await fetchUserProfile(firebaseUser.uid);
         setUser(profile);
       } else {
-        const stored = await AsyncStorage.getItem("user");
-        if (stored) {
-          try {
-            setUser(JSON.parse(stored));
-          } catch {
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
+        // Firebase says nobody is authenticated. Previously this fell back to
+        // whatever profile happened to still be cached in AsyncStorage, which
+        // is what caused Guest mode (and a fresh sign-out) to incorrectly show
+        // the last logged-in account. There is no session, so there is no
+        // user — full stop.
+        setUser(null);
       }
       setLoading(false);
     });
@@ -125,7 +148,9 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, refreshUser, clearUser }}>
+    <AuthContext.Provider
+      value={{ user, loading, isGuest, refreshUser, clearUser, enterGuestMode }}
+    >
       {children}
     </AuthContext.Provider>
   );
