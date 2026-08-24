@@ -252,9 +252,22 @@ export interface Event {
   Status?: string;
   // Present only on events the admin marked as joinable (e.g. medical
   // checkup, free medicine, ayuda). Absent/empty = a plain announcement
-  // with no signup — Join just shows an instant RSVP, no form.
+  // with no signup — Join just shows an instant RSVP, no form. Simple
+  // announcements (from the ANNOUNCEMENTS collection) never have this.
   formFields?: EventFormField[];
   FormFields?: EventFormField[]; // tolerate either casing from the admin app
+  isJoinable?: boolean;
+}
+
+// Firestore's serverTimestamp() comes back as a Timestamp object (with
+// .toMillis()) from a live snapshot, but can also arrive as a plain
+// {seconds, nanoseconds} shape in some cached/offline cases — this handles
+// both, and treats a missing timestamp as "oldest" rather than throwing.
+function toMillis(ts: any): number {
+  if (!ts) return 0;
+  if (typeof ts.toMillis === "function") return ts.toMillis();
+  if (typeof ts.seconds === "number") return ts.seconds * 1000;
+  return 0;
 }
 
 function filterEvents(docs: any[], barangay?: string | null, district?: string | null): Event[] {
@@ -273,17 +286,28 @@ function filterEvents(docs: any[], barangay?: string | null, district?: string |
       if (audience === "DISTRICT_2" && district === "DISTRICT_2") return true;
       if (audience === "BARANGAY" && barangay === event.barangay) return true;
       return false;
-    });
+    })
+    // Merging two collections means Firestore's own per-query ordering no
+    // longer guarantees a globally sorted result — re-sort explicitly so
+    // announcements and joinable events interleave correctly by recency.
+    .sort((a, b) => toMillis((b as any).createdAt) - toMillis((a as any).createdAt));
 }
 
+// Both the joinable-events collection (editorial_health) and the simple
+// announcements collection (announcements) use the same field shape —
+// Title/Body/Location/Date/Audience/etc — so they can be merged directly.
+// Only editorial_health documents will ever have formFields/isJoinable set;
+// plain announcements simply won't, and the UI already treats an event with
+// no formFields as a no-signup announcement.
 export async function fetchEvents(
   barangay?: string | null,
   district?: string | null,
 ): Promise<Event[]> {
-  const snapshot = await getDocs(
-    query(collection(db, COLLECTIONS.EVENTS), orderBy("createdAt", "desc")),
-  );
-  return filterEvents(snapshot.docs, barangay, district);
+  const [eventsSnap, announcementsSnap] = await Promise.all([
+    getDocs(query(collection(db, COLLECTIONS.EVENTS), orderBy("createdAt", "desc"))),
+    getDocs(query(collection(db, COLLECTIONS.ANNOUNCEMENTS), orderBy("createdAt", "desc"))),
+  ]);
+  return filterEvents([...eventsSnap.docs, ...announcementsSnap.docs], barangay, district);
 }
 
 export function subscribeToEvents(
@@ -291,26 +315,50 @@ export function subscribeToEvents(
   district: string | null,
   callback: (events: Event[]) => void,
 ) {
-  let unsubscribeSnapshot: (() => void) | null = null;
+  let unsubEventsSnapshot: (() => void) | null = null;
+  let unsubAnnouncementsSnapshot: (() => void) | null = null;
+
+  // Each collection's listener only knows about ITS OWN docs — we keep the
+  // latest snapshot from each side and re-merge/re-filter/re-emit whenever
+  // either one fires, so a change in either collection updates the list.
+  let latestEventDocs: any[] = [];
+  let latestAnnouncementDocs: any[] = [];
+
+  const emit = () => {
+    callback(filterEvents([...latestEventDocs, ...latestAnnouncementDocs], barangay, district));
+  };
 
   const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-    if (unsubscribeSnapshot) {
-      unsubscribeSnapshot();
-      unsubscribeSnapshot = null;
-    }
+    unsubEventsSnapshot?.();
+    unsubAnnouncementsSnapshot?.();
+    unsubEventsSnapshot = null;
+    unsubAnnouncementsSnapshot = null;
+    latestEventDocs = [];
+    latestAnnouncementDocs = [];
+
     if (!user) return;
 
-    unsubscribeSnapshot = onSnapshot(
+    unsubEventsSnapshot = onSnapshot(
       query(collection(db, COLLECTIONS.EVENTS), orderBy("createdAt", "desc")),
       (snapshot) => {
-        callback(filterEvents(snapshot.docs, barangay, district));
+        latestEventDocs = snapshot.docs;
+        emit();
+      },
+    );
+
+    unsubAnnouncementsSnapshot = onSnapshot(
+      query(collection(db, COLLECTIONS.ANNOUNCEMENTS), orderBy("createdAt", "desc")),
+      (snapshot) => {
+        latestAnnouncementDocs = snapshot.docs;
+        emit();
       },
     );
   });
 
   return () => {
     unsubscribeAuth();
-    if (unsubscribeSnapshot) unsubscribeSnapshot();
+    unsubEventsSnapshot?.();
+    unsubAnnouncementsSnapshot?.();
   };
 }
 
@@ -329,6 +377,11 @@ export function subscribeToEvents(
 //      registered, and marks checkedIn true.
 // The QR code itself never changes — it's just "who is this person". The
 // event-specific part lives entirely in Firestore, keyed by uid.
+//
+// NOTE: attendance/joining only makes sense for editorial_health documents
+// (the ones with formFields/isJoinable) — plain announcements have no
+// attendees subcollection, so joinEvent should only ever be called for
+// events that came from COLLECTIONS.EVENTS, not COLLECTIONS.ANNOUNCEMENTS.
 
 export interface EventAttendee {
   uid: string;

@@ -78,6 +78,30 @@ const getBarangayFromCoords = (lat: number, lng: number): string => {
 const buildGoogleMapsEmbedUrl = (lat: number, lng: number) =>
   `https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
 
+// Wraps the embed URL in an actual <iframe>. A WebView loads a URL as the
+// TOP-LEVEL document, not nested inside a real iframe — Google's embed
+// endpoint detects that and rejects it with "must be used in an iframe".
+// Loading this tiny local HTML shell instead (which DOES contain a real
+// iframe pointing at the embed URL) satisfies that check.
+const buildGoogleMapsEmbedHtml = (lat: number, lng: number) => `
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <style>
+        html, body, iframe { margin: 0; padding: 0; width: 100%; height: 100%; border: 0; }
+      </style>
+    </head>
+    <body>
+      <iframe
+        src="${buildGoogleMapsEmbedUrl(lat, lng)}"
+        allowfullscreen
+        loading="lazy"
+      ></iframe>
+    </body>
+  </html>
+`;
+
 const buildGoogleMapsAppUrl = (lat: number, lng: number) =>
   Platform.OS === 'ios'
     ? `maps:0,0?q=${lat},${lng}`
@@ -311,7 +335,7 @@ export default function EmergencyScreen() {
             ) : location ? (
               <WebView
                 key={mapKey}
-                source={{ uri: buildGoogleMapsEmbedUrl(location.latitude, location.longitude) }}
+                source={{ html: buildGoogleMapsEmbedHtml(location.latitude, location.longitude) }}
                 style={styles.map}
                 originWhitelist={['*']}
                 javaScriptEnabled
