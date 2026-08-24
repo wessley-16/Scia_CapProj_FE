@@ -240,6 +240,42 @@ export const useChatbot = () => {
     [updateActiveSession],
   );
 
+  // Appends a chunk of text to the LAST message in place (same id, same
+  // position) instead of adding a new message — this is what lets a
+  // streamed reply grow smoothly in the UI instead of appearing as one
+  // big block once the whole response has arrived.
+  const appendToLastMessage = useCallback(
+    (chunk: string) => {
+      updateActiveSession((session) => {
+        const msgs = session.messages;
+        const last = msgs[msgs.length - 1];
+        if (!last || last.role !== "assistant") return session; // safety guard
+        const updated = [
+          ...msgs.slice(0, -1),
+          { ...last, text: last.text + chunk },
+        ];
+        return { ...session, messages: updated, updatedAt: Date.now() };
+      });
+    },
+    [updateActiveSession],
+  );
+
+  // Replaces the LAST message's text outright — used for the "No
+  // response." / error fallback so we fill the already-visible empty
+  // bubble instead of leaving it stranded and adding a second one.
+  const setLastMessageText = useCallback(
+    (text: string) => {
+      updateActiveSession((session) => {
+        const msgs = session.messages;
+        const last = msgs[msgs.length - 1];
+        if (!last || last.role !== "assistant") return session;
+        const updated = [...msgs.slice(0, -1), { ...last, text }];
+        return { ...session, messages: updated, updatedAt: Date.now() };
+      });
+    },
+    [updateActiveSession],
+  );
+
   const sendMessage = async (message: string) => {
     const trimmed = message.trim();
     if (!trimmed || loading) return;
@@ -261,24 +297,32 @@ export const useChatbot = () => {
     addMessage("user", trimmed);
     setLoading(true);
 
+    // Seed an empty assistant bubble right away — every chunk that arrives
+    // (streaming path) or the eventual full reply (fallback paths) fills
+    // THIS SAME bubble instead of appending a new one each time.
+    addMessage("assistant", "");
+
     try {
       const result = await chatRef.current.sendMessageStream(trimmed);
       let reply = "";
       for await (const chunk of result.stream) {
-        reply += chunk.text();
+        const text = chunk.text();
+        reply += text;
+        appendToLastMessage(text);
       }
-      addMessage("assistant", reply.trim() || "No response.");
+      if (!reply.trim()) {
+        setLastMessageText("No response.");
+      }
     } catch (streamErr) {
       console.warn("Stream failed, trying non-stream:", streamErr);
       try {
         const result = await chatRef.current.sendMessage(trimmed);
         const reply = result.response.text();
-        addMessage("assistant", reply.trim() || "No response.");
+        setLastMessageText(reply.trim() || "No response.");
       } catch (err) {
         console.error("HealthAI error:", err);
         chatRef.current = null; // reset broken session — fresh one on next send
-        addMessage(
-          "assistant",
+        setLastMessageText(
           "I'm having trouble connecting. Please check your internet and try again. 😊",
         );
       }

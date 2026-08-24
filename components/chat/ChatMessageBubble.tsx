@@ -1,6 +1,6 @@
 // components/chat/ChatMessageBubble.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from "react";
+import React, { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ChatMessage } from "@/hooks/useChatbot";
 import MarkdownText from "@/components/chat/Markdowntext";
@@ -17,7 +17,7 @@ interface ChatMessageBubbleProps {
   fontScale: number;
 }
 
-export default function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
+function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -78,6 +78,16 @@ export default function ChatMessageBubble({ message, fontScale }: ChatMessageBub
     </View>
   );
 }
+
+// Memoized so FlatList only re-renders bubbles whose actual content
+// changed — without this, every state update anywhere in the chat (a new
+// streamed chunk, a session swap, etc.) re-renders EVERY bubble in the
+// list, which is what was causing the visible lag/jank.
+export default memo(ChatMessageBubble, (prev, next) =>
+  prev.message.id === next.message.id &&
+  prev.message.text === next.message.text &&
+  prev.fontScale === next.fontScale,
+);
 
 const styles = StyleSheet.create({
   container: {
