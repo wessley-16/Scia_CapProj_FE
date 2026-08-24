@@ -19,6 +19,7 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
+  writeBatch,
   FieldValue,
 } from "@react-native-firebase/firestore";
 import { getStorage } from "@react-native-firebase/storage";
@@ -222,6 +223,17 @@ export async function loginByIdentifier(identifier: string, password: string) {
 }
 
 // ── EVENTS ────────────────────────────────────────────────────────────────────
+// A single field in an event's admin-defined signup form — e.g. for a
+// medical checkup event the admin might add a "Current medications" text
+// field, or for an ayuda distribution a "Household size" number field.
+export interface EventFormField {
+  id: string; // stable key — used as the answer's key in formResponses
+  label: string;
+  type: "text" | "number" | "textarea" | "select";
+  options?: string[]; // required when type === "select"
+  required?: boolean;
+}
+
 export interface Event {
   id: string;
   Title?: string;
@@ -238,6 +250,11 @@ export interface Event {
   expiration?: string | null;
   createdAt?: any;
   Status?: string;
+  // Present only on events the admin marked as joinable (e.g. medical
+  // checkup, free medicine, ayuda). Absent/empty = a plain announcement
+  // with no signup — Join just shows an instant RSVP, no form.
+  formFields?: EventFormField[];
+  FormFields?: EventFormField[]; // tolerate either casing from the admin app
 }
 
 function filterEvents(docs: any[], barangay?: string | null, district?: string | null): Event[] {
@@ -295,6 +312,86 @@ export function subscribeToEvents(
     unsubscribeAuth();
     if (unsubscribeSnapshot) unsubscribeSnapshot();
   };
+}
+
+// ── EVENT ATTENDANCE / QR CHECK-IN ──────────────────────────────────────────
+//
+// How this connects to the QR code shown on the senior's profile:
+//   1. Signing in gives every senior a stable identity (their Firebase uid).
+//      Their profile screen renders that identity as a QR code (see
+//      buildUserQRPayload below) — it's the SAME code every time, not
+//      regenerated per event.
+//   2. Tapping "Join" on an event writes a record under that event marking
+//      this senior as a registered attendee (joinEvent below).
+//   3. At the event, an admin scans the senior's QR code with the SCIA Admin
+//      app (separate repo). It reads the uid out of the payload, looks up
+//      editorial_health/{eventId}/attendees/{uid}, confirms they're
+//      registered, and marks checkedIn true.
+// The QR code itself never changes — it's just "who is this person". The
+// event-specific part lives entirely in Firestore, keyed by uid.
+
+export interface EventAttendee {
+  uid: string;
+  name: string;
+  barangay?: string | null;
+  idNumber?: string | null;
+  joinedAt?: any;
+  checkedIn: boolean;
+  checkedInAt?: any;
+  // Answers to the event's admin-defined signup form, if it has one — keyed
+  // by EventFormField.id. Empty/absent for events with no form.
+  formResponses?: Record<string, string>;
+}
+
+// Called when a senior taps "Join" on an event. Writes two records in one
+// atomic batch:
+//   • editorial_health/{eventId}/attendees/{uid} — what the admin scanner
+//     looks up when it scans this senior's QR code at the event. Includes
+//     their signup form answers, if the event had a form.
+//   • users/{uid}/joinedEvents/{eventId} — a fast local mirror so the app
+//     itself can show "Joined ✅" without a collection-group query.
+export async function joinEvent(
+  eventId: string,
+  profile: { uid: string; name: string; barangay?: string | null; idNumber?: string | null },
+  formResponses?: Record<string, string>,
+): Promise<void> {
+  const batch = writeBatch(db);
+
+  const attendeeRef = doc(db, COLLECTIONS.EVENTS, eventId, "attendees", profile.uid);
+  batch.set(attendeeRef, {
+    uid: profile.uid,
+    name: profile.name,
+    barangay: profile.barangay ?? null,
+    idNumber: profile.idNumber ?? null,
+    joinedAt: serverTimestamp(),
+    checkedIn: false,
+    formResponses: formResponses ?? {},
+  });
+
+  const mirrorRef = doc(db, COLLECTIONS.USERS, profile.uid, "joinedEvents", eventId);
+  batch.set(mirrorRef, { joinedAt: serverTimestamp() });
+
+  await batch.commit();
+}
+
+// Which events has this senior already joined? Used on Home screen mount so
+// the button shows "Joined ✅" instead of "Join" for events already RSVP'd.
+export async function fetchJoinedEventIds(uid: string): Promise<string[]> {
+  const snapshot = await getDocs(collection(db, COLLECTIONS.USERS, uid, "joinedEvents"));
+  return snapshot.docs.map((d) => d.id);
+}
+
+// The payload encoded in the senior's profile QR code. Kept as a small,
+// self-describing JSON string (rather than a bare uid) so the admin scanner
+// can tell at a glance this is a SCIA check-in code and not something else,
+// and has a human-readable idNumber alongside the authoritative uid for
+// display/debugging on the admin side.
+export function buildUserQRPayload(profile: { uid: string; idNumber?: string | null }): string {
+  return JSON.stringify({
+    type: "scia_checkin",
+    uid: profile.uid,
+    idNumber: profile.idNumber ?? null,
+  });
 }
 
 // ── SOS / EMERGENCY ───────────────────────────────────────────────────────────

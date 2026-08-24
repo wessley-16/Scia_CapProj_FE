@@ -19,10 +19,11 @@ import {
   View,
   StatusBar,
 } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
-import { submitIDRequest, logoutUser } from "@/lib/firebase";
+import { submitIDRequest, logoutUser, buildUserQRPayload } from "@/lib/firebase";
 
 // ─── Colour tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -295,6 +296,31 @@ export default function Account() {
             </View>
           )}
         </View>
+
+        {/* ── QR code card: identity for event check-in ──────────────────── */}
+        {user && (
+          <View style={s.sectionCard}>
+            <View style={s.sectionHeader}>
+              <Ionicons name="qr-code-outline" size={22} color={C.primary} />
+              <Text style={s.sectionTitle}>My QR Code</Text>
+            </View>
+
+            <Text style={s.qrDescription}>
+              Show this at SCIA events so staff can check you in after you join.
+            </Text>
+
+            <View style={s.qrWrapper}>
+              <QRCode
+                value={buildUserQRPayload({ uid: user.uid, idNumber: user.idNumber })}
+                size={180}
+                backgroundColor="#ffffff"
+                color={C.text}
+              />
+            </View>
+
+            <Text style={s.qrIdLabel}>ID: {user.idNumber || "Not yet assigned"}</Text>
+          </View>
+        )}
 
         {/* ── Personal information card ────────────────────────────────── */}
         <View style={s.sectionCard}>
@@ -613,6 +639,30 @@ const s = StyleSheet.create({
     borderBottomColor: C.border,
   },
   sectionTitle: { fontSize: 17, fontWeight: "800", color: C.text },
+
+  // QR code card
+  qrDescription: {
+    fontSize:   15,
+    color:      C.textSub,
+    lineHeight: 22,
+    marginBottom: 18,
+  },
+  qrWrapper: {
+    alignSelf: "center",
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  qrIdLabel: {
+    textAlign: "center",
+    marginTop: 14,
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.textSub,
+    letterSpacing: 0.5,
+  },
 
   // ID description
   idDescription: {

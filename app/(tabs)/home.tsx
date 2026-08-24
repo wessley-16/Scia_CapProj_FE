@@ -3,12 +3,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
-// 🔥 Firebase — replaces http://10.142.254.160:3000/api/events
-import { subscribeToEvents, Event as FirebaseEvent, logoutUser } from "@/lib/firebase";
+// 🔥 Firebase — events, join/check-in, and everything else now go through
+// Firestore directly (previously joining hit a hardcoded local dev backend
+// at http://10.142.254.160:3000 that no longer exists)
+import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds } from "@/lib/firebase";
+import EventCarousel from "@/components/home/EventCarousel";
+import EventJoinFormModal from "@/components/home/EventJoinFormModal";
 import { useAuth } from "@/context/AuthContext";
 import { Medicine } from "@/interfaces/interfaces";
 
@@ -109,56 +113,75 @@ export default function Home() {
   }, []);
 
   /* ---------------- JOIN EVENT ---------------- */
-  const handleJoinEvent = async (eventId: string) => {
-    try {
-      const name = await AsyncStorage.getItem("userName");
-      const address = await AsyncStorage.getItem("userBarangay");
-      const userId = await AsyncStorage.getItem("userId");
+  const [joinFormEvent, setJoinFormEvent] = useState<FirebaseEvent | null>(null);
+  const [joining, setJoining] = useState(false);
 
-      const res = await fetch(
-        // Join is still handled via backend for attendance tracking
-        `http://10.142.254.160:3000/api/events/${eventId}/join`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name,
-            address,
-            userId,
-            age: 60, // temporary (later compute from DOB)
-          }),
-        }
+  // Tapping "Join" on a card: events with an admin-defined signup form open
+  // that form first; plain events (no form) join immediately, same as before.
+  const handleJoinPress = (event: FirebaseEvent) => {
+    if (!user || isGuest) {
+      Alert.alert(
+        "Log In Required",
+        "Please log in with your account to join events — this is what links your QR code to event check-in.",
       );
+      return;
+    }
 
-      const data = await res.json();
+    const fields = event.formFields ?? event.FormFields ?? [];
+    if (fields.length > 0) {
+      setJoinFormEvent(event);
+    } else {
+      performJoin(event, {});
+    }
+  };
 
-      if (res.ok) {
-        const updated = [...joinedEvents, event];
-
-        setJoinedEvents(updated);
-        await AsyncStorage.setItem("joinedEvents", JSON.stringify(updated));
-
-        alert("Joined successfully!");
-      }
-
+  // Does the actual Firestore write, whether it came from the instant-join
+  // path or after submitting the signup form.
+  const performJoin = async (event: FirebaseEvent, formResponses: Record<string, string>) => {
+    if (!user) return;
+    setJoining(true);
+    try {
+      await joinEvent(
+        event.id,
+        {
+          uid: user.uid,
+          name,
+          barangay: user.barangay ?? null,
+          idNumber: user.idNumber ?? null,
+        },
+        formResponses,
+      );
+      setJoinedEvents((prev) => [...prev, event]);
+      setJoinFormEvent(null);
     } catch (err) {
-      alert("Failed to join");
+      console.error("Failed to join event:", err);
+      Alert.alert("Error", "Failed to join event. Please try again.");
+    } finally {
+      setJoining(false);
     }
   };
 
   /* ---------------- LOAD JOINED EVENTS ---------------- */
-  const loadJoinedEvents = async () => {
-    try {
-      const stored = await AsyncStorage.getItem("joinedEvents");
-      if (stored) {
-        setJoinedEvents(JSON.parse(stored));
-      }
-    } catch (err) {
-      console.log("Failed to load joined events");
+  // Re-derives from Firestore whenever the signed-in identity or the event
+  // list changes — guests never have joined events (no stable identity to
+  // check in with).
+  useEffect(() => {
+    let cancelled = false;
+    if (!user || isGuest) {
+      setJoinedEvents([]);
+      return;
     }
-  };
+    fetchJoinedEventIds(user.uid)
+      .then((joinedIds) => {
+        if (!cancelled) {
+          setJoinedEvents(events.filter((e) => joinedIds.includes(e.id)));
+        }
+      })
+      .catch((err) => console.log("Failed to load joined events:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isGuest, events]);
 
   /* ---------------- LOAD MEDICINE ---------------- */
   const loadNextMedicine = useCallback(async () => {
@@ -246,7 +269,6 @@ export default function Home() {
       loadProfileImage();
       fetchEvents();
       loadEvents();
-      loadJoinedEvents();
       loadNotifications();
     }, [loadProfileImage, loadNextMedicine, loadEvents])
   );
@@ -384,48 +406,12 @@ export default function Home() {
           >
 
             <View>
-              {events.length === 0 ? (
-                <Text style={[styles.programLabel, { fontSize: 16 * fontScale }]}>
-                  No events available
-                </Text>
-              ) : (
-                events.map((event) => (
-                  <View key={event.id} style={{ marginBottom: 15 }}>
-                    <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>
-                      What: {event.title}
-                    </Text>
-
-                    <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>
-                      When: {new Date(event.date).toLocaleString()}
-                    </Text>
-
-                    <Text style={[styles.programLabel, { fontSize: 20 * fontScale }]}>
-                      Where: {event.location}
-                    </Text>
-
-                    <Text style={[styles.programLabel, { fontSize: 16 * fontScale }]}>
-                      {event.description}
-                    </Text>
-
-                    <View style={styles.joinFunction}>
-                      {joinedEvents.some(e => e.id === event.id) ? (
-                        <Text style={{ color: "#22C55E", fontSize: 16 * fontScale }}>
-                          Joined ✅
-                        </Text>
-                      ) : (
-                        <TouchableOpacity
-                          style={styles.joinButton}
-                          onPress={() => handleJoinEvent(event.id)}
-                        >
-                          <Text style={{ fontSize: 18 * fontScale, color: "white" }}>
-                            Join
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                ))
-              )}
+              <EventCarousel
+                events={events}
+                joinedEventIds={joinedEvents.map((e) => e.id)}
+                fontScale={fontScale}
+                onJoinPress={handleJoinPress}
+              />
             </View>
 
           </Animated.View>
@@ -527,6 +513,18 @@ export default function Home() {
           />
         </View>
       </ScrollView>
+
+      <EventJoinFormModal
+        visible={!!joinFormEvent}
+        eventTitle={joinFormEvent ? (joinFormEvent.title ?? joinFormEvent.Title ?? "Event") : ""}
+        fields={joinFormEvent ? (joinFormEvent.formFields ?? joinFormEvent.FormFields ?? []) : []}
+        submitting={joining}
+        fontScale={fontScale}
+        onClose={() => setJoinFormEvent(null)}
+        onSubmit={(responses) => {
+          if (joinFormEvent) performJoin(joinFormEvent, responses);
+        }}
+      />
 
       {/* FLOATING CHAT */}
       <TouchableOpacity
