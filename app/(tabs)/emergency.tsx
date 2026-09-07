@@ -24,7 +24,11 @@ import { sendSOSAlert, subscribeToSOSAlert } from '../../lib/firebase';
 const HOLD_DURATION_MS = 5000;
 const COOLDOWN_MS = 5 * 60 * 1000;
 
+// Names/spelling match constants/barangays.ts (and the admin dashboard)
+// exactly — an SOS alert's barangay has to string-match what the admin
+// side scopes by, or a scoped sub-admin never sees it on the SOS Map.
 const valenzuelaBarangays = [
+  { name: 'Arkong Bato',         lat: 14.7175, lng: 120.9800 },
   { name: 'Bagbaguin',           lat: 14.7365, lng: 120.9920 },
   { name: 'Balangkas',           lat: 14.7015, lng: 120.9790 },
   { name: 'Bignay',              lat: 14.7250, lng: 120.9980 },
@@ -33,8 +37,7 @@ const valenzuelaBarangays = [
   { name: 'Canumay West',        lat: 14.7065, lng: 120.9880 },
   { name: 'Coloong',             lat: 14.7205, lng: 120.9780 },
   { name: 'Dalandanan',          lat: 14.7035, lng: 120.9825 },
-  { name: 'Gen. T. de Leon',     lat: 14.7120, lng: 120.9870 },
-  { name: 'Gen. Pio Valenzuela', lat: 14.7040, lng: 120.9850 },
+  { name: 'General T. de Leon',  lat: 14.7120, lng: 120.9870 },
   { name: 'Isla',                lat: 14.6945, lng: 120.9950 },
   { name: 'Karuhatan',           lat: 14.7055, lng: 120.9890 },
   { name: 'Lawang Bato',         lat: 14.7155, lng: 120.9975 },
@@ -51,7 +54,7 @@ const valenzuelaBarangays = [
   { name: 'Paso de Blas',        lat: 14.7290, lng: 120.9930 },
   { name: 'Pasolo',              lat: 14.7110, lng: 120.9795 },
   { name: 'Poblacion',           lat: 14.7080, lng: 120.9860 },
-  { name: 'Polo',                lat: 14.7245, lng: 120.9835 },
+  { name: 'Pulo',                lat: 14.7245, lng: 120.9835 },
   { name: 'Punturin',            lat: 14.7270, lng: 120.9875 },
   { name: 'Rincon',              lat: 14.7095, lng: 120.9795 },
   { name: 'Tagalag',             lat: 14.7320, lng: 120.9880 },

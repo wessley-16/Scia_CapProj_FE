@@ -213,7 +213,7 @@ export default function Home() {
 
     await loadProfileImage();
     await loadNextMedicine();
-    await fetchEvents();
+    await fetchEvents().catch((e) => console.error("fetchEvents error:", e));
 
     setRefreshing(false);
   }, [loadProfileImage, loadNextMedicine]);
@@ -267,7 +267,7 @@ export default function Home() {
     useCallback(() => {
       loadNextMedicine();
       loadProfileImage();
-      fetchEvents();
+      fetchEvents().catch((e) => console.error("fetchEvents error:", e));
       loadEvents();
       loadNotifications();
     }, [loadProfileImage, loadNextMedicine, loadEvents])

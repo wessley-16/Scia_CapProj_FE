@@ -74,6 +74,9 @@ export interface UserRegistration {
   firstName: string;
   midName: string;
   lastName: string;
+  district: string;
+  barangay: string;
+  street: string;
   address: string;
   conNumber: string;
   gender: string;
@@ -102,6 +105,9 @@ export async function registerUser(data: UserRegistration) {
       firstName: data.firstName,
       midName: data.midName,
       lastName: data.lastName,
+      district: data.district,
+      barangay: data.barangay,
+      street: data.street,
       address: data.address,
       conNumber: data.conNumber,
       gender: data.gender,

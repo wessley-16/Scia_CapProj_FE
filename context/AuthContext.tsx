@@ -89,10 +89,11 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           "userName",
           `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim(),
         );
-        await AsyncStorage.setItem(
-          "userBarangay",
-          data.barangay ?? data.address ?? "",
-        );
+        // NOTE: no fallback to data.address here — that's free-text street
+        // input and will never match an admin's exact barangay name, which
+        // silently broke barangay-scoped announcements/events/SOS for any
+        // account created before the barangay field existed.
+        await AsyncStorage.setItem("userBarangay", data.barangay ?? "");
         await AsyncStorage.setItem("userDistrict", data.district ?? "");
         return data;
       }

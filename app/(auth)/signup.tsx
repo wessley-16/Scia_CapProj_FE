@@ -1,6 +1,8 @@
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { registerUser, submitIDRequest } from "@/lib/firebase";
+import { DISTRICT_1_BARANGAYS, DISTRICT_2_BARANGAYS } from "@/constants/barangays";
+import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -44,7 +46,9 @@ export default function Signup() {
   const [firstName, setFirstName] = useState("");
   const [midName, setMidName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [address, setAddress] = useState("");
+  const [district, setDistrict] = useState("");
+  const [barangay, setBarangay] = useState("");
+  const [street, setStreet] = useState("");
   const [conNumber, setConNumber] = useState("");
   const [gender, setGender] = useState("");
   const [dob, setDob] = useState("");
@@ -57,6 +61,15 @@ export default function Signup() {
   const [hasSciaId, setHasSciaId] = useState<null | boolean>(null);
   const [idRequestLoading, setIdRequestLoading] = useState(false);
   const [idRequestReason, setIdRequestReason] = useState("");
+
+  const barangayOptions =
+    district === "District 1" ? DISTRICT_1_BARANGAYS
+    : district === "District 2" ? DISTRICT_2_BARANGAYS
+    : [];
+
+  const fullAddress = street && barangay
+    ? `${street}, Brgy. ${barangay}, Valenzuela City`
+    : "";
 
   const pickIdImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -100,7 +113,9 @@ export default function Signup() {
       !firstName ||
       !midName ||
       !lastName ||
-      !address ||
+      !district ||
+      !barangay ||
+      !street ||
       !conNumber ||
       !dob ||
       !gender ||
@@ -115,7 +130,10 @@ export default function Signup() {
         firstName,
         midName,
         lastName,
-        address,
+        district,
+        barangay,
+        street,
+        address: fullAddress,
         conNumber,
         gender,
         dob,
@@ -145,7 +163,7 @@ export default function Signup() {
       await submitIDRequest({
         seniorName: `${firstName} ${midName} ${lastName}`.trim(),
         seniorId: idNumber || "Not yet assigned",
-        address,
+        address: fullAddress,
         contactNumber: conNumber,
         reason: idRequestReason.trim(),
         imageBase64: idImage?.base64,
@@ -206,13 +224,6 @@ export default function Signup() {
             onChangeText={setLastName}
           />
           <TextInput
-            placeholder="Address *"
-            placeholderTextColor="#9CA3AF"
-            style={styles.input}
-            value={address}
-            onChangeText={setAddress}
-          />
-          <TextInput
             placeholder="Contact Number *"
             placeholderTextColor="#9CA3AF"
             style={styles.input}
@@ -221,6 +232,48 @@ export default function Signup() {
             keyboardType="phone-pad"
           />
         </View>
+
+        <Text style={styles.sectionLabel}>District *</Text>
+        <View style={styles.genderRow}>
+          {["District 1", "District 2"].map((d) => (
+            <TouchableOpacity
+              key={d}
+              style={[styles.genderOption, district === d && styles.genderOptionActive]}
+              onPress={() => { setDistrict(d); setBarangay(""); }}
+            >
+              <Text style={[styles.genderText, district === d && styles.genderTextActive]}>
+                {d}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>Barangay *</Text>
+        <View style={styles.pickerBox}>
+          <Picker
+            selectedValue={barangay}
+            onValueChange={setBarangay}
+            enabled={district.length > 0}
+            style={{ height: 50 }}
+          >
+            <Picker.Item
+              label={district ? "Select barangay" : "Select a district first"}
+              value=""
+            />
+            {barangayOptions.map((b) => (
+              <Picker.Item key={b} label={b} value={b} />
+            ))}
+          </Picker>
+        </View>
+
+        <Text style={styles.sectionLabel}>Street / House No. *</Text>
+        <TextInput
+          placeholder="e.g. 123 Rizal St."
+          placeholderTextColor="#9CA3AF"
+          style={styles.input}
+          value={street}
+          onChangeText={setStreet}
+        />
 
         <Text style={styles.sectionLabel}>Date of Birth *</Text>
         <TouchableOpacity
@@ -481,6 +534,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     fontSize: 15,
     color: "#111827",
+  },
+  pickerBox: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    overflow: "hidden",
+    marginBottom: 4,
   },
   optionalWrapper: { position: "relative" },
   optionalBadge: {
