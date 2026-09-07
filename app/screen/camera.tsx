@@ -12,7 +12,7 @@ import React, { useState, useRef } from "react";
 import * as ImagePicker from "expo-image-picker";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { AntDesign, FontAwesome } from "@expo/vector-icons";
-import { useMedAi } from "@/hooks/useMedAi";
+import { useMedAi, MedicationReminder } from "@/hooks/useMedAi";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 
@@ -25,7 +25,7 @@ const CameraScreen = () => {
   const [isReviewing, setIsReviewing] = useState(false);
   const router = useRouter();
   const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef(null);
+  const cameraRef = useRef<CameraView | null>(null);
 
   // --- Action 1: Snap Picture from Live Camera ---
   const handleTakePicture = async () => {
@@ -54,7 +54,7 @@ const CameraScreen = () => {
       const stored = await AsyncStorage.getItem("medicines");
       const existingMeds = stored ? JSON.parse(stored) : [];
 
-      const newMeds = reminders.map((med, index) => {
+      const newMeds = reminders.map((med: MedicationReminder, index: number) => {
         // Keep the full dose string if it's complex, or just use what AI gave
         const finalDosage = med.dose || "1";
 
@@ -165,7 +165,7 @@ const CameraScreen = () => {
           {reminders && reminders.length > 0 && (
             <View style={styles.resultsContainer}>
               <Text style={styles.resultsHeader}>Medications Found:</Text>
-              {reminders.map((med, index) => (
+              {reminders.map((med: MedicationReminder, index: number) => (
                 <View key={index} style={styles.medCard}>
                   <Text style={styles.medTitle}>{med.medicationName}</Text>
                   <Text style={styles.medBody}>{med.body}</Text>

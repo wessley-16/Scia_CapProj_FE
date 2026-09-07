@@ -144,8 +144,9 @@ export default function Account() {
     });
     if (!result.canceled) {
       const uri      = result.assets[0].uri;
-      const filename = uri.split("/").pop();
-      const newUri   = FileSystem.documentDirectory + filename;
+      const filename = uri.split("/").pop() || `avatar_${Date.now()}.jpg`;
+      const baseDir  = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? "";
+      const newUri   = `${baseDir}${filename}`;
       await FileSystem.copyAsync({ from: uri, to: newUri });
       setProfileImage(newUri);
       await AsyncStorage.setItem("profileImage", newUri);

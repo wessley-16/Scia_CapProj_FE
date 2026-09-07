@@ -44,6 +44,7 @@ const VERTEX_REGION   = "us-central1";
 const LIVE_MODEL      = "gemini-live-2.5-flash-native-audio";
 
 const SYSTEM_INSTRUCTION = {
+  role: "system" as const,
   parts: [{
     text:
       "You are HealthAI, a warm and caring voice assistant for senior citizens " +
@@ -250,7 +251,7 @@ export function useLiveVoice() {
       const ai = getAI(getApp(), { backend: new VertexAIBackend(VERTEX_REGION) });
       const liveModel = getLiveGenerativeModel(ai, {
         model: LIVE_MODEL,
-        liveGenerationConfig: {
+        generationConfig: {
           responseModalities:       [ResponseModality.AUDIO],
           inputAudioTranscription:  {},
           outputAudioTranscription: {},

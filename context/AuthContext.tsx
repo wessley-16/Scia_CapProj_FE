@@ -2,7 +2,7 @@
 import { COLLECTIONS } from "@/lib/firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getAuth, onAuthStateChanged } from "@react-native-firebase/auth";
-import { getFirestore } from "@react-native-firebase/firestore";
+import { doc, getDoc, getFirestore } from "@react-native-firebase/firestore";
 import React, {
   createContext,
   ReactNode,
@@ -77,12 +77,9 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   const fetchUserProfile = async (uid: string): Promise<UserProfile | null> => {
     try {
-      const userDoc = await db
-        .collection(COLLECTIONS.USERS)
-        .doc(uid)
-        .get();
-      if (userDoc.exists) {
-        const data = { id: userDoc.id, ...userDoc.data() } as UserProfile;
+      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+      if (userDoc.exists()) {
+        const data = { id: userDoc.id, uid, ...userDoc.data() } as UserProfile;
         await AsyncStorage.setItem("user", JSON.stringify(data));
         await AsyncStorage.setItem("userId", data.id);
         await AsyncStorage.setItem(

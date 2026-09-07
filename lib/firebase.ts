@@ -25,7 +25,7 @@ import {
 import { getStorage } from "@react-native-firebase/storage";
 import { initAppCheck } from "./appCheck";
 
-const auth = getAuth();
+export const auth = getAuth();
 const db = getFirestore();
 export const storage = getStorage();
 
@@ -309,11 +309,18 @@ export async function fetchEvents(
   barangay?: string | null,
   district?: string | null,
 ): Promise<Event[]> {
-  const [eventsSnap, announcementsSnap] = await Promise.all([
-    getDocs(query(collection(db, COLLECTIONS.EVENTS), orderBy("createdAt", "desc"))),
-    getDocs(query(collection(db, COLLECTIONS.ANNOUNCEMENTS), orderBy("createdAt", "desc"))),
-  ]);
-  return filterEvents([...eventsSnap.docs, ...announcementsSnap.docs], barangay, district);
+  try {
+    const [eventsSnap, announcementsSnap] = await Promise.all([
+      getDocs(query(collection(db, COLLECTIONS.EVENTS), orderBy("createdAt", "desc"))),
+      getDocs(query(collection(db, COLLECTIONS.ANNOUNCEMENTS), orderBy("createdAt", "desc"))),
+    ]);
+    const eventDocs = eventsSnap?.docs ?? [];
+    const announcementDocs = announcementsSnap?.docs ?? [];
+    return filterEvents([...eventDocs, ...announcementDocs], barangay, district);
+  } catch (error) {
+    console.error("fetchEvents error:", error);
+    return [];
+  }
 }
 
 export function subscribeToEvents(
@@ -347,16 +354,24 @@ export function subscribeToEvents(
     unsubEventsSnapshot = onSnapshot(
       query(collection(db, COLLECTIONS.EVENTS), orderBy("createdAt", "desc")),
       (snapshot) => {
-        latestEventDocs = snapshot.docs;
+        if (!snapshot) return;
+        latestEventDocs = snapshot.docs ?? [];
         emit();
+      },
+      (error) => {
+        console.warn("subscribeToEvents: events listener error:", error);
       },
     );
 
     unsubAnnouncementsSnapshot = onSnapshot(
       query(collection(db, COLLECTIONS.ANNOUNCEMENTS), orderBy("createdAt", "desc")),
       (snapshot) => {
-        latestAnnouncementDocs = snapshot.docs;
+        if (!snapshot) return;
+        latestAnnouncementDocs = snapshot.docs ?? [];
         emit();
+      },
+      (error) => {
+        console.warn("subscribeToEvents: announcements listener error:", error);
       },
     );
   });
@@ -435,9 +450,16 @@ export async function joinEvent(
 
 // Which events has this senior already joined? Used on Home screen mount so
 // the button shows "Joined ✅" instead of "Join" for events already RSVP'd.
-export async function fetchJoinedEventIds(uid: string): Promise<string[]> {
-  const snapshot = await getDocs(collection(db, COLLECTIONS.USERS, uid, "joinedEvents"));
-  return snapshot.docs.map((d) => d.id);
+export async function fetchJoinedEventIds(uid?: string): Promise<string[]> {
+  const targetUid = uid || auth.currentUser?.uid;
+  if (!targetUid) return [];
+  try {
+    const snapshot = await getDocs(collection(db, COLLECTIONS.USERS, targetUid, "joinedEvents"));
+    return (snapshot?.docs ?? []).map((d) => d.id);
+  } catch (error) {
+    console.error("fetchJoinedEventIds error:", error);
+    return [];
+  }
 }
 
 // The payload encoded in the senior's profile QR code. Kept as a small,
@@ -477,9 +499,17 @@ export function subscribeToSOSAlert(
   docId: string,
   callback: (data: any) => void,
 ) {
-  return onSnapshot(doc(db, COLLECTIONS.EMERGENCIES, docId), (snap) => {
-    if (snap.exists) callback({ id: snap.id, ...snap.data() });
-  });
+  return onSnapshot(
+    doc(db, COLLECTIONS.EMERGENCIES, docId),
+    (snap) => {
+      if (!snap) return;
+      const exists = typeof snap.exists === "function" ? snap.exists() : (snap as any)?.exists;
+      if (exists) callback({ id: snap.id, ...snap.data() });
+    },
+    (error) => {
+      console.warn("subscribeToSOSAlert listener error:", error);
+    },
+  );
 }
 
 // ── APPOINTMENTS ──────────────────────────────────────────────────────────────
@@ -526,7 +556,11 @@ export function subscribeToUserAppointments(
         orderBy("createdAt", "desc"),
       ),
       (snapshot) => {
-        callback(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })));
+        if (!snapshot) return;
+        callback((snapshot.docs ?? []).map((d) => ({ id: d.id, ...d.data() })));
+      },
+      (error) => {
+        console.warn("subscribeToUserAppointments listener error:", error);
       },
     );
   });
@@ -550,8 +584,13 @@ export interface HealthCenter {
 }
 
 export async function fetchHealthCenters(): Promise<HealthCenter[]> {
-  const snapshot = await getDocs(collection(db, COLLECTIONS.HEALTH_CENTERS));
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as HealthCenter);
+  try {
+    const snapshot = await getDocs(collection(db, COLLECTIONS.HEALTH_CENTERS));
+    return (snapshot?.docs ?? []).map((d) => ({ id: d.id, ...d.data() }) as HealthCenter);
+  } catch (error) {
+    console.error("fetchHealthCenters error:", error);
+    return [];
+  }
 }
 
 export function subscribeToHealthCenters(
@@ -569,9 +608,13 @@ export function subscribeToHealthCenters(
     unsubscribeSnapshot = onSnapshot(
       collection(db, COLLECTIONS.HEALTH_CENTERS),
       (snapshot) => {
+        if (!snapshot) return;
         callback(
-          snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as HealthCenter),
+          (snapshot.docs ?? []).map((d) => ({ id: d.id, ...d.data() }) as HealthCenter),
         );
+      },
+      (error) => {
+        console.warn("subscribeToHealthCenters listener error:", error);
       },
     );
   });

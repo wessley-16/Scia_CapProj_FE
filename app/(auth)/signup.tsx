@@ -260,7 +260,7 @@ export default function Signup() {
               label={district ? "Select barangay" : "Select a district first"}
               value=""
             />
-            {barangayOptions.map((b) => (
+            {barangayOptions.map((b: string) => (
               <Picker.Item key={b} label={b} value={b} />
             ))}
           </Picker>

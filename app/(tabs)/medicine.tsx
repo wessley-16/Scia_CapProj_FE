@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
-import * as Constants from "expo-constants";
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -27,6 +27,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -47,8 +49,8 @@ export default function medicine() {
   const [interval, setInterval] = useState("8");
 
   const router = useRouter();
-  const notificationListener = useRef<any>();
-  const responseListener = useRef<any>();
+  const notificationListener = useRef<Notifications.EventSubscription | null>(null);
+  const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -71,14 +73,8 @@ export default function medicine() {
 
     return () => {
       // Clean up subscriptions
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(
-          notificationListener.current,
-        );
-      }
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
-      }
+      notificationListener.current?.remove();
+      responseListener.current?.remove();
     };
   }, []);
 

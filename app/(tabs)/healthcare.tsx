@@ -31,6 +31,8 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
@@ -63,8 +65,8 @@ export default function Healthcare() {
   const [dosage, setDosage] = useState("");
   const [dosageUnit, setDosageUnit] = useState<"ml" | "mg" | "capsule">("mg");
   const [interval, setInterval] = useState("8");
-  const notifListener = useRef<any>();
-  const responseListener = useRef<any>();
+  const notifListener = useRef<Notifications.EventSubscription | null>(null);
+  const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
   // ─── APPOINTMENT STATE ────────────────────────────────────────────────────
   const [selectedDate, setSelectedDate] = useState("");
@@ -92,8 +94,8 @@ export default function Healthcare() {
     notifListener.current = Notifications.addNotificationReceivedListener(() => {});
     responseListener.current = Notifications.addNotificationResponseReceivedListener(() => {});
     return () => {
-      if (notifListener.current) Notifications.removeNotificationSubscription(notifListener.current);
-      if (responseListener.current) Notifications.removeNotificationSubscription(responseListener.current);
+      notifListener.current?.remove();
+      responseListener.current?.remove();
     };
   }, []);
 

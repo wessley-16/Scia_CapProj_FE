@@ -39,6 +39,7 @@ export function createNativeChatSession(history: ChatHistoryItem[] = []) {
   const model = getGenerativeModel(ai, {
     model: "gemini-2.5-flash",
     systemInstruction: {
+      role: "system" as const,
       parts: [{ text: HEALTH_AI_SYSTEM_PROMPT }],
     },
     generationConfig: {

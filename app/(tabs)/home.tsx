@@ -167,11 +167,12 @@ export default function Home() {
   // check in with).
   useEffect(() => {
     let cancelled = false;
-    if (!user || isGuest) {
+    const targetUid = user?.uid || (user as any)?.id;
+    if (!targetUid || isGuest) {
       setJoinedEvents([]);
       return;
     }
-    fetchJoinedEventIds(user.uid)
+    fetchJoinedEventIds(targetUid)
       .then((joinedIds) => {
         if (!cancelled) {
           setJoinedEvents(events.filter((e) => joinedIds.includes(e.id)));
