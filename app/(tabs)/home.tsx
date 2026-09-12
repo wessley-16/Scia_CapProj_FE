@@ -10,7 +10,7 @@ import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — events, join/check-in, and everything else now go through
 // Firestore directly (previously joining hit a hardcoded local dev backend
 // at http://10.142.254.160:3000 that no longer exists)
-import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds } from "@/lib/firebase";
+import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds, subscribeToAuthState } from "@/lib/firebase";
 import EventCarousel from "@/components/home/EventCarousel";
 import EventJoinFormModal from "@/components/home/EventJoinFormModal";
 import { useAuth } from "@/context/AuthContext";
@@ -117,7 +117,9 @@ export default function Home() {
   const [joining, setJoining] = useState(false);
 
   // Tapping "Join" on a card: events with an admin-defined signup form open
-  // that form first; plain events (no form) join immediately, same as before.
+  // that form first; plain joinable events (no form) join immediately.
+  // EventCarousel now only ever calls this for items with isJoinable === true,
+  // so plain announcements never reach here.
   const handleJoinPress = (event: FirebaseEvent) => {
     if (!user || isGuest) {
       Alert.alert(
@@ -161,18 +163,34 @@ export default function Home() {
     }
   };
 
+  /* ---------------- FIREBASE AUTH READY STATE ---------------- */
+  // Tracks Firebase Auth's own restored session, separately from
+  // AuthContext's `user`. AuthContext may hydrate from AsyncStorage a beat
+  // before the native Firebase Auth SDK finishes restoring its session —
+  // during that gap request.auth is still null on the server, so any
+  // Firestore read gated on auth.uid (like joinedEvents) gets rejected with
+  // permission-denied even though `user` already looks populated here.
+  const [firebaseUid, setFirebaseUid] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToAuthState((fbUser) => {
+      setFirebaseUid(fbUser?.uid ?? null);
+    });
+    return unsubscribe;
+  }, []);
+
   /* ---------------- LOAD JOINED EVENTS ---------------- */
-  // Re-derives from Firestore whenever the signed-in identity or the event
-  // list changes — guests never have joined events (no stable identity to
-  // check in with).
+  // Re-derives from Firestore whenever the confirmed Firebase identity or
+  // the event list changes — guests never have joined events (no stable
+  // identity to check in with), and this only fires once Firebase Auth has
+  // actually confirmed the session, matching what the security rules check.
   useEffect(() => {
     let cancelled = false;
-    const targetUid = user?.uid || (user as any)?.id;
-    if (!targetUid || isGuest) {
+    if (!firebaseUid || isGuest) {
       setJoinedEvents([]);
       return;
     }
-    fetchJoinedEventIds(targetUid)
+    fetchJoinedEventIds(firebaseUid)
       .then((joinedIds) => {
         if (!cancelled) {
           setJoinedEvents(events.filter((e) => joinedIds.includes(e.id)));
@@ -182,7 +200,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [user, isGuest, events]);
+  }, [firebaseUid, isGuest, events]);
 
   /* ---------------- LOAD MEDICINE ---------------- */
   const loadNextMedicine = useCallback(async () => {

@@ -450,9 +450,20 @@ export async function joinEvent(
 
 // Which events has this senior already joined? Used on Home screen mount so
 // the button shows "Joined ✅" instead of "Join" for events already RSVP'd.
+//
+// Guarded against firing before Firebase Auth has finished restoring its
+// session (or with a stale cached uid that no longer matches the live
+// session) — the security rule requires request.auth.uid == userId, and
+// during that restore window request.auth is still null server-side even
+// though targetUid looks valid here in JS, which produces the
+// permission-denied you saw in the log.
 export async function fetchJoinedEventIds(uid?: string): Promise<string[]> {
   const targetUid = uid || auth.currentUser?.uid;
-  if (!targetUid) return [];
+
+  if (!targetUid || !auth.currentUser || auth.currentUser.uid !== targetUid) {
+    return [];
+  }
+
   try {
     const snapshot = await getDocs(collection(db, COLLECTIONS.USERS, targetUid, "joinedEvents"));
     return (snapshot?.docs ?? []).map((d) => d.id);

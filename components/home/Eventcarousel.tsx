@@ -60,14 +60,30 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
         contentContainerStyle={{ paddingRight: CARD_SPACING }}
         renderItem={({ item }) => {
           const joined = joinedEventIds.includes(item.id);
-          const hasForm = getFormFields(item).length > 0;
+          // Only editorial_health docs the admin flagged carry isJoinable.
+          // Plain announcements never do — they have no attendees
+          // subcollection, so they must never render a Join CTA.
+          const isJoinable = !!item.isJoinable;
+          const fields = getFormFields(item);
+          const hasForm = fields.length > 0;
           const dateLabel = getDate(item) ? new Date(getDate(item)).toLocaleString() : "";
 
           return (
             <View style={[styles.card, { width: CARD_WIDTH, marginRight: CARD_SPACING }]}>
-              <Text style={[styles.cardTitle, { fontSize: 19 * fontScale }]} numberOfLines={2}>
-                {getTitle(item)}
-              </Text>
+              <View style={styles.titleRow}>
+                <Text style={[styles.cardTitle, { fontSize: 19 * fontScale }]} numberOfLines={2}>
+                  {getTitle(item)}
+                </Text>
+
+                {isJoinable && !joined && (
+                  <View style={styles.joinableTag}>
+                    <Ionicons name="megaphone" size={12} color="#2563EB" />
+                    <Text style={[styles.joinableTagText, { fontSize: 11 * fontScale }]}>
+                      {hasForm ? "Signup required" : "Joinable"}
+                    </Text>
+                  </View>
+                )}
+              </View>
 
               {!!dateLabel && (
                 <View style={styles.metaRow}>
@@ -96,12 +112,25 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
                     <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
                     <Text style={[styles.joinedText, { fontSize: 14 * fontScale }]}>Joined</Text>
                   </View>
-                ) : (
+                ) : isJoinable ? (
                   <TouchableOpacity style={styles.joinBtn} onPress={() => onJoinPress(item)} activeOpacity={0.85}>
+                    <Ionicons
+                      name={hasForm ? "create-outline" : "checkmark-done-outline"}
+                      size={16}
+                      color="#fff"
+                      style={{ marginRight: 6 }}
+                    />
                     <Text style={[styles.joinBtnText, { fontSize: 15 * fontScale }]}>
                       {hasForm ? "Join — Fill Form" : "Join"}
                     </Text>
                   </TouchableOpacity>
+                ) : (
+                  <View style={styles.announcementBadge}>
+                    <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
+                    <Text style={[styles.announcementText, { fontSize: 13 * fontScale }]}>
+                      Announcement — no signup needed
+                    </Text>
+                  </View>
                 )}
               </View>
             </View>
@@ -128,15 +157,41 @@ const styles = StyleSheet.create({
     padding: 18,
     minHeight: 190,
   },
-  cardTitle: { fontWeight: "800", color: "#111827", marginBottom: 8 },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+    gap: 8,
+  },
+  cardTitle: { fontWeight: "800", color: "#111827", flex: 1 },
+  joinableTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#EEF2FF",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  joinableTagText: { color: "#2563EB", fontWeight: "700" },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
   metaText: { color: "#6B7280" },
   cardDescription: { color: "#374151", marginTop: 8, lineHeight: 20 },
   footerRow: { marginTop: 14, alignItems: "flex-start" },
-  joinBtn: { backgroundColor: "#2563EB", paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14 },
+  joinBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#2563EB",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
   joinBtnText: { color: "#fff", fontWeight: "700" },
   joinedBadge: { flexDirection: "row", alignItems: "center", gap: 6 },
   joinedText: { color: "#16A34A", fontWeight: "700" },
+  announcementBadge: { flexDirection: "row", alignItems: "center", gap: 6 },
+  announcementText: { color: "#9CA3AF", fontWeight: "600" },
   dotsRow: { flexDirection: "row", justifyContent: "center", marginTop: 12, gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.4)" },
   dotActive: { backgroundColor: "#ffffff", width: 18 },
