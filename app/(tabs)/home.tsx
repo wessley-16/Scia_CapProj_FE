@@ -116,9 +116,10 @@ export default function Home() {
   const [joinFormEvent, setJoinFormEvent] = useState<FirebaseEvent | null>(null);
   const [joining, setJoining] = useState(false);
 
-  // Tapping "Join" on a card: events with an admin-defined signup form open
-  // that form first; plain joinable events (no form) join immediately.
-  // EventCarousel now only ever calls this for items with isJoinable === true,
+  // Tapping "Join" on a card always opens the details screen first, so the
+  // senior sees exactly what the admin posted (date, location, description)
+  // before confirming — whether or not the event has extra signup fields.
+  // EventCarousel only ever calls this for items with isJoinable === true,
   // so plain announcements never reach here.
   const handleJoinPress = (event: FirebaseEvent) => {
     if (!user || isGuest) {
@@ -129,12 +130,7 @@ export default function Home() {
       return;
     }
 
-    const fields = event.formFields ?? event.FormFields ?? [];
-    if (fields.length > 0) {
-      setJoinFormEvent(event);
-    } else {
-      performJoin(event, {});
-    }
+    setJoinFormEvent(event);
   };
 
   // Does the actual Firestore write, whether it came from the instant-join
@@ -155,6 +151,7 @@ export default function Home() {
       );
       setJoinedEvents((prev) => [...prev, event]);
       setJoinFormEvent(null);
+      Alert.alert("You're In!", `You've joined "${event.title ?? event.Title ?? "the event"}".`);
     } catch (err) {
       console.error("Failed to join event:", err);
       Alert.alert("Error", "Failed to join event. Please try again.");
@@ -535,8 +532,7 @@ export default function Home() {
 
       <EventJoinFormModal
         visible={!!joinFormEvent}
-        eventTitle={joinFormEvent ? (joinFormEvent.title ?? joinFormEvent.Title ?? "Event") : ""}
-        fields={joinFormEvent ? (joinFormEvent.formFields ?? joinFormEvent.FormFields ?? []) : []}
+        event={joinFormEvent}
         submitting={joining}
         fontScale={fontScale}
         onClose={() => setJoinFormEvent(null)}
