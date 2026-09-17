@@ -1,8 +1,9 @@
 // components/home/EventCarousel.tsx
 import { Event } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
   FlatList,
   NativeScrollEvent,
@@ -16,6 +17,7 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH - 64; // matches the app's horizontal content padding
 const CARD_SPACING = 12;
+const AUTO_ADVANCE_MS = 10000;
 
 interface Props {
   events: Event[];
@@ -28,7 +30,6 @@ const getTitle = (e: Event) => e.title ?? e.Title ?? "Untitled event";
 const getDescription = (e: Event) => e.description ?? e.Body ?? "";
 const getLocation = (e: Event) => e.location ?? e.Location ?? "";
 const getDate = (e: Event) => e.date ?? e.Date ?? "";
-const getFormFields = (e: Event) => e.formFields ?? e.FormFields ?? [];
 
 export default function EventCarousel({ events, joinedEventIds, fontScale, onJoinPress }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -37,6 +38,36 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
   const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const index = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + CARD_SPACING));
     if (index !== activeIndex) setActiveIndex(index);
+  };
+
+  // Auto-advances to the next announcement every 10 seconds so seniors
+  // don't have to swipe to see what else is posted.
+  useEffect(() => {
+    if (events.length <= 1) return;
+
+    const timer = setInterval(() => {
+      setActiveIndex((prev) => {
+        const next = (prev + 1) % events.length;
+        listRef.current?.scrollToOffset({
+          offset: next * (CARD_WIDTH + CARD_SPACING),
+          animated: true,
+        });
+        return next;
+      });
+    }, AUTO_ADVANCE_MS);
+
+    return () => clearInterval(timer);
+  }, [events.length]);
+
+  const showDetails = (event: Event) => {
+    const dateLabel = getDate(event) ? new Date(getDate(event)).toLocaleString() : "";
+    const lines = [
+      dateLabel && `When: ${dateLabel}`,
+      getLocation(event) && `Where: ${getLocation(event)}`,
+      getDescription(event),
+    ].filter(Boolean);
+
+    Alert.alert(getTitle(event), lines.join("\n\n") || "No further details.");
   };
 
   if (events.length === 0) {
@@ -61,76 +92,51 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
         renderItem={({ item }) => {
           const joined = joinedEventIds.includes(item.id);
           // Only editorial_health docs the admin flagged carry isJoinable.
-          // Plain announcements never do — they have no attendees
-          // subcollection, so they must never render a Join CTA.
+          // Plain announcements never do, so they get a "View" button instead.
           const isJoinable = !!item.isJoinable;
-          const fields = getFormFields(item);
-          const hasForm = fields.length > 0;
           const dateLabel = getDate(item) ? new Date(getDate(item)).toLocaleString() : "";
 
           return (
             <View style={[styles.card, { width: CARD_WIDTH, marginRight: CARD_SPACING }]}>
-              <View style={styles.titleRow}>
-                <Text style={[styles.cardTitle, { fontSize: 19 * fontScale }]} numberOfLines={2}>
-                  {getTitle(item)}
-                </Text>
-
-                {isJoinable && !joined && (
-                  <View style={styles.joinableTag}>
-                    <Ionicons name="megaphone" size={12} color="#2563EB" />
-                    <Text style={[styles.joinableTagText, { fontSize: 11 * fontScale }]}>
-                      {hasForm ? "Signup required" : "Joinable"}
-                    </Text>
-                  </View>
-                )}
-              </View>
+              <Text style={[styles.cardTitle, { fontSize: 20 * fontScale }]} numberOfLines={2}>
+                {getTitle(item)}
+              </Text>
 
               {!!dateLabel && (
                 <View style={styles.metaRow}>
-                  <Ionicons name="calendar-outline" size={15} color="#6B7280" />
-                  <Text style={[styles.metaText, { fontSize: 13 * fontScale }]}>{dateLabel}</Text>
+                  <Ionicons name="calendar-outline" size={17} color="#4B5563" />
+                  <Text style={[styles.metaText, { fontSize: 15 * fontScale }]}>{dateLabel}</Text>
                 </View>
               )}
               {!!getLocation(item) && (
                 <View style={styles.metaRow}>
-                  <Ionicons name="location-outline" size={15} color="#6B7280" />
-                  <Text style={[styles.metaText, { fontSize: 13 * fontScale }]} numberOfLines={1}>
+                  <Ionicons name="location-outline" size={17} color="#4B5563" />
+                  <Text style={[styles.metaText, { fontSize: 15 * fontScale }]} numberOfLines={1}>
                     {getLocation(item)}
                   </Text>
                 </View>
               )}
 
-              {!!getDescription(item) && (
-                <Text style={[styles.cardDescription, { fontSize: 14 * fontScale }]} numberOfLines={3}>
-                  {getDescription(item)}
-                </Text>
-              )}
-
               <View style={styles.footerRow}>
                 {joined ? (
                   <View style={styles.joinedBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#16A34A" />
-                    <Text style={[styles.joinedText, { fontSize: 14 * fontScale }]}>Joined</Text>
+                    <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
+                    <Text style={[styles.joinedText, { fontSize: 16 * fontScale }]}>Joined</Text>
                   </View>
                 ) : isJoinable ? (
-                  <TouchableOpacity style={styles.joinBtn} onPress={() => onJoinPress(item)} activeOpacity={0.85}>
-                    <Ionicons
-                      name={hasForm ? "create-outline" : "checkmark-done-outline"}
-                      size={16}
-                      color="#fff"
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text style={[styles.joinBtnText, { fontSize: 15 * fontScale }]}>
-                      {hasForm ? "Join — Fill Form" : "Join"}
-                    </Text>
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => onJoinPress(item)} activeOpacity={0.85}>
+                    <Text style={[styles.actionBtnText, { fontSize: 16 * fontScale }]}>Join</Text>
                   </TouchableOpacity>
                 ) : (
-                  <View style={styles.announcementBadge}>
-                    <Ionicons name="information-circle-outline" size={16} color="#9CA3AF" />
-                    <Text style={[styles.announcementText, { fontSize: 13 * fontScale }]}>
-                      Announcement — no signup needed
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.viewBtn]}
+                    onPress={() => showDetails(item)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.actionBtnText, styles.viewBtnText, { fontSize: 16 * fontScale }]}>
+                      View
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 )}
               </View>
             </View>
@@ -150,49 +156,33 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
 }
 
 const styles = StyleSheet.create({
-  emptyText: { color: "#ffffff", opacity: 0.85 },
+  emptyText: { color: "#ffffff", opacity: 0.9 },
   card: {
     backgroundColor: "#ffffff",
     borderRadius: 18,
-    padding: 18,
-    minHeight: 190,
+    padding: 20,
+    minHeight: 150,
   },
-  titleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
-    gap: 8,
-  },
-  cardTitle: { fontWeight: "800", color: "#111827", flex: 1 },
-  joinableTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#EEF2FF",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 4,
-  },
-  joinableTagText: { color: "#2563EB", fontWeight: "700" },
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
-  metaText: { color: "#6B7280" },
-  cardDescription: { color: "#374151", marginTop: 8, lineHeight: 20 },
-  footerRow: { marginTop: 14, alignItems: "flex-start" },
-  joinBtn: {
-    flexDirection: "row",
-    alignItems: "center",
+  cardTitle: { fontWeight: "800", color: "#111827", marginBottom: 10 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  metaText: { color: "#374151" },
+  footerRow: { marginTop: 12, alignItems: "flex-start" },
+  actionBtn: {
     backgroundColor: "#2563EB",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
     borderRadius: 14,
+    minHeight: 48,
+    minWidth: 96,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  joinBtnText: { color: "#fff", fontWeight: "700" },
-  joinedBadge: { flexDirection: "row", alignItems: "center", gap: 6 },
+  actionBtnText: { color: "#fff", fontWeight: "700" },
+  viewBtn: { backgroundColor: "#EEF2FF" },
+  viewBtnText: { color: "#2563EB" },
+  joinedBadge: { flexDirection: "row", alignItems: "center", gap: 8 },
   joinedText: { color: "#16A34A", fontWeight: "700" },
-  announcementBadge: { flexDirection: "row", alignItems: "center", gap: 6 },
-  announcementText: { color: "#9CA3AF", fontWeight: "600" },
-  dotsRow: { flexDirection: "row", justifyContent: "center", marginTop: 12, gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.4)" },
-  dotActive: { backgroundColor: "#ffffff", width: 18 },
+  dotsRow: { flexDirection: "row", justifyContent: "center", marginTop: 14, gap: 6 },
+  dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: "rgba(255,255,255,0.4)" },
+  dotActive: { backgroundColor: "#ffffff", width: 20 },
 });

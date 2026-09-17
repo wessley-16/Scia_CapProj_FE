@@ -25,7 +25,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { submitIDRequest, logoutUser, buildUserQRPayload } from "@/lib/firebase";
 
-// ─── Colour tokens ────────────────────────────────────────────────────────────
+// Colour tokens
 const C = {
   primary:       "#1A56C4",
   primaryLight:  "#EBF2FF",
@@ -41,21 +41,21 @@ const C = {
   card:          "#FFFFFF",
   text:          "#111827",
   textSub:       "#4B5563",
-  textMuted:     "#9CA3AF",
-  border:        "#E5E7EB",
+  textMuted:     "#6B7280",
+  border:        "#9CA3AF",
   shadow:        "#1A56C4",
 };
 
-// ─── Info row component ───────────────────────────────────────────────────────
-function InfoRow({ icon, label, value }: { icon: any; label: string; value: string }) {
+// Info row component
+function InfoRow({ icon, label, value, fontScale }: { icon: any; label: string; value: string; fontScale: number }) {
   return (
     <View style={row.wrap}>
       <View style={row.iconBox}>
         <Ionicons name={icon} size={22} color={C.primary} />
       </View>
       <View style={row.text}>
-        <Text style={row.label}>{label}</Text>
-        <Text style={row.value}>{value || "—"}</Text>
+        <Text style={[row.label, { fontSize: 14 * fontScale }]}>{label}</Text>
+        <Text style={[row.value, { fontSize: 18 * fontScale }]}>{value || "Not set"}</Text>
       </View>
     </View>
   );
@@ -83,7 +83,7 @@ const row = StyleSheet.create({
   value: { fontSize: 17, color: C.text,     fontWeight: "700", lineHeight: 22 },
 });
 
-// ─── Main screen ──────────────────────────────────────────────────────────────
+// Main screen
 export default function Account() {
   const { fontScale, t } = useSettings();
   const { user, refreshUser, clearUser } = useAuth();
@@ -132,7 +132,7 @@ export default function Account() {
     }, [loadProfileImage]),
   );
 
-  // ── Profile image ────────────────────────────────────────────────────────
+  // Profile image
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) { alert("Permission required to access gallery"); return; }
@@ -171,7 +171,7 @@ export default function Account() {
     ]);
   };
 
-  // ── ID Request ────────────────────────────────────────────────────────────
+  // ID Request
   const submitIDRequestHandler = async () => {
     if (!user) return;
     setIdSubmitting(true);
@@ -185,7 +185,7 @@ export default function Account() {
       });
       setIdSubmitted(true);
       setIdModalVisible(false);
-      Alert.alert("✅ Request Submitted", "Your physical Senior Citizen ID request has been sent to the admin.");
+      Alert.alert("Request Submitted", "Your physical Senior Citizen ID request has been sent to the admin.");
     } catch {
       Alert.alert("Error", "Failed to submit. Please check your connection.");
     } finally {
@@ -193,7 +193,7 @@ export default function Account() {
     }
   };
 
-  // ── Logout ────────────────────────────────────────────────────────────────
+  // Logout
   const handleLogout = () => {
     Alert.alert("Log Out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
@@ -212,15 +212,15 @@ export default function Account() {
   const isVerified  = user?.isVerified === true;
   const displayName = user
     ? `${user.firstName ?? ""} ${user.midName ?? ""} ${user.lastName ?? ""}`.replace(/\s+/g, " ").trim()
-    : "—";
+    : "Not set";
 
   return (
     <SafeAreaView style={s.safe} edges={["top", "left", "right"]}>
       <StatusBar barStyle="dark-content" backgroundColor={C.bg} />
 
-      {/* ── Top bar ─────────────────────────────────────────────────────── */}
+      {/* Top bar */}
       <View style={s.topBar}>
-        <Text style={s.topBarTitle}>My Profile</Text>
+        <Text style={[s.topBarTitle, { fontSize: 20 * fontScale }]}>My Profile</Text>
         <View style={s.topBarActions}>
           <TouchableOpacity style={s.iconBtn} onPress={() => router.push("/settings")}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -243,7 +243,7 @@ export default function Account() {
         showsVerticalScrollIndicator={false}
       >
 
-        {/* ── Hero card: photo + name + badge ─────────────────────────── */}
+        {/* Hero card: photo, name, badge */}
         <View style={s.heroCard}>
           {/* Profile photo */}
           <View style={s.photoWrapper}>
@@ -263,15 +263,15 @@ export default function Account() {
               </View>
             </TouchableOpacity>
             {profileImage && (
-              <TouchableOpacity style={s.removePhotoBtn} onPress={deleteProfileImage}>
-                <Text style={s.removePhotoText}>Remove photo</Text>
+              <TouchableOpacity style={s.removePhotoBtn} onPress={deleteProfileImage} hitSlop={8}>
+                <Text style={[s.removePhotoText, { fontSize: 15 * fontScale }]}>Remove photo</Text>
               </TouchableOpacity>
             )}
           </View>
 
           {/* Name */}
-          <Text style={s.heroName}>{displayName}</Text>
-          <Text style={s.heroIdNumber}>
+          <Text style={[s.heroName, { fontSize: 24 * fontScale }]}>{displayName}</Text>
+          <Text style={[s.heroIdNumber, { fontSize: 15 * fontScale }]}>
             ID: {user?.idNumber || "Not yet assigned"}
           </Text>
 
@@ -279,34 +279,34 @@ export default function Account() {
           {isVerified ? (
             <View style={[s.badge, s.badgeVerified]}>
               <Ionicons name="checkmark-circle" size={18} color={C.success} />
-              <Text style={[s.badgeText, { color: C.success }]}>Verified Account</Text>
+              <Text style={[s.badgeText, { color: C.success, fontSize: 14 * fontScale }]}>Verified Account</Text>
             </View>
           ) : (
             <View style={[s.badge, s.badgePending]}>
               <Ionicons name="time-outline" size={18} color={C.warning} />
-              <Text style={[s.badgeText, { color: C.warning }]}>Pending Verification</Text>
+              <Text style={[s.badgeText, { color: C.warning, fontSize: 14 * fontScale }]}>Pending Verification</Text>
             </View>
           )}
 
           {/* Pending explanation */}
           {!isVerified && (
             <View style={s.pendingNote}>
-              <Text style={s.pendingNoteText}>
+              <Text style={[s.pendingNoteText, { fontSize: 14 * fontScale }]}>
                 Your account is awaiting admin verification. You'll get full access once approved.
               </Text>
             </View>
           )}
         </View>
 
-        {/* ── QR code card: identity for event check-in ──────────────────── */}
+        {/* QR code card: identity for event check-in */}
         {user && (
           <View style={s.sectionCard}>
             <View style={s.sectionHeader}>
               <Ionicons name="qr-code-outline" size={22} color={C.primary} />
-              <Text style={s.sectionTitle}>My QR Code</Text>
+              <Text style={[s.sectionTitle, { fontSize: 17 * fontScale }]}>My QR Code</Text>
             </View>
 
-            <Text style={s.qrDescription}>
+            <Text style={[s.qrDescription, { fontSize: 15 * fontScale }]}>
               Show this at SCIA events so staff can check you in after you join.
             </Text>
 
@@ -319,36 +319,37 @@ export default function Account() {
               />
             </View>
 
-            <Text style={s.qrIdLabel}>ID: {user.idNumber || "Not yet assigned"}</Text>
+            <Text style={[s.qrIdLabel, { fontSize: 14 * fontScale }]}>ID: {user.idNumber || "Not yet assigned"}</Text>
           </View>
         )}
 
-        {/* ── Personal information card ────────────────────────────────── */}
+        {/* Personal information card */}
         <View style={s.sectionCard}>
           <View style={s.sectionHeader}>
             <Ionicons name="person-circle-outline" size={22} color={C.primary} />
-            <Text style={s.sectionTitle}>Personal Information</Text>
+            <Text style={[s.sectionTitle, { fontSize: 17 * fontScale }]}>Personal Information</Text>
           </View>
 
-          <InfoRow icon="person-outline"    label="Full Name"       value={displayName} />
-          <InfoRow icon="location-outline"  label="Address"        value={user?.address   || ""} />
-          <InfoRow icon="call-outline"      label="Contact Number" value={user?.conNumber || ""} />
-          <InfoRow icon="calendar-outline"  label="Date of Birth"  value={user?.dob       || ""} />
+          <InfoRow icon="person-outline"    label="Full Name"       value={displayName} fontScale={fontScale} />
+          <InfoRow icon="location-outline"  label="Address"        value={user?.address   || ""} fontScale={fontScale} />
+          <InfoRow icon="call-outline"      label="Contact Number" value={user?.conNumber || ""} fontScale={fontScale} />
+          <InfoRow icon="calendar-outline"  label="Date of Birth"  value={user?.dob       || ""} fontScale={fontScale} />
           <InfoRow
             icon="male-female-outline"
             label="Gender"
             value={user?.gender || ""}
+            fontScale={fontScale}
           />
         </View>
 
-        {/* ── Physical ID request card ─────────────────────────────────── */}
+        {/* Physical ID request card */}
         <View style={s.sectionCard}>
           <View style={s.sectionHeader}>
             <Ionicons name="card-outline" size={22} color={C.primary} />
-            <Text style={s.sectionTitle}>Physical Senior Citizen ID</Text>
+            <Text style={[s.sectionTitle, { fontSize: 17 * fontScale }]}>Physical Senior Citizen ID</Text>
           </View>
 
-          <Text style={s.idDescription}>
+          <Text style={[s.idDescription, { fontSize: 15 * fontScale }]}>
             Request your official physical ID card from the Valenzuela City OSCA.
             Your request will be reviewed by the admin.
           </Text>
@@ -356,21 +357,21 @@ export default function Account() {
           {idSubmitted ? (
             <View style={s.submittedBox}>
               <Ionicons name="checkmark-circle" size={24} color={C.success} />
-              <Text style={s.submittedText}>Request already submitted</Text>
+              <Text style={[s.submittedText, { fontSize: 15 * fontScale }]}>Request already submitted</Text>
             </View>
           ) : (
             <TouchableOpacity style={s.idRequestBtn} onPress={() => setIdModalVisible(true)} activeOpacity={0.85}>
               <Ionicons name="send-outline" size={20} color="#fff" />
-              <Text style={s.idRequestBtnText}>Request Physical ID</Text>
+              <Text style={[s.idRequestBtnText, { fontSize: 17 * fontScale }]}>Request Physical ID</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* ── Quick actions ────────────────────────────────────────────── */}
+        {/* Quick actions */}
         <View style={s.sectionCard}>
           <View style={s.sectionHeader}>
             <Ionicons name="grid-outline" size={22} color={C.primary} />
-            <Text style={s.sectionTitle}>Quick Actions</Text>
+            <Text style={[s.sectionTitle, { fontSize: 17 * fontScale }]}>Quick Actions</Text>
           </View>
 
           <TouchableOpacity style={s.quickAction} onPress={() => router.push("/settings")} activeOpacity={0.8}>
@@ -378,8 +379,8 @@ export default function Account() {
               <Ionicons name="settings-outline" size={24} color={C.primary} />
             </View>
             <View style={s.quickText}>
-              <Text style={s.quickTitle}>Settings</Text>
-              <Text style={s.quickSub}>Font size, language, accessibility</Text>
+              <Text style={[s.quickTitle, { fontSize: 16 * fontScale }]}>Settings</Text>
+              <Text style={[s.quickSub, { fontSize: 14 * fontScale }]}>Font size, language, accessibility</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={C.textMuted} />
           </TouchableOpacity>
@@ -389,8 +390,8 @@ export default function Account() {
               <Ionicons name="notifications-outline" size={24} color={C.accent} />
             </View>
             <View style={s.quickText}>
-              <Text style={s.quickTitle}>Notifications</Text>
-              <Text style={s.quickSub}>Events & system alerts</Text>
+              <Text style={[s.quickTitle, { fontSize: 16 * fontScale }]}>Notifications</Text>
+              <Text style={[s.quickSub, { fontSize: 14 * fontScale }]}>Events & system alerts</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={C.textMuted} />
           </TouchableOpacity>
@@ -400,8 +401,8 @@ export default function Account() {
               <Ionicons name="log-out-outline" size={24} color={C.danger} />
             </View>
             <View style={s.quickText}>
-              <Text style={[s.quickTitle, { color: C.danger }]}>Log Out</Text>
-              <Text style={s.quickSub}>Sign out of your account</Text>
+              <Text style={[s.quickTitle, { color: C.danger, fontSize: 16 * fontScale }]}>Log Out</Text>
+              <Text style={[s.quickSub, { fontSize: 14 * fontScale }]}>Sign out of your account</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={C.textMuted} />
           </TouchableOpacity>
@@ -410,23 +411,23 @@ export default function Account() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* ── ID Request modal ─────────────────────────────────────────────── */}
+      {/* ID Request modal */}
       <Modal visible={idModalVisible} animationType="slide" transparent>
         <View style={m.overlay}>
           <View style={m.box}>
             <View style={m.handle} />
-            <Text style={m.title}>Request Physical ID</Text>
-            <Text style={m.sub}>
+            <Text style={[m.title, { fontSize: 22 * fontScale }]}>Request Physical ID</Text>
+            <Text style={[m.sub, { fontSize: 15 * fontScale }]}>
               This request will be sent to the Super Admin for processing.
             </Text>
 
-            <Text style={m.label}>Reason (optional)</Text>
+            <Text style={[m.label, { fontSize: 15 * fontScale }]}>Reason (optional)</Text>
             <TextInput
-              placeholder="e.g. First-time request, Lost ID…"
+              placeholder="e.g. First-time request, lost ID"
               placeholderTextColor={C.textMuted}
               value={idReason}
               onChangeText={setIdReason}
-              style={m.input}
+              style={[m.input, { fontSize: 16 * fontScale }]}
               multiline
               numberOfLines={3}
             />
@@ -441,7 +442,7 @@ export default function Account() {
                 ? <ActivityIndicator color="#fff" />
                 : <>
                     <Ionicons name="send-outline" size={20} color="#fff" />
-                    <Text style={m.submitText}>Submit Request</Text>
+                    <Text style={[m.submitText, { fontSize: 17 * fontScale }]}>Submit Request</Text>
                   </>
               }
             </TouchableOpacity>
@@ -451,19 +452,19 @@ export default function Account() {
               onPress={() => setIdModalVisible(false)}
               activeOpacity={0.8}
             >
-              <Text style={m.cancelText}>Cancel</Text>
+              <Text style={[m.cancelText, { fontSize: 16 * fontScale }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* ── Notification panel ───────────────────────────────────────────── */}
+      {/* Notification panel */}
       {showNotif && (
         <>
           <TouchableOpacity style={n.backdrop} activeOpacity={1} onPress={toggleNotification} />
           <Animated.View style={[n.panel, { transform: [{ translateX: slideAnim }] }]}>
             <View style={n.panelHeader}>
-              <Text style={n.panelTitle}>Notifications</Text>
+              <Text style={[n.panelTitle, { fontSize: 22 * fontScale }]}>Notifications</Text>
               <TouchableOpacity onPress={toggleNotification}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Ionicons name="close-circle" size={30} color={C.primary} />
@@ -471,37 +472,50 @@ export default function Account() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={n.sectionLabel}>Joined Events</Text>
+              <Text style={[n.sectionLabel, { fontSize: 13 * fontScale }]}>Joined Events</Text>
               {joinedEvents.length === 0 ? (
                 <View style={n.emptyBox}>
                   <Ionicons name="calendar-outline" size={32} color={C.textMuted} />
-                  <Text style={n.emptyText}>No joined events yet</Text>
+                  <Text style={[n.emptyText, { fontSize: 15 * fontScale }]}>No joined events yet</Text>
                 </View>
               ) : (
                 joinedEvents.map((e) => (
                   <View key={e.id} style={n.notifCard}>
-                    <Text style={n.notifCardTitle}>📌 {e.title}</Text>
-                    <Text style={n.notifCardSub}>🗓 {new Date(e.date).toLocaleString()}</Text>
-                    <Text style={n.notifCardSub}>📍 {e.location}</Text>
+                    <Text style={[n.notifCardTitle, { fontSize: 16 * fontScale }]}>{e.title}</Text>
+                    <View style={n.notifCardMetaRow}>
+                      <Ionicons name="calendar-outline" size={15} color={C.textSub} />
+                      <Text style={[n.notifCardSub, { fontSize: 14 * fontScale }]}>{new Date(e.date).toLocaleString()}</Text>
+                    </View>
+                    <View style={n.notifCardMetaRow}>
+                      <Ionicons name="location-outline" size={15} color={C.textSub} />
+                      <Text style={[n.notifCardSub, { fontSize: 14 * fontScale }]}>{e.location}</Text>
+                    </View>
                   </View>
                 ))
               )}
 
-              <Text style={n.sectionLabel}>System Alerts</Text>
+              <Text style={[n.sectionLabel, { fontSize: 13 * fontScale }]}>System Alerts</Text>
               {notifications.length === 0 ? (
                 <View style={n.emptyBox}>
                   <Ionicons name="notifications-off-outline" size={32} color={C.textMuted} />
-                  <Text style={n.emptyText}>No alerts yet</Text>
+                  <Text style={[n.emptyText, { fontSize: 15 * fontScale }]}>No alerts yet</Text>
                 </View>
               ) : (
                 notifications.map((notif) => (
                   <View key={notif.id}
                     style={[n.notifCard, { backgroundColor: notif.type === "SOS" ? C.dangerLight : C.primaryLight }]}>
-                    <Text style={n.notifCardTitle}>
-                      {notif.type === "SOS" ? "🚨 Emergency Alert" : "🔔 Notification"}
-                    </Text>
-                    <Text style={n.notifCardSub}>{notif.message}</Text>
-                    <Text style={n.notifCardTime}>{new Date(notif.timestamp).toLocaleString()}</Text>
+                    <View style={n.notifCardMetaRow}>
+                      <Ionicons
+                        name={notif.type === "SOS" ? "warning" : "notifications"}
+                        size={16}
+                        color={notif.type === "SOS" ? C.danger : C.primary}
+                      />
+                      <Text style={[n.notifCardTitle, { fontSize: 16 * fontScale }]}>
+                        {notif.type === "SOS" ? "Emergency Alert" : "Notification"}
+                      </Text>
+                    </View>
+                    <Text style={[n.notifCardSub, { fontSize: 14 * fontScale }]}>{notif.message}</Text>
+                    <Text style={[n.notifCardTime, { fontSize: 13 * fontScale }]}>{new Date(notif.timestamp).toLocaleString()}</Text>
                   </View>
                 ))
               )}
@@ -514,7 +528,7 @@ export default function Account() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// Styles
 
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
@@ -537,7 +551,7 @@ const s = StyleSheet.create({
   },
   topBarTitle: { fontSize: 20, fontWeight: "800", color: C.text },
   topBarActions: { flexDirection: "row", alignItems: "center", gap: 4 },
-  iconBtn: { padding: 6, borderRadius: 10 },
+  iconBtn: { padding: 10, borderRadius: 10, minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   logoutBtn: { marginLeft: 4 },
 
   // Scroll
@@ -719,7 +733,7 @@ const s = StyleSheet.create({
   quickSub:   { fontSize: 13, color: C.textSub },
 });
 
-// ─── Modal styles ─────────────────────────────────────────────────────────────
+// Modal styles
 const m = StyleSheet.create({
   overlay: {
     flex:            1,
@@ -776,7 +790,7 @@ const m = StyleSheet.create({
   cancelText: { color: C.danger, fontSize: 16, fontWeight: "700" },
 });
 
-// ─── Notification panel styles ────────────────────────────────────────────────
+// Notification panel styles
 const n = StyleSheet.create({
   backdrop: {
     position:        "absolute",
@@ -827,7 +841,8 @@ const n = StyleSheet.create({
     padding:         14,
     marginBottom:    10,
   },
-  notifCardTitle: { fontSize: 15, fontWeight: "700", color: C.text,    marginBottom: 4 },
-  notifCardSub:   { fontSize: 13, color: C.textSub,  marginBottom: 2 },
-  notifCardTime:  { fontSize: 11, color: C.textMuted, marginTop: 4 },
+  notifCardMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  notifCardTitle: { fontSize: 16, fontWeight: "700", color: C.text,    marginBottom: 4 },
+  notifCardSub:   { fontSize: 14, color: C.textSub,  marginBottom: 2 },
+  notifCardTime:  { fontSize: 13, color: C.textMuted, marginTop: 4 },
 });

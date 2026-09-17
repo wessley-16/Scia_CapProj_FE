@@ -24,7 +24,6 @@ export default function govdocs() {
       >
           <Text style={styles.headerTitle}>Online Government Websites</Text>
 
-          {/* NCSC Link */}
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
@@ -44,7 +43,6 @@ export default function govdocs() {
             
           </TouchableOpacity>
 
-          {/* DSWD Link */}
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
@@ -64,7 +62,6 @@ export default function govdocs() {
             
           </TouchableOpacity>
 
-          {/* OSCA Link */}
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
@@ -84,7 +81,6 @@ export default function govdocs() {
             
           </TouchableOpacity>
 
-          {/* PhilHealth Link */}
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
@@ -104,7 +100,6 @@ export default function govdocs() {
             
           </TouchableOpacity>
 
-          {/* DOH Link */}
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
@@ -124,7 +119,6 @@ export default function govdocs() {
             
           </TouchableOpacity>
 
-          {/* SSS Link */}
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
@@ -144,7 +138,6 @@ export default function govdocs() {
             
           </TouchableOpacity>
 
-          {/* GSIS Link */}
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
@@ -164,7 +157,6 @@ export default function govdocs() {
             
           </TouchableOpacity>
 
-          {/* PSA Link */}
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
@@ -203,7 +195,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "bold",
     color: "#1F2937",
     marginBottom: 20,
@@ -213,8 +205,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "white",
     borderRadius: 16,
-    padding: 8,
-    marginBottom: 24,
+    padding: 14,
+    marginBottom: 20,
+    minHeight: 84,
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -228,11 +221,12 @@ const styles = StyleSheet.create({
   },
   textWrapper: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 14,
   },
   linkText: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "black",
+    color: "#111827",
+    lineHeight: 26,
   },
 })

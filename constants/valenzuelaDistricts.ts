@@ -1,4 +1,3 @@
-    
 export const DISTRICT_1_BARANGAYS = [
   "Arkong Bato",
   "Balangkas",
@@ -49,7 +48,7 @@ const ALIASES: Record<string, string> = {
   "general t. de leon": "gen. t. de leon",
   "general t de leon": "gen. t. de leon",
   "gen t de leon": "gen. t. de leon",
-  "canumay": "canumay east", // pre-split records — best-effort guess
+  "canumay": "canumay east", // pre-split records, best-effort guess
 };
 
 const normalize = (s: string) =>

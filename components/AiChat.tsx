@@ -1,4 +1,3 @@
-// components/AiChat.tsx
 import ChatHeader from "@/components/chat/ChatHeader";
 import ChatHistoryDrawer from "@/components/chat/ChatHistoryDrawer";
 import ChatInputArea from "@/components/chat/ChatInputArea";
@@ -36,16 +35,14 @@ const AiChat = () => {
   const flatListRef = useRef<FlatList>(null);
   const [historyVisible, setHistoryVisible] = useState(false);
 
-  // Whether the user is currently sitting near the bottom of the list.
-  // Only when this is true do we auto-follow new content — otherwise
-  // someone scrolled up to reread something and a forced scroll would just
-  // yank them back down (this was the source of the up/down glitching).
+  // Whether the user is currently near the bottom of the list. Only then
+  // do we auto-follow new content, so scrolling up to reread something
+  // doesn't get yanked back down.
   const isNearBottomRef = useRef(true);
   const previousMessageCountRef = useRef(0);
   const previousSessionIdRef = useRef<string | null>(null);
-  // Set right before we decide to scroll, so onContentSizeChange knows
-  // whether to give it a follow-up nudge once the new bubble has actually
-  // finished measuring (FlatList sometimes under-scrolls on the first try).
+  // Set right before we scroll, so onContentSizeChange knows whether to
+  // give it a follow-up nudge once the new bubble finishes measuring.
   const pendingScrollRef = useRef(false);
 
   const scrollToBottom = useCallback((animated: boolean) => {
@@ -59,8 +56,8 @@ const AiChat = () => {
     isNearBottomRef.current = distanceFromBottom < NEAR_BOTTOM_THRESHOLD;
   }, []);
 
-  // Runs only when the messages array actually changes, or when a different
-  // conversation is opened — never on every layout/keyboard event.
+  // Runs only when messages change or a different conversation opens,
+  // never on every layout or keyboard event.
   useEffect(() => {
     const sessionChanged = activeSessionId !== previousSessionIdRef.current;
     previousSessionIdRef.current = activeSessionId;
@@ -69,10 +66,8 @@ const AiChat = () => {
     previousMessageCountRef.current = messages.length;
 
     if (sessionChanged) {
-      // Opened a different conversation (or it's the initial load / a
-      // hydrated history replacing the placeholder, or a brand-new chat) —
-      // always jump straight to its latest point, silently, regardless of
-      // whether it's longer or shorter than whatever was open before.
+      // Opened a different conversation (or the initial load, or a
+      // brand-new chat): jump straight to its latest point, silently.
       isNearBottomRef.current = true;
       pendingScrollRef.current = true;
       scrollToBottom(false);
@@ -91,7 +86,7 @@ const AiChat = () => {
     }
   }, [messages, activeSessionId, scrollToBottom]);
 
-  // Follow the "typing…" indicator too, same near-bottom rule.
+  // Follow the "typing..." indicator too, same near-bottom rule.
   useEffect(() => {
     if (loading && isNearBottomRef.current) {
       pendingScrollRef.current = true;
@@ -99,10 +94,9 @@ const AiChat = () => {
     }
   }, [loading, scrollToBottom]);
 
-  // A newly-added bubble can still be mid-measurement when the effect above
-  // fires. If we actually decided to auto-scroll, give it one silent
-  // follow-up nudge once its real size is in — otherwise do nothing, so
-  // content growing off-screen (while reading history) never moves you.
+  // A newly-added bubble can still be mid-measurement when the effect
+  // above fires. If we decided to auto-scroll, give it one silent
+  // follow-up nudge once its real size is in.
   const handleContentSizeChange = useCallback(() => {
     if (pendingScrollRef.current) {
       pendingScrollRef.current = false;
@@ -132,7 +126,7 @@ const AiChat = () => {
           loading ? (
             <View style={styles.typingContainer}>
               <ActivityIndicator size="small" color="#2b5ce6" />
-              <Text style={[styles.typingText, { fontSize: 13 * fontScale }]}>
+              <Text style={[styles.typingText, { fontSize: 14 * fontScale }]}>
                 HealthAI is typing...
               </Text>
             </View>
@@ -193,7 +187,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   typingText: {
-    fontSize: 13,
     color: "#4b5563",
     fontWeight: "500",
   },

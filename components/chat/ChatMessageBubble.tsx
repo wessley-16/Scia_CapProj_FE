@@ -1,4 +1,3 @@
-// components/chat/ChatMessageBubble.tsx
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { memo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -23,28 +22,28 @@ function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
   return (
     <View style={[styles.container, isUser ? styles.containerUser : styles.containerBot]}>
 
-      {/* ── Bot header ── */}
+      {/* Bot header */}
       {!isUser && (
         <View style={styles.header}>
           <View style={styles.botAvatar}>
             <MaterialCommunityIcons name="shield-star" size={18} color="white" />
           </View>
-          <Text style={[styles.headerText, { fontSize: 11 * fontScale }]}>
+          <Text style={[styles.headerText, { fontSize: 13 * fontScale }]}>
             HEALTHAI ASSISTANT • {message.time || "NOW"}
           </Text>
         </View>
       )}
 
-      {/* ── User header ── */}
+      {/* User header */}
       {isUser && (
         <View style={[styles.header, styles.headerUser]}>
-          <Text style={[styles.headerText, { fontSize: 11 * fontScale }]}>
+          <Text style={[styles.headerText, { fontSize: 13 * fontScale }]}>
             YOU • {message.time || "JUST NOW"}
           </Text>
         </View>
       )}
 
-      {/* ── Bubble ── */}
+      {/* Bubble */}
       <View style={[styles.bubble, isUser ? styles.userBubble : styles.botBubble]}>
         {isUser ? (
           <Text style={[styles.userText, { fontSize: 16 * fontScale, lineHeight: 25 * fontScale }]}>
@@ -54,7 +53,7 @@ function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
           <MarkdownText text={message.text} fontScale={fontScale} />
         )}
 
-        {/* ── Action buttons ── */}
+        {/* Action buttons */}
         {!isUser && message.actions && message.actions.length > 0 && (
           <View style={styles.actionsContainer}>
             {message.actions.map((action, index) => (
@@ -67,7 +66,7 @@ function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
                   size={22}
                   color={action.textColor || "#000"}
                 />
-                <Text style={[styles.actionBtnText, { color: action.textColor || "#000", fontSize: 13 * fontScale }]}>
+                <Text style={[styles.actionBtnText, { color: action.textColor || "#000", fontSize: 15 * fontScale }]}>
                   {action.label}
                 </Text>
               </TouchableOpacity>
@@ -79,10 +78,8 @@ function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
   );
 }
 
-// Memoized so FlatList only re-renders bubbles whose actual content
-// changed — without this, every state update anywhere in the chat (a new
-// streamed chunk, a session swap, etc.) re-renders EVERY bubble in the
-// list, which is what was causing the visible lag/jank.
+// Memoized so the list only re-renders bubbles whose content changed,
+// instead of every bubble on any chat state update.
 export default memo(ChatMessageBubble, (prev, next) =>
   prev.message.id === next.message.id &&
   prev.message.text === next.message.text &&
@@ -120,7 +117,7 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontWeight: "700",
-    color: "#9ca3af",
+    color: "#4B5563",
     textTransform: "uppercase",
     letterSpacing: 0.3,
   },

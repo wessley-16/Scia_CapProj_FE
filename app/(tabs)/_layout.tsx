@@ -45,10 +45,10 @@ const CustomTabBar = ({
       >
         <Ionicons
           name={isFocused ? item.active : item.icon}
-          size={26}
-          color={isFocused ? "white" : "#e4e4e4"}
+          size={28}
+          color={isFocused ? "white" : "#E5E7EB"}
         />
-        <Text style={[styles.label, { color: isFocused ? "white" : "#e4e4e4" }]}>
+        <Text style={[styles.label, { color: isFocused ? "white" : "#E5E7EB" }]}>
           {item.label}
         </Text>
       </TouchableOpacity>
@@ -75,8 +75,9 @@ const CustomTabBar = ({
         activeOpacity={0.9}
         onPress={onScanPress}
         style={styles.scanButton}
+        hitSlop={6}
       >
-        <Entypo name="mic" size={32} color="#2356E1" />
+        <Entypo name="mic" size={34} color="#2356E1" />
       </TouchableOpacity>
     </View>
   );
@@ -103,7 +104,7 @@ export default function Layout() {
         >
           <Tabs.Screen name="home" />
 
-          {/* Healthcare is now a hidden route — still navigable from home buttons */}
+          {/* Healthcare is now a hidden route, still navigable from home buttons */}
           <Tabs.Screen
             name="healthcare"
             options={{ href: null }}
@@ -124,7 +125,7 @@ export default function Layout() {
             options={{ href: null, tabBarStyle: { display: "none" } }}
           />
 
-          {/* Hidden legacy screens — kept so existing links don't break */}
+          {/* Hidden legacy screens, kept so existing links don't break */}
           <Tabs.Screen name="medicine" options={{ href: null }} />
           <Tabs.Screen name="appointment" options={{ href: null }} />
           <Tabs.Screen name="govdocs" options={{ href: null }} />
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: "row",
-    height: 70,
+    height: 76,
     width: "100%",
     alignItems: "center",
     borderTopWidth: 3,
@@ -161,9 +162,9 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   label: {
-    fontSize: 11,
-    marginTop: 3,
-    fontWeight: "600",
+    fontSize: 13,
+    marginTop: 4,
+    fontWeight: "700",
   },
   centerSlot: {
     width: 80,
@@ -173,17 +174,18 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   scanLabel: {
-    fontSize: 11,
-    color: "#e4e4e4",
+    fontSize: 13,
+    color: "#E5E7EB",
+    fontWeight: "600",
     textAlign: "center",
     width: "100%",
   },
   scanButton: {
     position: "absolute",
-    top: -30,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    top: -32,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     borderWidth: 4,
     borderColor: "#2356E1",
     backgroundColor: "white",

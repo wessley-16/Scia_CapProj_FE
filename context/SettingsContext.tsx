@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
-// Define the shape of the context value
 interface SettingsContextType {
   fontScale: number;
   language: string;
@@ -10,10 +9,8 @@ interface SettingsContextType {
   t: (key: string) => string;
 }
 
-// Create context with the type, defaulting to null (but typed)
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
-// Custom hook to use the context
 export const useSettings = (): SettingsContextType => {
   const context = useContext(SettingsContext);
   if (!context) {
@@ -22,16 +19,15 @@ export const useSettings = (): SettingsContextType => {
   return context;
 };
 
-// Provider component
 interface SettingsProviderProps {
   children: ReactNode;
 }
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
-  const [fontScale, setFontScaleState] = useState<number>(1); // Default to medium
-  const [language, setLanguageState] = useState<string>('tl'); // Default to Tagalog — most SCIA users are Filipino seniors
+  const [fontScale, setFontScaleState] = useState<number>(1);
+  // Defaults to Tagalog since most SCIA users are Filipino seniors.
+  const [language, setLanguageState] = useState<string>('tl');
 
-  // Persistence logic (unchanged)
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -64,7 +60,6 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     }
   };
 
-  // Translation helper (unchanged, but ensure it matches the interface)
   const t = (key: string): string => {
     const translations: Record<string, Record<string, string>> = {
       en: {
@@ -179,7 +174,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         guest: 'Guest',
         idOrNamePlaceholder: 'ID Number, Full Name, or Phone Number',
         passwordPlaceholder: 'Password',
-        loginHintTitle: '💡 You can log in using your:',
+        loginHintTitle: 'You can log in using your:',
         loginHintId: '• 6-digit OSCA ID number',
         loginHintPhone: '• Phone number (e.g. 09955015206)',
         loginHintFullName: '• Full name (e.g. Juan Santos Cruz)',
@@ -319,7 +314,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         guest: 'Bisita',
         idOrNamePlaceholder: 'ID Number, Buong Pangalan, o Numero ng Telepono',
         passwordPlaceholder: 'Password',
-        loginHintTitle: '💡 Maaari kang mag-log in gamit ang:',
+        loginHintTitle: 'Maaari kang mag-log in gamit ang:',
         loginHintId: '• 6-digit na numero ng OSCA ID',
         loginHintPhone: '• Numero ng telepono (hal. 09955015206)',
         loginHintFullName: '• Buong pangalan (hal. Juan Santos Cruz)',
@@ -364,5 +359,4 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 };
 
-// Export the context for advanced use
 export default SettingsContext;

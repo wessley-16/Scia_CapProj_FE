@@ -1,4 +1,3 @@
-// context/AuthContext.tsx
 import { COLLECTIONS } from "@/lib/firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getAuth, onAuthStateChanged } from "@react-native-firebase/auth";
@@ -86,7 +85,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
           "userName",
           `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim(),
         );
-        // NOTE: no fallback to data.address here — that's free-text street
+        // NOTE: no fallback to data.address here. That's free-text street
         // input and will never match an admin's exact barangay name, which
         // silently broke barangay-scoped announcements/events/SOS for any
         // account created before the barangay field existed.
@@ -114,10 +113,9 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
     AsyncStorage.multiRemove(USER_CACHE_KEYS);
   };
 
-  // Explicitly enter Guest mode. This is only ever safe to call when there is
-  // no active Firebase session (callers must check `user` first) — it wipes
-  // any leftover cached profile data so Guest mode never shows a previous
-  // account's name, barangay, medicines, etc.
+  // Only ever safe to call when there is no active Firebase session
+  // (callers must check `user` first). Wipes any leftover cached profile
+  // data so Guest mode never shows a previous account's details.
   const enterGuestMode = async () => {
     setUser(null);
     setIsGuest(true);
@@ -127,7 +125,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(authInstance, async (firebaseUser) => {
       if (firebaseUser) {
-        // A real account is authenticated with Firebase — Guest mode can't
+        // A real account is authenticated with Firebase. Guest mode can't
         // coexist with a signed-in session.
         setIsGuest(false);
         const profile = await fetchUserProfile(firebaseUser.uid);
@@ -137,7 +135,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
         // whatever profile happened to still be cached in AsyncStorage, which
         // is what caused Guest mode (and a fresh sign-out) to incorrectly show
         // the last logged-in account. There is no session, so there is no
-        // user — full stop.
+        // user.
         setUser(null);
       }
       setLoading(false);

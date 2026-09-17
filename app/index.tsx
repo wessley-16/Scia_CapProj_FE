@@ -1,6 +1,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { loginByIdentifier, logoutUser } from "@/lib/firebase";
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -46,9 +47,7 @@ export default function Index() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
-  // There IS an existing saved/signed-in account whenever `user` is populated
-  // (AuthContext only ever sets this from a real, current Firebase session —
-  // see the fix in context/AuthContext.tsx).
+  // user is populated only for a real, current Firebase session
   const displayName = user
     ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.idNumber
     : "";
@@ -65,9 +64,7 @@ export default function Index() {
 
   const avatarSource = avatarUri ? { uri: avatarUri } : defaultAvatar;
 
-  // Guest mode and account creation must never run while a real account is
-  // still signed in — otherwise Guest would leak that account's data, or a
-  // fresh sign-up could silently orphan the still-active session.
+  // Prevents guest mode or signup from running while already signed in
   const blockIfSignedIn = () => {
     if (!user) return false;
     Alert.alert(
@@ -142,8 +139,8 @@ export default function Index() {
         onPress={() => setSettingsVisible(true)}
         accessibilityLabel={t("languageAndFont")}
       >
-        <Text style={styles.settingsBtnIcon}>🌐</Text>
-        <Text style={[styles.settingsBtnText, { fontSize: 13 * fontScale }]}>
+        <Ionicons name="globe-outline" size={18} color="#2563EB" style={styles.settingsBtnIcon} />
+        <Text style={[styles.settingsBtnText, { fontSize: 15 * fontScale }]}>
           {t("languageAndFont")}
         </Text>
       </TouchableOpacity>
@@ -188,42 +185,43 @@ export default function Index() {
                 <TouchableOpacity
                   style={styles.closeBtn}
                   onPress={() => setShowLogin(false)}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  <Text style={styles.closeText}>✕</Text>
+                  <Ionicons name="close" size={26} color="#111827" />
                 </TouchableOpacity>
 
                 <TextInput
-                  style={[styles.input, { fontSize: 16 * fontScale }]}
+                  style={[styles.input, { fontSize: 17 * fontScale }]}
                   placeholder={t("idOrNamePlaceholder")}
-                  placeholderTextColor="#888"
+                  placeholderTextColor="#6B7280"
                   value={identifier}
                   onChangeText={setIdentifier}
                   autoCapitalize="words"
                   autoCorrect={false}
                 />
                 <TextInput
-                  style={[styles.input, { fontSize: 16 * fontScale }]}
+                  style={[styles.input, { fontSize: 17 * fontScale }]}
                   placeholder={t("passwordPlaceholder")}
-                  placeholderTextColor="#888"
+                  placeholderTextColor="#6B7280"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry
                 />
 
                 <View style={styles.hintBox}>
-                  <Text style={[styles.hintText, { fontSize: 13 * fontScale }]}>
+                  <Text style={[styles.hintText, { fontSize: 15 * fontScale }]}>
                     {t("loginHintTitle")}
                   </Text>
-                  <Text style={[styles.hintItem, { fontSize: 12 * fontScale }]}>
+                  <Text style={[styles.hintItem, { fontSize: 14 * fontScale }]}>
                     {t("loginHintId")}
                   </Text>
-                  <Text style={[styles.hintItem, { fontSize: 12 * fontScale }]}>
+                  <Text style={[styles.hintItem, { fontSize: 14 * fontScale }]}>
                     {t("loginHintPhone")}
                   </Text>
-                  <Text style={[styles.hintItem, { fontSize: 12 * fontScale }]}>
+                  <Text style={[styles.hintItem, { fontSize: 14 * fontScale }]}>
                     {t("loginHintFullName")}
                   </Text>
-                  <Text style={[styles.hintItem, { fontSize: 12 * fontScale }]}>
+                  <Text style={[styles.hintItem, { fontSize: 14 * fontScale }]}>
                     {t("loginHintFirstLast")}
                   </Text>
                 </View>
@@ -283,8 +281,9 @@ export default function Index() {
             <TouchableOpacity
               style={styles.modalCloseBtn}
               onPress={() => setSettingsVisible(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Text style={styles.closeText}>✕</Text>
+              <Ionicons name="close" size={26} color="#111827" />
             </TouchableOpacity>
 
             <Text style={[styles.modalTitle, { fontSize: 20 * fontScale }]}>
@@ -374,13 +373,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#EEF2FF",
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
+    borderRadius: 22,
+    minHeight: 44,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: "#C7D2FE",
   },
-  settingsBtnIcon: { fontSize: 16, marginRight: 6 },
+  settingsBtnIcon: { marginRight: 6 },
   settingsBtnText: { color: "#2563EB", fontWeight: "700" },
   formContainer: {
     width: "100%",
@@ -391,7 +391,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   closeBtn: { position: "absolute", top: 8, right: 10, zIndex: 1 },
-  closeText: { fontSize: 24, fontWeight: "bold", color: "#000" },
   input: {
     backgroundColor: "#F7F9FC",
     padding: 12,
@@ -399,9 +398,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#111",
   },
-  hintBox: { marginTop: 4, marginBottom: 6, gap: 3 },
-  hintText: { color: "#555", lineHeight: 20, fontWeight: "600" },
-  hintItem: { color: "#666", lineHeight: 18, paddingLeft: 4 },
+  hintBox: { marginTop: 4, marginBottom: 6, gap: 4 },
+  hintText: { color: "#374151", lineHeight: 22, fontWeight: "700" },
+  hintItem: { color: "#4B5563", lineHeight: 20, paddingLeft: 4 },
   primaryBtn: {
     width: "100%",
     paddingVertical: 14,
@@ -423,7 +422,6 @@ const styles = StyleSheet.create({
   secondaryText: { color: "#2563EB", fontWeight: "700" },
   guest: { textAlign: "center", color: "#2563EB", fontWeight: "600" },
 
-  // Welcome-back state (existing saved session)
   welcomeCard: { width: "100%", alignItems: "center" },
   welcomeAvatar: {
     width: 88,
@@ -445,7 +443,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "600",
   },
-  notYouBtn: { marginTop: 6, padding: 6 },
+  notYouBtn: { marginTop: 6, padding: 10 },
   notYouText: {
     color: "#6B7280",
     textAlign: "center",

@@ -1,4 +1,3 @@
-// components/home/EventJoinFormModal.tsx
 import { Event, EventFormField } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
@@ -41,9 +40,8 @@ export default function EventJoinFormModal({
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [displayEvent, setDisplayEvent] = useState<Event | null>(null);
 
-  // Keep rendering the last event's content while the sheet slides shut —
-  // `event` goes null the same tick `visible` does, so without this the
-  // modal would go blank mid-animation instead of closing on its content.
+  // Keeps rendering the last event's content while the sheet slides shut,
+  // so the modal doesn't go blank mid-animation.
   useEffect(() => {
     if (event) setDisplayEvent(event);
   }, [event]);
@@ -96,18 +94,18 @@ export default function EventJoinFormModal({
             <View style={styles.detailsBlock}>
               {!!dateLabel && (
                 <View style={styles.detailRow}>
-                  <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-                  <Text style={[styles.detailText, { fontSize: 14 * fontScale }]}>{dateLabel}</Text>
+                  <Ionicons name="calendar-outline" size={18} color="#4B5563" />
+                  <Text style={[styles.detailText, { fontSize: 15 * fontScale }]}>{dateLabel}</Text>
                 </View>
               )}
               {!!getLocation(displayEvent) && (
                 <View style={styles.detailRow}>
-                  <Ionicons name="location-outline" size={16} color="#6B7280" />
-                  <Text style={[styles.detailText, { fontSize: 14 * fontScale }]}>{getLocation(displayEvent)}</Text>
+                  <Ionicons name="location-outline" size={18} color="#4B5563" />
+                  <Text style={[styles.detailText, { fontSize: 15 * fontScale }]}>{getLocation(displayEvent)}</Text>
                 </View>
               )}
               {!!getDescription(displayEvent) && (
-                <Text style={[styles.description, { fontSize: 14 * fontScale }]}>
+                <Text style={[styles.description, { fontSize: 15 * fontScale }]}>
                   {getDescription(displayEvent)}
                 </Text>
               )}
@@ -116,13 +114,13 @@ export default function EventJoinFormModal({
             {fields.length > 0 && (
               <>
                 <View style={styles.divider} />
-                <Text style={[styles.subtitle, { fontSize: 14 * fontScale }]}>
+                <Text style={[styles.subtitle, { fontSize: 15 * fontScale }]}>
                   Fill in the information below to join.
                 </Text>
 
                 {fields.map((field) => (
                   <View key={field.id} style={styles.fieldBlock}>
-                    <Text style={[styles.fieldLabel, { fontSize: 15 * fontScale }]}>
+                    <Text style={[styles.fieldLabel, { fontSize: 16 * fontScale }]}>
                       {field.label}
                       {field.required && <Text style={styles.required}> *</Text>}
                     </Text>
@@ -141,7 +139,7 @@ export default function EventJoinFormModal({
                               <Text
                                 style={[
                                   styles.optionChipText,
-                                  { fontSize: 14 * fontScale },
+                                  { fontSize: 15 * fontScale },
                                   selected && styles.optionChipTextSelected,
                                 ]}
                               >
@@ -156,12 +154,12 @@ export default function EventJoinFormModal({
                         style={[
                           styles.input,
                           field.type === "textarea" && styles.inputMultiline,
-                          { fontSize: 15 * fontScale },
+                          { fontSize: 16 * fontScale },
                         ]}
                         value={answers[field.id] ?? ""}
                         onChangeText={(v) => setAnswer(field.id, v)}
                         placeholder={field.label}
-                        placeholderTextColor="#9CA3AF"
+                        placeholderTextColor="#6B7280"
                         keyboardType={field.type === "number" ? "numeric" : "default"}
                         multiline={field.type === "textarea"}
                         numberOfLines={field.type === "textarea" ? 3 : 1}
@@ -174,7 +172,7 @@ export default function EventJoinFormModal({
           </ScrollView>
 
           {!readyToJoin && requiredFields.length > 0 && (
-            <Text style={[styles.progressHint, { fontSize: 13 * fontScale }]}>
+            <Text style={[styles.progressHint, { fontSize: 14 * fontScale }]}>
               {requiredFields.length - requiredFields.filter((f) => answers[f.id]?.trim()).length} of{" "}
               {requiredFields.length} required field
               {requiredFields.length === 1 ? "" : "s"} left
@@ -212,10 +210,10 @@ const styles = StyleSheet.create({
   title: { fontWeight: "800", color: "#111827", flex: 1, marginRight: 12 },
   detailsBlock: { marginBottom: 4 },
   detailRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  detailText: { color: "#6B7280" },
+  detailText: { color: "#4B5563" },
   description: { color: "#374151", lineHeight: 20, marginTop: 4 },
   divider: { height: 1, backgroundColor: "#E5E7EB", marginVertical: 16 },
-  subtitle: { color: "#6B7280", marginBottom: 16 },
+  subtitle: { color: "#4B5563", marginBottom: 16 },
   fieldsScroll: { marginBottom: 8 },
   fieldBlock: { marginBottom: 16 },
   fieldLabel: { fontWeight: "700", color: "#111827", marginBottom: 8 },
@@ -240,7 +238,7 @@ const styles = StyleSheet.create({
   optionChipSelected: { backgroundColor: "#EEF2FF", borderColor: "#2356E1" },
   optionChipText: { color: "#374151", fontWeight: "600" },
   optionChipTextSelected: { color: "#2356E1" },
-  progressHint: { color: "#9CA3AF", textAlign: "center", marginBottom: 8 },
+  progressHint: { color: "#4B5563", textAlign: "center", marginBottom: 8 },
   joinBtn: {
     backgroundColor: "#2356E1",
     borderRadius: 14,
@@ -248,8 +246,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 8,
   },
-  // Grey while required fields are still empty — turns blue (joinBtn's
-  // color above) the moment every required field has an answer.
+  // Grey while required fields are empty, blue once all are filled in.
   joinBtnDisabled: { backgroundColor: "#D1D5DB" },
   joinBtnText: { color: "#fff", fontWeight: "700" },
 });

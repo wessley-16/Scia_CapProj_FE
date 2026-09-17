@@ -96,7 +96,7 @@ export default function Appointment() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-        <Text style={[styles.headerTitle, { fontSize: 24 * fontScale }]}>{t("scheduleAppointment")}</Text>
+        <Text style={[styles.headerTitle, { fontSize: 26 * fontScale }]}>{t("scheduleAppointment")}</Text>
 
         <View style={styles.calendarWrapper}>
           <Calendar
@@ -111,8 +111,8 @@ export default function Appointment() {
 
         {selectedDate ? (
           <View style={styles.selectedDateContainer}>
-            <Text style={[styles.selectedDateLabel, { fontSize: 16 * fontScale }]}>{t("selectedDate")}</Text>
-            <Text style={[styles.selectedDateText, { fontSize: 16 * fontScale }]}>{selectedDate}</Text>
+            <Text style={[styles.selectedDateLabel, { fontSize: 20 * fontScale }]}>{t("selectedDate")}</Text>
+            <Text style={[styles.selectedDateText, { fontSize: 20 * fontScale }]}>{selectedDate}</Text>
           </View>
         ) : null}
 
@@ -123,7 +123,7 @@ export default function Appointment() {
             setErrorMessage("");
           }}
         >
-          <Text style={[styles.addButtonText, { fontSize: 16 * fontScale }]}>{t("bookAppointment")}</Text>
+          <Text style={[styles.addButtonText, { fontSize: 20 * fontScale }]}>{t("bookAppointment")}</Text>
         </TouchableOpacity>
 
         {appointments.map((item, index) => (
@@ -136,10 +136,10 @@ export default function Appointment() {
             ]}
           >
             <View style={styles.appointmentHeader}>
-              <Text style={[styles.appointmentText, item.status === "done" && styles.appointmentTextDone, { fontSize: 16 * fontScale }]}>
+              <Text style={[styles.appointmentText, item.status === "done" && styles.appointmentTextDone, { fontSize: 20 * fontScale }]}>
                 {item.type}
               </Text>
-              {item.status === "done" ? <Text style={[styles.doneIcon, { fontSize: 20 * fontScale }]}>✓</Text> : null}
+              {item.status === "done" ? <Text style={[styles.doneIcon, { fontSize: 22 * fontScale }]}>✓</Text> : null}
             </View>
 
             <Text style={styles.appointmentSub}>
@@ -176,10 +176,11 @@ export default function Appointment() {
         <Modal visible={modalVisible} animationType="slide" transparent>
           <View style={styles.modalBackground}>
             <View style={styles.modalContainer}>
-              <Text style={[styles.modalTitle, { fontSize: 18 * fontScale }]}>{t("newAppointment")}</Text>
+              <Text style={[styles.modalTitle, { fontSize: 20 * fontScale }]}>{t("newAppointment")}</Text>
 
               <TextInput
                 placeholder={t("hospitalClinic")}
+                placeholderTextColor="#6B7280"
                 value={hospital}
                 onChangeText={setHospital}
                 style={styles.input}
@@ -188,15 +189,17 @@ export default function Appointment() {
               <View style={styles.timeRow}>
                 <TextInput
                   placeholder={t("hhPlaceholder")}
+                  placeholderTextColor="#6B7280"
                   value={hour}
                   onChangeText={(text) => setHour(text.replace(/[^0-9]/g, ""))}
                   style={[styles.input, styles.timeInput]}
                   keyboardType="number-pad"
                   maxLength={2}
                 />
-                <Text style={[styles.timeSeparator, { fontSize: 18 * fontScale }]}>:</Text>
+                <Text style={[styles.timeSeparator, { fontSize: 20 * fontScale }]}>:</Text>
                 <TextInput
                   placeholder={t("mmPlaceholder")}
+                  placeholderTextColor="#6B7280"
                   value={minute}
                   onChangeText={(text) => setMinute(text.replace(/[^0-9]/g, ""))}
                   style={[styles.input, styles.timeInput]}
@@ -221,6 +224,7 @@ export default function Appointment() {
 
               <TextInput
                 placeholder={t("typePlaceholder")}
+                placeholderTextColor="#6B7280"
                 value={type}
                 onChangeText={setType}
                 style={styles.input}
@@ -261,7 +265,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "bold",
     color: "#1F2937",
     marginBottom: 20,
@@ -282,24 +286,26 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   selectedDateLabel: {
-    fontSize: 16,
-    color: "#4B5563",
+    fontSize: 18,
+    color: "#374151",
   },
   selectedDateText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#1E3A8A",
   },
   addButton: {
     marginTop: 20,
     backgroundColor: "#2563EB",
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
     alignItems: "center",
+    minHeight: 52,
+    justifyContent: "center",
   },
   addButtonText: {
     color: "white",
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
   },
   appointmentCard: {
@@ -310,17 +316,19 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   appointmentText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
   },
   appointmentSub: {
     marginTop: 4,
-    color: "#6B7280",
+    color: "#374151",
+    fontSize: 15,
   },
   appointmentDate: {
     marginTop: 6,
     color: "#2563EB",
     fontWeight: "bold",
+    fontSize: 15,
   },
   appointmentHeader: {
     flexDirection: "row",
@@ -328,7 +336,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   doneIcon: {
-    fontSize: 20,
+    fontSize: 22,
     color: "#10B981",
     fontWeight: "bold",
   },
@@ -353,9 +361,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   smallButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 8,
+    minHeight: 40,
+    justifyContent: "center",
   },
   doneButton: {
     backgroundColor: "#10B981",
@@ -366,6 +376,7 @@ const styles = StyleSheet.create({
   smallButtonText: {
     color: "white",
     fontWeight: "bold",
+    fontSize: 15,
   },
   modalBackground: {
     flex: 1,
@@ -379,34 +390,41 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
     marginBottom: 15,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderWidth: 1.5,
+    borderColor: "#D1D5DB",
     borderRadius: 10,
-    padding: 12,
+    padding: 14,
     marginBottom: 12,
+    fontSize: 16,
+    minHeight: 50,
   },
   saveButton: {
     backgroundColor: "#2563EB",
-    padding: 14,
+    padding: 16,
     borderRadius: 10,
     alignItems: "center",
+    minHeight: 52,
+    justifyContent: "center",
   },
   saveButtonText: {
     color: "white",
     fontWeight: "bold",
+    fontSize: 17,
   },
   cancelButton: {
     marginTop: 10,
     alignItems: "center",
+    paddingVertical: 10,
   },
   cancelButtonText: {
     color: "#EF4444",
     fontWeight: "bold",
+    fontSize: 16,
   },
   contentContainer: {
     paddingHorizontal: 20,
@@ -432,13 +450,15 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   amPmButton: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    borderWidth: 1.5,
+    borderColor: "#9CA3AF",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 8,
     marginLeft: 4,
     backgroundColor: "#F9FAFB",
+    minHeight: 44,
+    justifyContent: "center",
   },
   amPmButtonActive: {
     backgroundColor: "#2563EB",
@@ -447,6 +467,7 @@ const styles = StyleSheet.create({
   amPmText: {
     color: "#374151",
     fontWeight: "bold",
+    fontSize: 15,
   },
   amPmTextActive: {
     color: "white",
@@ -456,12 +477,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EF4444",
     borderRadius: 10,
-    padding: 10,
+    padding: 12,
     marginBottom: 12,
     alignItems: "center",
   },
   errorText: {
     color: "#B91C1C",
     fontWeight: "bold",
+    fontSize: 15,
   },
 });

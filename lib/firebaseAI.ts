@@ -1,4 +1,3 @@
-// lib/firebaseAI.ts
 import { getApp } from "@react-native-firebase/app";
 import {
   getAI,
@@ -6,13 +5,11 @@ import {
   VertexAIBackend,
 } from "@react-native-firebase/ai";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 export type ChatHistoryItem = {
   role: "user" | "model";
   parts: { text: string }[];
 };
 
-// ── System prompt for HealthAI ────────────────────────────────────────────────
 const HEALTH_AI_SYSTEM_PROMPT = `You are HealthAI, a friendly and knowledgeable personal health assistant for senior citizens in the Philippines. 
 
 Your role is to:
@@ -29,11 +26,10 @@ Important guidelines:
 - If asked about emergencies, advise calling emergency services immediately
 - You are not a substitute for professional medical advice`;
 
-// ── Create a Vertex AI chat session ──────────────────────────────────────────
 export function createNativeChatSession(history: ChatHistoryItem[] = []) {
   const app = getApp();
 
-  // Use Vertex AI backend (backed by Google Cloud — enterprise grade)
+  // Vertex AI backend (Google Cloud, enterprise grade)
   const ai = getAI(app, { backend: new VertexAIBackend() });
 
   const model = getGenerativeModel(ai, {
@@ -49,7 +45,6 @@ export function createNativeChatSession(history: ChatHistoryItem[] = []) {
     },
   });
 
-  // Start a chat session with existing history
   return model.startChat({
     history,
   });

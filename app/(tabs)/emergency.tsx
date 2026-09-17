@@ -24,9 +24,8 @@ import { sendSOSAlert, subscribeToSOSAlert } from '../../lib/firebase';
 const HOLD_DURATION_MS = 5000;
 const COOLDOWN_MS = 5 * 60 * 1000;
 
-// Names/spelling match constants/barangays.ts (and the admin dashboard)
-// exactly — an SOS alert's barangay has to string-match what the admin
-// side scopes by, or a scoped sub-admin never sees it on the SOS Map.
+// Names must match constants/barangays.ts and the admin dashboard exactly,
+// so a scoped sub-admin can see the alert on the SOS Map.
 const valenzuelaBarangays = [
   { name: 'Arkong Bato',         lat: 14.7175, lng: 120.9800 },
   { name: 'Bagbaguin',           lat: 14.7365, lng: 120.9920 },
@@ -72,20 +71,12 @@ const getBarangayFromCoords = (lat: number, lng: number): string => {
   return closest.name;
 };
 
-// Google's own free "embed" endpoint — no API key needed. It's a single,
-// self-contained page from Google's own servers, unlike the old Leaflet
-// setup which had to separately load leaflet.js, leaflet.css, tile images,
-// and marker-icon images from three different third-party CDNs (unpkg,
-// OpenStreetMap, GitHub, cdnjs) — if any one of those failed to load on a
-// spotty connection, the marker or the whole map showed up as a broken image.
+// Google's free embed endpoint, no API key needed.
 const buildGoogleMapsEmbedUrl = (lat: number, lng: number) =>
   `https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`;
 
-// Wraps the embed URL in an actual <iframe>. A WebView loads a URL as the
-// TOP-LEVEL document, not nested inside a real iframe — Google's embed
-// endpoint detects that and rejects it with "must be used in an iframe".
-// Loading this tiny local HTML shell instead (which DOES contain a real
-// iframe pointing at the embed URL) satisfies that check.
+// Wraps the embed URL in a real iframe, since a WebView loads a URL as the
+// top-level document and Google's embed endpoint rejects that directly.
 const buildGoogleMapsEmbedHtml = (lat: number, lng: number) => `
   <!DOCTYPE html>
   <html>
@@ -248,17 +239,17 @@ export default function EmergencyScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Top bar — centered title, no settings button */}
+      {/* Top bar, centered title, no settings button */}
       <View style={styles.topBar}>
         <Ionicons name="alert-circle" size={22} color="#fff" style={styles.topBarIcon} />
-        <Text style={[styles.topBarTitle, { fontSize: 20 * fontScale }]}>EMERGENCY</Text>
+        <Text style={[styles.topBarTitle, { fontSize: 22 * fontScale }]}>EMERGENCY</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
 
         {/* SOS button */}
         <View style={styles.sosArea}>
-          <Text style={[styles.sosLabel, { fontSize: 15 * fontScale }]}>
+          <Text style={[styles.sosLabel, { fontSize: 17 * fontScale }]}>
             Press and hold for <Text style={styles.sosLabelBold}>5 seconds</Text> to send an alert
           </Text>
           <View style={styles.sosOuter}>
@@ -276,7 +267,7 @@ export default function EmergencyScreen() {
               <Text style={[styles.sosText, { fontSize: 24 * fontScale }]}>
                 {cooldownActive ? 'SENT' : isHolding ? String(secondsLeft) : 'HOLD'}
               </Text>
-              <Text style={[styles.sosSubText, { fontSize: 12 * fontScale }]}>
+              <Text style={[styles.sosSubText, { fontSize: 16 * fontScale }]}>
                 {cooldownActive ? 'Alert sent' : '5 seconds'}
               </Text>
             </Pressable>
@@ -288,10 +279,10 @@ export default function EmergencyScreen() {
           <View style={[styles.banner, styles.bannerDispatched]}>
             <Ionicons name="checkmark-circle" size={24} color="#065F46" style={styles.bannerIcon} />
             <View style={styles.bannerTextWrap}>
-              <Text style={[styles.bannerTitle, styles.bannerTitleDispatched, { fontSize: 15 * fontScale }]}>
+              <Text style={[styles.bannerTitle, styles.bannerTitleDispatched, { fontSize: 17 * fontScale }]}>
                 Responder dispatched
               </Text>
-              <Text style={[styles.bannerBody, styles.bannerBodyDispatched, { fontSize: 14 * fontScale }]}>
+              <Text style={[styles.bannerBody, styles.bannerBodyDispatched, { fontSize: 16 * fontScale }]}>
                 A responder has been sent to your location. Stay calm and stay where you are.
               </Text>
             </View>
@@ -302,10 +293,10 @@ export default function EmergencyScreen() {
           <View style={[styles.banner, styles.bannerWaiting]}>
             <Ionicons name="time-outline" size={24} color="#D97706" style={styles.bannerIcon} />
             <View style={styles.bannerTextWrap}>
-              <Text style={[styles.bannerTitle, styles.bannerTitleWaiting, { fontSize: 15 * fontScale }]}>
-                Alert sent — waiting for responder
+              <Text style={[styles.bannerTitle, styles.bannerTitleWaiting, { fontSize: 17 * fontScale }]}>
+                Alert sent. Waiting for responder.
               </Text>
-              <Text style={[styles.bannerBody, styles.bannerBodyWaiting, { fontSize: 14 * fontScale }]}>
+              <Text style={[styles.bannerBody, styles.bannerBodyWaiting, { fontSize: 16 * fontScale }]}>
                 Your location has been shared. A responder will be assigned shortly.
               </Text>
             </View>
@@ -314,24 +305,24 @@ export default function EmergencyScreen() {
 
         {/* Map */}
         <View style={styles.mapSection}>
-          <Text style={[styles.sectionLabel, { fontSize: 13 * fontScale }]}>
+          <Text style={[styles.sectionLabel, { fontSize: 15 * fontScale }]}>
             <Ionicons name="location-outline" size={14} color="#C0181F" /> Your pinned location
           </Text>
           <View style={styles.mapWrapper}>
             {mapLoadFailed ? (
               <View style={styles.mapPlaceholder}>
                 <Ionicons name="cloud-offline-outline" size={36} color="#C0181F" style={{ opacity: 0.5, marginBottom: 8 }} />
-                <Text style={[styles.mapPlaceholderText, { fontSize: 14 * fontScale, textAlign: 'center', paddingHorizontal: 16 }]}>
+                <Text style={[styles.mapPlaceholderText, { fontSize: 16 * fontScale, textAlign: 'center', paddingHorizontal: 16 }]}>
                   {t('mapLoadFailed')}
                 </Text>
                 <View style={styles.mapRetryRow}>
                   <TouchableOpacity style={styles.mapRetryBtn} onPress={handleRetryMap}>
                     <Ionicons name="refresh" size={16} color="#C0181F" />
-                    <Text style={[styles.mapRetryBtnText, { fontSize: 13 * fontScale }]}>{t('retry')}</Text>
+                    <Text style={[styles.mapRetryBtnText, { fontSize: 15 * fontScale }]}>{t('retry')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.mapRetryBtn} onPress={openInMapsApp}>
                     <Ionicons name="open-outline" size={16} color="#C0181F" />
-                    <Text style={[styles.mapRetryBtnText, { fontSize: 13 * fontScale }]}>{t('openInMaps')}</Text>
+                    <Text style={[styles.mapRetryBtnText, { fontSize: 15 * fontScale }]}>{t('openInMaps')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -357,7 +348,7 @@ export default function EmergencyScreen() {
             ) : (
               <View style={styles.mapPlaceholder}>
                 <Ionicons name="map-outline" size={40} color="#C0181F" style={{ opacity: 0.4, marginBottom: 8 }} />
-                <Text style={[styles.mapPlaceholderText, { fontSize: 14 * fontScale }]}>Fetching location…</Text>
+                <Text style={[styles.mapPlaceholderText, { fontSize: 16 * fontScale }]}>Fetching location…</Text>
               </View>
             )}
             <TouchableOpacity style={styles.refreshBtn} onPress={fetchLocation} accessibilityLabel="Refresh location">
@@ -368,29 +359,29 @@ export default function EmergencyScreen() {
 
         {/* Info card */}
         <View style={styles.infoCard}>
-          <Text style={[styles.infoCardTitle, { fontSize: 13 * fontScale }]}>Alert details</Text>
+          <Text style={[styles.infoCardTitle, { fontSize: 15 * fontScale }]}>Alert details</Text>
 
           <View style={styles.infoRow}>
             <Ionicons name="person-outline" size={20} color="#C0181F" style={styles.infoIcon} />
             <View style={styles.infoField}>
-              <Text style={[styles.infoKey, { fontSize: 12 * fontScale }]}>Name</Text>
-              <Text style={[styles.infoVal, { fontSize: 16 * fontScale }]}>{name}</Text>
+              <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Name</Text>
+              <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>{name}</Text>
             </View>
           </View>
 
           <View style={styles.infoRow}>
             <Ionicons name="home-outline" size={20} color="#C0181F" style={styles.infoIcon} />
             <View style={styles.infoField}>
-              <Text style={[styles.infoKey, { fontSize: 12 * fontScale }]}>Address</Text>
-              <Text style={[styles.infoVal, { fontSize: 16 * fontScale }]}>{fullAddress}</Text>
+              <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Address</Text>
+              <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>{fullAddress}</Text>
             </View>
           </View>
 
           <View style={styles.infoRow}>
             <Ionicons name="business-outline" size={20} color="#C0181F" style={styles.infoIcon} />
             <View style={styles.infoField}>
-              <Text style={[styles.infoKey, { fontSize: 12 * fontScale }]}>Barangay</Text>
-              <Text style={[styles.infoVal, { fontSize: 16 * fontScale }]}>{barangay}</Text>
+              <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Barangay</Text>
+              <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>{barangay}</Text>
             </View>
           </View>
 
@@ -398,7 +389,7 @@ export default function EmergencyScreen() {
             <View style={[styles.infoRow, styles.infoRowLast]}>
               <Ionicons name="radio-outline" size={20} color="#C0181F" style={styles.infoIcon} />
               <View style={styles.infoField}>
-                <Text style={[styles.infoKey, { fontSize: 12 * fontScale }]}>Status</Text>
+                <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Status</Text>
                 <View style={[
                   styles.statusPill,
                   isDispatched ? styles.statusPillDispatched : styles.statusPillPending,
@@ -406,7 +397,7 @@ export default function EmergencyScreen() {
                   <Text style={[
                     styles.statusPillText,
                     isDispatched ? styles.statusPillTextDispatched : styles.statusPillTextPending,
-                    { fontSize: 13 * fontScale },
+                    { fontSize: 15 * fontScale },
                   ]}>
                     {isDispatched
                       ? dispatchStatus!.charAt(0).toUpperCase() + dispatchStatus!.slice(1)
@@ -421,7 +412,7 @@ export default function EmergencyScreen() {
         {/* Instruction */}
         <View style={styles.instructionCard}>
           <Ionicons name="information-circle-outline" size={20} color="#EA580C" style={{ marginRight: 10, marginTop: 1 }} />
-          <Text style={[styles.instructionText, { fontSize: 14 * fontScale }]}>
+          <Text style={[styles.instructionText, { fontSize: 16 * fontScale }]}>
             Hold the red button for 5 seconds to send an emergency alert. Your pinned location will be shared with responders immediately.
           </Text>
         </View>
@@ -434,7 +425,7 @@ export default function EmergencyScreen() {
 const styles = StyleSheet.create({
   safeArea:             { flex: 1, backgroundColor: '#F8F9FA' },
 
-  // Top bar — centered, no settings button
+  // Top bar, centered, no settings button
   topBar:               { backgroundColor: '#C0181F', paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   topBarIcon:           { marginRight: 8 },
   topBarTitle:          { color: '#fff', fontSize: 20, fontWeight: '600', letterSpacing: 0.5 },
@@ -443,14 +434,14 @@ const styles = StyleSheet.create({
 
   // SOS area
   sosArea:              { alignItems: 'center', paddingVertical: 24 },
-  sosLabel:             { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22, marginBottom: 20 },
+  sosLabel:             { fontSize: 17, color: '#374151', textAlign: 'center', lineHeight: 24, marginBottom: 20 },
   sosLabelBold:         { fontWeight: '700', color: '#C0181F' },
   sosOuter:             { width: 210, height: 210, borderRadius: 105, backgroundColor: '#FFE5E5', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#E08080' },
   sosDashedRing:        { position: 'absolute', inset: -12, width: 234, height: 234, borderRadius: 117, borderWidth: 2, borderStyle: 'dashed', borderColor: '#C0181F', opacity: 0.35 },
   sosSpinRing:          { position: 'absolute', width: 230, height: 230, borderRadius: 115, borderWidth: 3, borderTopColor: '#C0181F', borderRightColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: 'transparent' },
   sosButton:            { width: 180, height: 180, borderRadius: 90, backgroundColor: '#C0181F', alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#C0181F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 10 },
   sosText:              { color: '#fff', fontSize: 24, fontWeight: '700', letterSpacing: 1 },
-  sosSubText:           { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 3 },
+  sosSubText:           { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 3 },
 
   // Banners
   banner:               { borderRadius: 14, padding: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start', borderWidth: 1.5 },
@@ -458,42 +449,42 @@ const styles = StyleSheet.create({
   bannerDispatched:     { backgroundColor: '#ECFDF5', borderColor: '#34D399' },
   bannerIcon:           { marginRight: 12, marginTop: 1 },
   bannerTextWrap:       { flex: 1 },
-  bannerTitle:          { fontWeight: '600', marginBottom: 3 },
+  bannerTitle:          { fontWeight: '600', marginBottom: 3, fontSize: 17 },
   bannerTitleWaiting:   { color: '#92400E' },
   bannerTitleDispatched:{ color: '#065F46' },
-  bannerBody:           { lineHeight: 20 },
+  bannerBody:           { lineHeight: 22, fontSize: 16 },
   bannerBodyWaiting:    { color: '#78350F' },
   bannerBodyDispatched: { color: '#047857' },
 
   // Map
   mapSection:           { marginBottom: 16 },
-  sectionLabel:         { fontSize: 13, color: '#888', marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
+  sectionLabel:         { fontSize: 15, color: '#4B5563', marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
   mapWrapper:           { height: 200, borderRadius: 16, overflow: 'hidden', borderWidth: 2, borderColor: '#C0181F' },
   map:                  { flex: 1 },
   mapPlaceholder:       { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
-  mapPlaceholderText:   { color: '#9CA3AF', fontSize: 14 },
+  mapPlaceholderText:   { color: '#4B5563', fontSize: 16 },
   mapRetryRow:          { flexDirection: 'row', marginTop: 12, gap: 10 },
-  mapRetryBtn:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#C0181F', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, gap: 6 },
-  mapRetryBtnText:      { color: '#C0181F', fontWeight: '700' },
-  refreshBtn:           { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#C0181F', borderRadius: 22, width: 40, height: 40, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  mapRetryBtn:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#C0181F', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 16, gap: 6, minHeight: 44 },
+  mapRetryBtnText:      { color: '#C0181F', fontWeight: '700', fontSize: 15 },
+  refreshBtn:           { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#C0181F', borderRadius: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', elevation: 4 },
 
   // Info card
-  infoCard:             { backgroundColor: '#fff', borderRadius: 16, borderWidth: 0.5, borderColor: '#E5E7EB', padding: 16, marginBottom: 16 },
-  infoCardTitle:        { fontSize: 13, fontWeight: '600', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 12 },
-  infoRow:              { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 11, borderBottomWidth: 0.5, borderBottomColor: '#F3F4F6' },
+  infoCard:             { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#D1D5DB', padding: 16, marginBottom: 16 },
+  infoCardTitle:        { fontSize: 15, fontWeight: '600', color: '#6B7280', letterSpacing: 0.4, marginBottom: 12 },
+  infoRow:              { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#F3F4F6' },
   infoRowLast:          { borderBottomWidth: 0 },
   infoIcon:             { marginRight: 12, marginTop: 2 },
   infoField:            { flex: 1 },
-  infoKey:              { fontSize: 12, color: '#9CA3AF', marginBottom: 2 },
-  infoVal:              { fontSize: 16, color: '#111827', fontWeight: '600' },
-  statusPill:           { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 3, borderRadius: 20 },
+  infoKey:              { fontSize: 14, color: '#6B7280', marginBottom: 2 },
+  infoVal:              { fontSize: 18, color: '#111827', fontWeight: '600' },
+  statusPill:           { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   statusPillPending:    { backgroundColor: '#FEF3C7' },
   statusPillDispatched: { backgroundColor: '#D1FAE5' },
-  statusPillText:       { fontSize: 13, fontWeight: '600' },
+  statusPillText:       { fontSize: 15, fontWeight: '600' },
   statusPillTextPending:    { color: '#92400E' },
   statusPillTextDispatched: { color: '#065F46' },
 
   // Instruction
   instructionCard:      { backgroundColor: '#FFF7ED', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FED7AA', flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
-  instructionText:      { color: '#9A3412', fontSize: 14, lineHeight: 22, flex: 1 },
+  instructionText:      { color: '#7C2D12', fontSize: 16, lineHeight: 24, flex: 1 },
 });

@@ -1,4 +1,3 @@
-// components/chat/ChatInputArea.tsx
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -42,7 +41,7 @@ export default function ChatInputArea({
 
   return (
     <View style={styles.container}>
-      {/* ── Suggestion chips ── */}
+      {/* Suggestion chips */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -56,20 +55,20 @@ export default function ChatInputArea({
             disabled={loading}
             activeOpacity={0.7}
           >
-            <Text style={[styles.suggestionText, { fontSize: 13 * fontScale }]}>
+            <Text style={[styles.suggestionText, { fontSize: 15 * fontScale }]}>
               {sugg}
             </Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      {/* ── Input row ── */}
+      {/* Input row */}
       <View style={styles.inputRow}>
         <View style={styles.inputWrapper}>
           <TextInput
             style={[styles.input, { fontSize: 16 * fontScale }]}
             placeholder="Type your health concern..."
-            placeholderTextColor="#9ca3af"
+            placeholderTextColor="#6B7280"
             value={text}
             onChangeText={setText}
             editable={!loading}
@@ -84,7 +83,7 @@ export default function ChatInputArea({
           style={styles.micButton}
           activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="microphone-outline" size={26} color="#6b7280" />
+          <MaterialCommunityIcons name="microphone-outline" size={26} color="#4B5563" />
         </TouchableOpacity>
 
         <TouchableOpacity

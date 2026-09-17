@@ -14,14 +14,19 @@ export default function ChatHeader({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.iconButton}>
-        <Ionicons name="arrow-back" size={24} color="#2b5ce6" />
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={styles.iconButton}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        accessibilityLabel="Go back"
+      >
+        <Ionicons name="arrow-back" size={26} color="#2b5ce6" />
       </TouchableOpacity>
 
       <View style={styles.titleContainer}>
         <MaterialCommunityIcons
           name="robot-outline"
-          size={24}
+          size={26}
           color="#2b5ce6"
         />
         <Text style={[styles.title, { fontSize: 18 * fontScale }]}>HealthAI Assistant</Text>
@@ -30,9 +35,10 @@ export default function ChatHeader({
       <TouchableOpacity
         style={styles.iconButton}
         onPress={onHistoryPress}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         accessibilityLabel="Chat history"
       >
-        <Ionicons name="time-outline" size={24} color="#6b7280" />
+        <Ionicons name="time-outline" size={26} color="#4B5563" />
       </TouchableOpacity>
     </View>
   );
@@ -47,10 +53,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: "#E5E7EB",
   },
   iconButton: {
-    padding: 4,
+    padding: 10,
   },
   titleContainer: {
     flexDirection: "row",
@@ -58,7 +64,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 18,
     fontWeight: "700",
     color: "#2b5ce6",
   },

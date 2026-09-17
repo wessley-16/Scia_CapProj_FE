@@ -7,7 +7,7 @@ const APP_CHECK_DEBUG_TOKEN = "E667E464-3DF8-49E1-9CA2-2324AE796CB3";
 export function initAppCheck() {
   if (__DEV__ && !APP_CHECK_DEBUG_TOKEN) {
     console.warn(
-      "[AppCheck] No debug token set in lib/appCheck.ts yet — Gemini/AI " +
+      "[AppCheck] No debug token set in lib/appCheck.ts yet. Gemini/AI " +
         "calls will fail until one is added. See the Firebase setup guide.",
     );
     return;
@@ -31,7 +31,7 @@ export function initAppCheck() {
       isTokenAutoRefreshEnabled: true,
     });
   } catch (e) {
-    // Never let App Check setup crash the app — worst case, AI calls fail
+    // Never let App Check setup crash the app. Worst case, AI calls fail
     // with a clear error and everything else keeps working.
     console.warn("[AppCheck] Failed to initialize:", e);
   }

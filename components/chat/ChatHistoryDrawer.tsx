@@ -1,4 +1,3 @@
-// components/chat/ChatHistoryDrawer.tsx
 import { ChatSession } from "@/hooks/useChatbot";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
@@ -103,7 +102,7 @@ export default function ChatHistoryDrawer({
           </Text>
         </TouchableOpacity>
 
-        <Text style={[styles.sectionLabel, { fontSize: 12 * fontScale }]}>
+        <Text style={[styles.sectionLabel, { fontSize: 13 * fontScale }]}>
           RECENT CONVERSATIONS
         </Text>
 
@@ -125,7 +124,7 @@ export default function ChatHistoryDrawer({
                 <Ionicons
                   name="chatbubble-ellipses-outline"
                   size={20}
-                  color={isActive ? "#2356E1" : "#9ca3af"}
+                  color={isActive ? "#2356E1" : "#6B7280"}
                   style={styles.sessionIcon}
                 />
                 <View style={styles.sessionTextBlock}>
@@ -139,7 +138,7 @@ export default function ChatHistoryDrawer({
                   >
                     {item.title}
                   </Text>
-                  <Text style={[styles.sessionTime, { fontSize: 12 * fontScale }]}>
+                  <Text style={[styles.sessionTime, { fontSize: 13 * fontScale }]}>
                     {formatRelativeTime(item.updatedAt)}
                   </Text>
                 </View>
@@ -149,7 +148,7 @@ export default function ChatHistoryDrawer({
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   accessibilityLabel="Delete conversation"
                 >
-                  <Ionicons name="trash-outline" size={18} color="#d1d5db" />
+                  <Ionicons name="trash-outline" size={18} color="#9CA3AF" />
                 </TouchableOpacity>
               </TouchableOpacity>
             );
@@ -171,7 +170,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   headerTitle: { fontWeight: "800", color: "#111827" },
-  closeBtn: { padding: 6 },
+  closeBtn: { padding: 10 },
   newChatBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -196,7 +195,7 @@ const styles = StyleSheet.create({
   },
   newChatText: { color: "#2356E1", fontWeight: "700" },
   sectionLabel: {
-    color: "#9ca3af",
+    color: "#4B5563",
     fontWeight: "700",
     letterSpacing: 0.5,
     marginHorizontal: 20,
@@ -216,6 +215,6 @@ const styles = StyleSheet.create({
   sessionTextBlock: { flex: 1 },
   sessionTitle: { color: "#374151", fontWeight: "500" },
   sessionTitleActive: { color: "#111827", fontWeight: "700" },
-  sessionTime: { color: "#9ca3af", marginTop: 2 },
-  deleteBtn: { padding: 6, marginLeft: 8 },
+  sessionTime: { color: "#6B7280", marginTop: 2 },
+  deleteBtn: { padding: 10, marginLeft: 8 },
 });

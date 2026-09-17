@@ -62,17 +62,12 @@ export default function medicine() {
     registerForPushNotificationsAsync();
 
     notificationListener.current =
-      Notifications.addNotificationReceivedListener((notification) => {
-        // console.log(notification);
-      });
+      Notifications.addNotificationReceivedListener(() => {});
 
     responseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        // console.log(response);
-      });
+      Notifications.addNotificationResponseReceivedListener(() => {});
 
     return () => {
-      // Clean up subscriptions
       notificationListener.current?.remove();
       responseListener.current?.remove();
     };
@@ -90,10 +85,8 @@ export default function medicine() {
       }
 
       if (Constants.appOwnership === "expo") {
-        // In Expo Go, we can't request full push permissions easily without error on Android sometimes
-        // But local notifications should work without the full push dance if we just ask quietly.
-        // However, scheduleNotificationAsync requires permissions on Android 13+.
-        // We'll wrap this in a try-catch to be safe.
+        // Expo Go can't request full push permissions cleanly, so local
+        // notifications below are wrapped in try/catch to stay safe.
       }
 
       let existingStatus;
@@ -114,7 +107,6 @@ export default function medicine() {
         }
       }
       if (finalStatus !== "granted") {
-        // Alert.alert('Permission needed', 'Failed to get push token for push notification!');
         return;
       }
     } catch (error) {
@@ -357,13 +349,13 @@ export default function medicine() {
                   <Text style={[styles.medicineDetails, { fontSize: 14 * fontScale }]}>
                     {formatDosage(medicine.dosage, medicine.dosageUnit)}
                   </Text>
-                  <Text style={[styles.nextDoseText, { fontSize: 12 * fontScale }]}>
+                  <Text style={[styles.nextDoseText, { fontSize: 14 * fontScale }]}>
                     Next: {getNextDoseTime(medicine)}
                   </Text>
                   <Text
                     style={[
                       styles.medicineDetails,
-                      { fontSize: 12 * fontScale, marginTop: 4, color: "#666" },
+                      { fontSize: 13 * fontScale, marginTop: 4, color: "#4B5563" },
                     ]}
                   >
                     {getDurationText(medicine)}
@@ -372,6 +364,7 @@ export default function medicine() {
               </View>
               <TouchableOpacity
                 style={styles.deleteButton}
+                hitSlop={8}
                 onPress={() =>
                   Alert.alert(
                     "Delete Medicine",
@@ -409,6 +402,7 @@ export default function medicine() {
               <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("medicineName")}</Text>
               <TextInput
                 placeholder={t("medicineNamePlaceholder")}
+                placeholderTextColor="#6B7280"
                 value={medicineName}
                 onChangeText={setMedicineName}
                 style={styles.input}
@@ -417,6 +411,7 @@ export default function medicine() {
               <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("descriptionPurpose")}</Text>
               <TextInput
                 placeholder={t("descriptionPlaceholder")}
+                placeholderTextColor="#6B7280"
                 value={description}
                 onChangeText={setDescription}
                 style={styles.input}
@@ -425,6 +420,7 @@ export default function medicine() {
               <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("dosage")}</Text>
               <TextInput
                 placeholder={t("dosagePlaceholder")}
+                placeholderTextColor="#6B7280"
                 value={dosage}
                 onChangeText={setDosage}
                 keyboardType="decimal-pad"
@@ -447,6 +443,7 @@ export default function medicine() {
               <Text style={[styles.label, { fontSize: 14 * fontScale }]}>{t("intervalHours")}</Text>
               <TextInput
                 placeholder={t("intervalPlaceholder")}
+                placeholderTextColor="#6B7280"
                 value={interval}
                 onChangeText={setInterval}
                 keyboardType="number-pad"
@@ -480,14 +477,14 @@ export default function medicine() {
                 <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>{selectedMedicine.name}</Text>
 
                 <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { fontSize: 14 * fontScale }]}>{t("descriptionLabel")}</Text>
+                  <Text style={[styles.detailLabel, { fontSize: 15 * fontScale }]}>{t("descriptionLabel")}</Text>
                   <Text style={styles.detailValue}>
                     {selectedMedicine.description || t("noDescriptionProvided")}
                   </Text>
                 </View>
 
                 <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { fontSize: 14 * fontScale }]}>{t("dosageLabel")}</Text>
+                  <Text style={[styles.detailLabel, { fontSize: 15 * fontScale }]}>{t("dosageLabel")}</Text>
                   <Text style={styles.detailValue}>
                     {formatDosage(
                       selectedMedicine.dosage,
@@ -497,7 +494,7 @@ export default function medicine() {
                 </View>
 
                 <View style={styles.detailRow}>
-                  <Text style={[styles.detailLabel, { fontSize: 14 * fontScale }]}>{t("scheduleLabel")}</Text>
+                  <Text style={[styles.detailLabel, { fontSize: 15 * fontScale }]}>{t("scheduleLabel")}</Text>
                   <Text style={styles.detailValue}>
                     Every {selectedMedicine.interval} hours
                   </Text>
@@ -514,7 +511,7 @@ export default function medicine() {
                     },
                   ]}
                 >
-                  <Text style={[styles.detailLabel, { fontSize: 14 * fontScale, color: "#2563EB" }]}>
+                  <Text style={[styles.detailLabel, { fontSize: 15 * fontScale, color: "#2563EB" }]}>
                     Next Dose:
                   </Text>
                   <Text
@@ -651,7 +648,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   deleteButton: {
-    padding: 8,
+    padding: 12,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyState: {
     alignItems: "center",
@@ -665,8 +666,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   emptyStateSubText: {
-    fontSize: 14,
-    color: "#9CA3AF",
+    fontSize: 15,
+    color: "#6B7280",
     marginTop: 8,
   },
   modalBackground: {
@@ -690,23 +691,24 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   label: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
     color: "#374151",
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#9CA3AF",
     borderRadius: 10,
-    padding: 12,
+    padding: 14,
     marginBottom: 16,
-    fontSize: 16,
-    backgroundColor: "#F9FAFB", // Light gray background for inputs
+    fontSize: 17,
+    minHeight: 52,
+    backgroundColor: "#F9FAFB",
   },
   pickerContainer: {
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#9CA3AF",
     borderRadius: 10,
     marginBottom: 16,
     overflow: "hidden",
@@ -717,37 +719,41 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: "#2563EB",
-    padding: 14,
+    padding: 16,
     borderRadius: 10,
     alignItems: "center",
     marginTop: 8,
+    minHeight: 52,
+    justifyContent: "center",
   },
   saveButtonText: {
     color: "white",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 17,
   },
   cancelButton: {
     marginTop: 12,
     alignItems: "center",
-    padding: 12,
+    padding: 14,
+    minHeight: 48,
+    justifyContent: "center",
   },
   cancelButtonText: {
     color: "#EF4444",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 17,
   },
   detailRow: {
-    marginBottom: 12,
+    marginBottom: 14,
   },
   detailLabel: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginBottom: 2,
+    fontSize: 15,
+    color: "#4B5563",
+    marginBottom: 4,
     fontWeight: "500",
   },
   detailValue: {
-    fontSize: 18,
+    fontSize: 19,
     color: "#1F2937",
     fontWeight: "500",
   },

@@ -27,11 +27,7 @@ export default function Signup() {
   const { user, refreshUser } = useAuth();
   const { t } = useSettings();
 
-  // This screen is a real route and can be reached directly (deep link, a
-  // stale nav stack, etc.), not just via the "Sign-up" button on the login
-  // screen — so it needs its own guard against creating a second account
-  // while one is already signed in, rather than relying on the caller to
-  // have checked first.
+  // Block signup if a user is already logged in (can be reached via deep link).
   useEffect(() => {
     if (user) {
       Alert.alert(
@@ -204,28 +200,28 @@ export default function Signup() {
         <View style={styles.inputGroup}>
           <TextInput
             placeholder="First Name *"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             style={styles.input}
             value={firstName}
             onChangeText={setFirstName}
           />
           <TextInput
             placeholder="Middle Name *"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             style={styles.input}
             value={midName}
             onChangeText={setMidName}
           />
           <TextInput
             placeholder="Last Name *"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             style={styles.input}
             value={lastName}
             onChangeText={setLastName}
           />
           <TextInput
             placeholder="Contact Number *"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             style={styles.input}
             value={conNumber}
             onChangeText={setConNumber}
@@ -254,7 +250,7 @@ export default function Signup() {
             selectedValue={barangay}
             onValueChange={setBarangay}
             enabled={district.length > 0}
-            style={{ height: 50 }}
+            style={{ height: 56 }}
           >
             <Picker.Item
               label={district ? "Select barangay" : "Select a district first"}
@@ -269,7 +265,7 @@ export default function Signup() {
         <Text style={styles.sectionLabel}>Street / House No. *</Text>
         <TextInput
           placeholder="e.g. 123 Rizal St."
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#6B7280"
           style={styles.input}
           value={street}
           onChangeText={setStreet}
@@ -340,7 +336,7 @@ export default function Signup() {
           <View style={styles.optionalWrapper}>
             <TextInput
               placeholder="Senior Citizen ID Number"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor="#6B7280"
               style={[styles.input, { paddingRight: 90 }]}
               value={idNumber}
               onChangeText={setIdNumber}
@@ -351,7 +347,7 @@ export default function Signup() {
           </View>
           <TextInput
             placeholder="Password *"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor="#6B7280"
             secureTextEntry
             style={styles.input}
             value={password}
@@ -377,7 +373,7 @@ export default function Signup() {
               </View>
               <Text style={styles.uploadTitle}>Upload ID Photo</Text>
               <Text style={styles.uploadHint}>
-                Only ID photos accepted — tap to select
+                Only ID photos accepted. Tap to select.
               </Text>
             </>
           )}
@@ -415,7 +411,7 @@ export default function Signup() {
               </Text>
               <TextInput
                 placeholder="Reason for requesting physical ID *"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="#6B7280"
                 style={styles.reasonInput}
                 value={idRequestReason}
                 onChangeText={setIdRequestReason}
@@ -495,50 +491,50 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "800",
     color: "#111827",
     letterSpacing: 0.3,
   },
-  subtitle: { fontSize: 14, color: "#6B7280", marginTop: 4 },
+  subtitle: { fontSize: 16, color: "#4B5563", marginTop: 4 },
   pendingNotice: {
     backgroundColor: "#FEF3C7",
     borderRadius: 10,
-    padding: 12,
+    padding: 14,
     marginTop: 14,
     borderWidth: 1,
     borderColor: "#F59E0B",
   },
   pendingNoticeText: {
-    fontSize: 13,
-    color: "#92400E",
+    fontSize: 15,
+    color: "#7A3B00",
     textAlign: "center",
-    lineHeight: 18,
+    lineHeight: 21,
   },
   sectionLabel: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "700",
-    color: "#2356E1",
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
+    color: "#1D4ED8",
+    letterSpacing: 0.5,
     marginBottom: 10,
-    marginTop: 20,
+    marginTop: 22,
   },
-  inputGroup: { gap: 10 },
+  inputGroup: { gap: 12 },
   input: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: "#D1D5DB",
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     borderRadius: 12,
-    fontSize: 15,
+    fontSize: 17,
     color: "#111827",
+    minHeight: 52,
   },
   pickerBox: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: "#D1D5DB",
     borderRadius: 12,
     overflow: "hidden",
     marginBottom: 4,
@@ -551,21 +547,22 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
   },
-  optionalBadgeText: { fontSize: 11, color: "#9CA3AF", fontStyle: "italic" },
+  optionalBadgeText: { fontSize: 13, color: "#6B7280", fontStyle: "italic" },
   dobButton: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: "#D1D5DB",
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderRadius: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    minHeight: 56,
   },
-  dobButtonText: { fontSize: 15, color: "#111827" },
-  placeholder: { color: "#9CA3AF" },
-  dobChevron: { fontSize: 22, color: "#9CA3AF", lineHeight: 24 },
+  dobButtonText: { fontSize: 17, color: "#111827" },
+  placeholder: { color: "#6B7280" },
+  dobChevron: { fontSize: 24, color: "#6B7280", lineHeight: 26 },
   dobConfirmButton: {
     backgroundColor: "#2356E1",
     borderRadius: 10,
@@ -579,28 +576,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-    paddingVertical: 14,
+    borderColor: "#D1D5DB",
+    paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
+    minHeight: 52,
+    justifyContent: "center",
   },
-  genderOptionActive: { borderColor: "#2356E1", backgroundColor: "#EEF2FF" },
-  genderText: { fontSize: 15, color: "#6B7280", fontWeight: "600" },
-  genderTextActive: { color: "#2356E1" },
+  genderOptionActive: { borderColor: "#1D4ED8", backgroundColor: "#EEF2FF" },
+  genderText: { fontSize: 17, color: "#374151", fontWeight: "600" },
+  genderTextActive: { color: "#1D4ED8" },
   uploadCard: {
     backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderColor: "#D1D5DB",
-    borderStyle: "dashed",
+    borderColor: "#9CA3AF",
     borderRadius: 14,
     padding: 24,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 130,
+    minHeight: 140,
   },
   uploadIconBox: {
-    width: 48,
-    height: 48,
+    width: 52,
+    height: 52,
     borderRadius: 8,
     backgroundColor: "#EEF2FF",
     alignItems: "center",
@@ -608,18 +606,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   uploadIconText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "800",
-    color: "#2356E1",
+    color: "#1D4ED8",
     letterSpacing: 1,
   },
   uploadTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "700",
     color: "#374151",
     marginBottom: 4,
   },
-  uploadHint: { fontSize: 13, color: "#9CA3AF" },
+  uploadHint: { fontSize: 15, color: "#6B7280", textAlign: "center" },
   idPreview: {
     width: "100%",
     height: 160,
@@ -627,8 +625,8 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
   },
   uploadChangeText: {
-    fontSize: 13,
-    color: "#2356E1",
+    fontSize: 15,
+    color: "#1D4ED8",
     marginTop: 8,
     fontWeight: "600",
   },
@@ -638,19 +636,19 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#D1D5DB",
     alignItems: "center",
   },
   noIdQuestion: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "800",
     color: "#374151",
     textAlign: "center",
     marginBottom: 4,
   },
   noIdSubtitle: {
-    fontSize: 13,
-    color: "#6B7280",
+    fontSize: 15,
+    color: "#4B5563",
     textAlign: "center",
     marginBottom: 16,
   },
@@ -659,69 +657,79 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#EEF2FF",
     borderWidth: 1.5,
-    borderColor: "#2356E1",
+    borderColor: "#1D4ED8",
     borderRadius: 12,
-    paddingVertical: 13,
+    paddingVertical: 16,
     alignItems: "center",
+    minHeight: 52,
+    justifyContent: "center",
   },
   idAnswerNo: {
     flex: 1,
     backgroundColor: "#FEF2F2",
     borderWidth: 1.5,
-    borderColor: "#EF4444",
+    borderColor: "#DC2626",
     borderRadius: 12,
-    paddingVertical: 13,
+    paddingVertical: 16,
     alignItems: "center",
+    minHeight: 52,
+    justifyContent: "center",
   },
-  idAnswerYesText: { fontSize: 13, fontWeight: "700", color: "#2356E1" },
-  idAnswerNoText: { fontSize: 13, fontWeight: "700", color: "#EF4444" },
+  idAnswerYesText: { fontSize: 15, fontWeight: "700", color: "#1D4ED8" },
+  idAnswerNoText: { fontSize: 15, fontWeight: "700", color: "#DC2626" },
   idActionCard: { alignItems: "center", gap: 12, width: "100%" },
   idActionText: {
-    fontSize: 13,
-    color: "#6B7280",
+    fontSize: 15,
+    color: "#4B5563",
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 21,
   },
   reasonInput: {
     width: "100%",
     backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    borderColor: "#D1D5DB",
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 12,
-    fontSize: 14,
+    fontSize: 16,
     color: "#111827",
-    minHeight: 80,
+    minHeight: 90,
   },
   requestIdButton: {
-    backgroundColor: "#2356E1",
+    backgroundColor: "#1D4ED8",
     borderRadius: 12,
-    paddingVertical: 13,
+    paddingVertical: 16,
     width: "100%",
     alignItems: "center",
+    minHeight: 52,
+    justifyContent: "center",
   },
-  requestIdButtonText: { color: "white", fontWeight: "700", fontSize: 15 },
+  requestIdButtonText: { color: "white", fontWeight: "700", fontSize: 17 },
   oscaButton: {
-    backgroundColor: "#059669",
+    backgroundColor: "#047857",
     borderRadius: 12,
-    paddingVertical: 13,
+    paddingVertical: 16,
     width: "100%",
     alignItems: "center",
+    minHeight: 52,
+    justifyContent: "center",
   },
-  oscaButtonText: { color: "white", fontWeight: "700", fontSize: 15 },
+  oscaButtonText: { color: "white", fontWeight: "700", fontSize: 17 },
   changeAnswerText: {
-    fontSize: 12,
-    color: "#9CA3AF",
+    fontSize: 14,
+    color: "#4B5563",
     textDecorationLine: "underline",
   },
   createButton: {
-    backgroundColor: "#2356E1",
-    padding: 17,
+    backgroundColor: "#1D4ED8",
+    padding: 18,
     borderRadius: 14,
     alignItems: "center",
     marginTop: 24,
-    shadowColor: "#2356E1",
+    minHeight: 56,
+    justifyContent: "center",
+    shadowColor: "#1D4ED8",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -731,7 +739,7 @@ const styles = StyleSheet.create({
   createButtonText: {
     color: "white",
     fontWeight: "800",
-    fontSize: 17,
+    fontSize: 19,
     letterSpacing: 0.3,
   },
 });

@@ -1,7 +1,5 @@
-// components/chat/MarkdownText.tsx
 // Lightweight markdown renderer using only React Native Text.
-// Supports: bold, italic, bullet lists, numbered lists, headings, inline code, horizontal rules.
-// No external library — zero dark-mode bleed.
+// Supports bold, italic, bullet lists, numbered lists, headings, inline code, and horizontal rules.
 
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -11,7 +9,7 @@ interface Props {
   fontScale: number;
 }
 
-// ── Inline renderer: bold, italic, inline code ────────────────────────────────
+// Inline renderer: bold, italic, inline code
 function renderInline(raw: string, fontScale: number, baseColor: string, key: string) {
   // Split on **bold**, *italic*, `code`
   const parts = raw.split(/(\*\*[\s\S]+?\*\*|\*[\s\S]+?\*|`[^`]+`)/g);
@@ -34,7 +32,7 @@ function renderInline(raw: string, fontScale: number, baseColor: string, key: st
         }
         if (part.startsWith("`") && part.endsWith("`")) {
           return (
-            <Text key={i} style={[styles.inlineCode, { fontSize: 13 * fontScale }]}>
+            <Text key={i} style={[styles.inlineCode, { fontSize: 14 * fontScale }]}>
               {part.slice(1, -1)}
             </Text>
           );
@@ -53,21 +51,21 @@ export default function MarkdownText({ text, fontScale }: Props) {
   while (i < lines.length) {
     const line = lines[i];
 
-    // ── Blank line ─────────────────────────────────────────────────────────
+    // Blank line
     if (line.trim() === "") {
       elements.push(<View key={`gap-${i}`} style={{ height: 6 }} />);
       i++;
       continue;
     }
 
-    // ── Horizontal rule ────────────────────────────────────────────────────
+    // Horizontal rule
     if (/^[-*_]{3,}$/.test(line.trim())) {
       elements.push(<View key={`hr-${i}`} style={styles.hr} />);
       i++;
       continue;
     }
 
-    // ── Headings ───────────────────────────────────────────────────────────
+    // Headings
     const h3 = line.match(/^### (.+)/);
     const h2 = line.match(/^## (.+)/);
     const h1 = line.match(/^# (.+)/);
@@ -99,7 +97,7 @@ export default function MarkdownText({ text, fontScale }: Props) {
       continue;
     }
 
-    // ── Bullet list ────────────────────────────────────────────────────────
+    // Bullet list
     if (/^[-*+] /.test(line)) {
       const bullet = line.replace(/^[-*+] /, "");
       elements.push(
@@ -114,7 +112,7 @@ export default function MarkdownText({ text, fontScale }: Props) {
       continue;
     }
 
-    // ── Numbered list ──────────────────────────────────────────────────────
+    // Numbered list
     const numMatch = line.match(/^(\d+)\. (.+)/);
     if (numMatch) {
       elements.push(
@@ -131,7 +129,7 @@ export default function MarkdownText({ text, fontScale }: Props) {
       continue;
     }
 
-    // ── Plain paragraph ────────────────────────────────────────────────────
+    // Plain paragraph
     elements.push(
       <View key={`p-${i}`} style={styles.paragraph}>
         {renderInline(line, fontScale, "#374151", `pi-${i}`)}

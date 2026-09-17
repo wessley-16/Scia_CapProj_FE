@@ -23,8 +23,7 @@ export default function SettingsScreen() {
   const { clearUser } = useAuth();
 
   const handleSaveChanges = () => {
-    // All changes are automatically persisted via AsyncStorage
-    // Just navigate back to account page
+    // Changes are already persisted via AsyncStorage as they're made.
     router.back();
   };
 
@@ -36,9 +35,9 @@ export default function SettingsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            await logoutUser(); // sign out of Firebase — this was previously missing,
-            clearUser();        // which left the session active behind the scenes
-            router.replace("/"); // go back to login
+            await logoutUser();
+            clearUser();
+            router.replace("/");
           } catch (error) {
             console.log("Logout error:", error);
           }
@@ -54,7 +53,7 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>{t("fontSize")}</Text>
-          <Text style={[styles.sectionDescription, { fontSize: 14 * fontScale }]}>
+          <Text style={[styles.sectionDescription, { fontSize: 15 * fontScale }]}>
             {t("adjustFontSize")}
           </Text>
           <View style={styles.optionsRow}>
@@ -70,7 +69,7 @@ export default function SettingsScreen() {
                   onPress={() => setFontScale(option.value)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.optionLabel, selected && styles.selectedOptionLabel, { fontSize: 16 * fontScale }]}>
+                  <Text style={[styles.optionLabel, selected && styles.selectedOptionLabel, { fontSize: 17 * fontScale }]}>
                     {t(option.labelKey)}
                   </Text>
                 </TouchableOpacity>
@@ -81,7 +80,7 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>{t("language")}</Text>
-          <Text style={[styles.sectionDescription, { fontSize: 14 * fontScale }]}>
+          <Text style={[styles.sectionDescription, { fontSize: 15 * fontScale }]}>
             {t("changeLanguage")}
           </Text>
           <View style={styles.optionsRow}>
@@ -97,7 +96,7 @@ export default function SettingsScreen() {
                   onPress={() => setLanguage(option.value)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.optionLabel, selected && styles.selectedOptionLabel, { fontSize: 16 * fontScale }]}>
+                  <Text style={[styles.optionLabel, selected && styles.selectedOptionLabel, { fontSize: 17 * fontScale }]}>
                     {t(option.labelKey)}
                   </Text>
                 </TouchableOpacity>
@@ -107,16 +106,16 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.previewBox}>
-          <Text style={[styles.previewText, { fontSize: 16 * fontScale }]}>{t("exampleTextPreview")}</Text>
+          <Text style={[styles.previewText, { fontSize: 17 * fontScale }]}>{t("exampleTextPreview")}</Text>
           <Text style={[styles.previewText, { fontSize: 18 * fontScale, fontWeight: "bold" }]}>{t("preview")}</Text>
         </View>
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSaveChanges}>
-          <Text style={[styles.saveButtonText, { fontSize: 16 * fontScale }]}>{t("saveChanges")}</Text>
+          <Text style={[styles.saveButtonText, { fontSize: 17 * fontScale }]}>{t("saveChanges")}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={[styles.logoutText, { fontSize: 16 * fontScale }]}>
+          <Text style={[styles.logoutText, { fontSize: 17 * fontScale }]}>
             {t("logout") || "Logout"}
           </Text>
         </TouchableOpacity>
@@ -171,6 +170,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginRight: 10,
     marginBottom: 10,
+    minHeight: 52,
+    minWidth: 90,
+    alignItems: "center",
+    justifyContent: "center",
   },
   selectedOption: {
     backgroundColor: "#2356E1",
@@ -225,3 +228,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+  

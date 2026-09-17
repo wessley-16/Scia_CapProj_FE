@@ -55,7 +55,7 @@ export default function Healthcare() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActiveTab>("medicine");
 
-  // ─── MEDICINE STATE ───────────────────────────────────────────────────────
+  // Medicine State
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [medicineModalVisible, setMedicineModalVisible] = useState(false);
   const [detailsModalVisible, setDetailsModalVisible] = useState(false);
@@ -68,7 +68,7 @@ export default function Healthcare() {
   const notifListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
-  // ─── APPOINTMENT STATE ────────────────────────────────────────────────────
+  // Appointment State
   const [selectedDate, setSelectedDate] = useState("");
   const [appointModalVisible, setAppointModalVisible] = useState(false);
   const [apptTime, setApptTime] = useState("");
@@ -81,7 +81,7 @@ export default function Healthcare() {
   const [apptError, setApptError] = useState("");
   const [submittingAppt, setSubmittingAppt] = useState(false);
 
-  // ─── LOAD DATA ────────────────────────────────────────────────────────────
+  // Load Data
   useFocusEffect(
     useCallback(() => {
       loadMedicines();
@@ -118,7 +118,7 @@ export default function Healthcare() {
     }
   };
 
-  // ─── MEDICINE FUNCTIONS ───────────────────────────────────────────────────
+  // Medicine Functions
   const loadMedicines = async () => {
     try {
       const stored = await AsyncStorage.getItem("medicines");
@@ -141,7 +141,7 @@ export default function Healthcare() {
     try {
       const id = await Notifications.scheduleNotificationAsync({
         content: {
-          title: "💊 Medicine Reminder",
+          title: "Medicine Reminder",
           body: `Time to take ${name}!`,
           sound: true,
         },
@@ -197,7 +197,7 @@ export default function Healthcare() {
     updatedMed.notificationId = newNotifId;
     await saveMedicines(medicines.map((m) => (m.id === updatedMed.id ? updatedMed : m)));
     setSelectedMedicine(updatedMed);
-    Alert.alert("✅ Done", "Medicine marked as taken!");
+    Alert.alert("Done", "Medicine marked as taken!");
   };
 
   const resetMedicineForm = () => {
@@ -223,7 +223,7 @@ export default function Healthcare() {
     return `${h}:${m} (in ${hr}h ${mn}m)`;
   };
 
-  // ─── APPOINTMENT FUNCTIONS ────────────────────────────────────────────────
+  // Appointment Functions
   const loadAppointments = async () => {
     try {
       const stored = await AsyncStorage.getItem("appointments_local");
@@ -260,7 +260,7 @@ export default function Healthcare() {
       // Get senior info from storage
       const seniorName = (await AsyncStorageLib.getItem("userName")) || "Senior";
       const seniorId = (await AsyncStorageLib.getItem("userId")) || "N/A";
-      // Submit to Firebase — sub-admin receives this
+      // Submit to Firebase; the sub-admin receives this
       await submitAppointment({
         seniorName,
         seniorId,
@@ -287,7 +287,7 @@ export default function Healthcare() {
       setApptType("General Check-up");
       setApptNotes("");
       Alert.alert(
-        "✅ Appointment Submitted",
+        "Appointment Submitted",
         "Your appointment request has been sent to the 3S Center. Please wait for confirmation."
       );
     } catch (e) {
@@ -327,14 +327,17 @@ export default function Healthcare() {
     "Vaccination",
   ];
 
-  // ─── RENDER ───────────────────────────────────────────────────────────────
+  // Render
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { fontSize: 22 * fontScale }]}>
-          🏥 Healthcare
-        </Text>
+        <View style={styles.headerTitleRow}>
+          <MaterialCommunityIcons name="hospital-box-outline" size={26} color="#1F2937" />
+          <Text style={[styles.headerTitle, { fontSize: 24 * fontScale }]}>
+            Healthcare
+          </Text>
+        </View>
         {/* Tab Switcher */}
         <View style={styles.tabSwitcher}>
           <TouchableOpacity
@@ -346,7 +349,7 @@ export default function Healthcare() {
               size={18}
               color={activeTab === "medicine" ? "white" : "#2356E1"}
             />
-            <Text style={[styles.tabBtnText, activeTab === "medicine" && styles.tabBtnTextActive, { fontSize: 13 * fontScale }]}>
+            <Text style={[styles.tabBtnText, activeTab === "medicine" && styles.tabBtnTextActive, { fontSize: 15 * fontScale }]}>
               Medicine
             </Text>
           </TouchableOpacity>
@@ -359,14 +362,14 @@ export default function Healthcare() {
               size={18}
               color={activeTab === "appointment" ? "white" : "#2356E1"}
             />
-            <Text style={[styles.tabBtnText, activeTab === "appointment" && styles.tabBtnTextActive, { fontSize: 13 * fontScale }]}>
+            <Text style={[styles.tabBtnText, activeTab === "appointment" && styles.tabBtnTextActive, { fontSize: 15 * fontScale }]}>
               Appointment
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── MEDICINE TAB ── */}
+      {/* Medicine Tab */}
       {activeTab === "medicine" && (
         <ScrollView
           style={styles.scrollView}
@@ -378,7 +381,7 @@ export default function Healthcare() {
             onPress={() => setMedicineModalVisible(true)}
           >
             <MaterialCommunityIcons name="plus" size={22} color="white" />
-            <Text style={[styles.primaryBtnText, { fontSize: 15 * fontScale }]}>
+            <Text style={[styles.primaryBtnText, { fontSize: 17 * fontScale }]}>
               Add Medicine & Set Alarm
             </Text>
           </TouchableOpacity>
@@ -386,8 +389,8 @@ export default function Healthcare() {
           {medicines.length === 0 ? (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="pill" size={60} color="#D1D5DB" />
-              <Text style={[styles.emptyText, { fontSize: 16 * fontScale }]}>No medicines added yet</Text>
-              <Text style={[styles.emptySubText, { fontSize: 13 * fontScale }]}>
+              <Text style={[styles.emptyText, { fontSize: 18 * fontScale }]}>No medicines added yet</Text>
+              <Text style={[styles.emptySubText, { fontSize: 15 * fontScale }]}>
                 Add your first medicine to get reminders
               </Text>
             </View>
@@ -399,10 +402,10 @@ export default function Healthcare() {
                 onPress={() => { setSelectedMedicine(med); setDetailsModalVisible(true); }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.cardTitle, { fontSize: 17 * fontScale }]}>{med.name}</Text>
-                  <Text style={[styles.cardSub, { fontSize: 13 * fontScale }]}>{formatDosage(med.dosage, med.dosageUnit)}</Text>
-                  <Text style={[styles.cardNext, { fontSize: 12 * fontScale }]}>
-                    ⏰ Next: {getNextDoseTime(med)}
+                  <Text style={[styles.cardTitle, { fontSize: 19 * fontScale }]}>{med.name}</Text>
+                  <Text style={[styles.cardSub, { fontSize: 15 * fontScale }]}>{formatDosage(med.dosage, med.dosageUnit)}</Text>
+                  <Text style={[styles.cardNext, { fontSize: 14 * fontScale }]}>
+                    Next: {getNextDoseTime(med)}
                   </Text>
                   <Text style={[styles.cardSub, { fontSize: 11 * fontScale, color: "#9CA3AF" }]}>
                     Every {med.interval}h
@@ -428,7 +431,7 @@ export default function Healthcare() {
         </ScrollView>
       )}
 
-      {/* ── APPOINTMENT TAB ── */}
+      {/* Appointment Tab */}
       {activeTab === "appointment" && (
         <ScrollView
           style={styles.scrollView}
@@ -437,7 +440,7 @@ export default function Healthcare() {
         >
           <View style={styles.infoBox}>
             <Ionicons name="information-circle-outline" size={18} color="#1E40AF" />
-            <Text style={[styles.infoText, { fontSize: 12 * fontScale }]}>
+            <Text style={[styles.infoText, { fontSize: 14 * fontScale }]}>
               Appointments are sent to the 3S Senior Center in Valenzuela. Sub-admin will confirm your booking.
             </Text>
           </View>
@@ -460,8 +463,8 @@ export default function Healthcare() {
 
           {selectedDate ? (
             <View style={styles.selectedDateBox}>
-              <Text style={[{ fontSize: 14 * fontScale, color: "#4B5563" }]}>Selected Date:</Text>
-              <Text style={[{ fontSize: 15 * fontScale, fontWeight: "bold", color: "#1E3A8A" }]}>
+              <Text style={[{ fontSize: 16 * fontScale, color: "#374151" }]}>Selected Date:</Text>
+              <Text style={[{ fontSize: 17 * fontScale, fontWeight: "bold", color: "#1E3A8A" }]}>
                 {selectedDate}
               </Text>
             </View>
@@ -472,14 +475,14 @@ export default function Healthcare() {
             onPress={() => { setAppointModalVisible(true); setApptError(""); }}
           >
             <Ionicons name="calendar" size={20} color="white" />
-            <Text style={[styles.primaryBtnText, { fontSize: 15 * fontScale }]}>
+            <Text style={[styles.primaryBtnText, { fontSize: 17 * fontScale }]}>
               Book Appointment at 3S Center
             </Text>
           </TouchableOpacity>
 
           {appointments.length > 0 && (
             <>
-              <Text style={[styles.sectionLabel, { fontSize: 14 * fontScale }]}>Your Appointments</Text>
+              <Text style={[styles.sectionLabel, { fontSize: 16 * fontScale }]}>Your Appointments</Text>
               {appointments.map((appt, idx) => (
                 <View
                   key={appt.id || idx}
@@ -490,28 +493,28 @@ export default function Healthcare() {
                   ]}
                 >
                   <View style={styles.apptRow}>
-                    <Text style={[styles.apptType, { fontSize: 15 * fontScale }]}>{appt.type}</Text>
+                    <Text style={[styles.apptType, { fontSize: 17 * fontScale }]}>{appt.type}</Text>
                     <View style={[styles.badge,
                       appt.status === "confirmed" && styles.badgeConfirmed,
                       appt.status === "cancelled" && styles.badgeCancelled,
                     ]}>
                       <Text style={styles.badgeText}>
-                        {appt.status === "pending" ? "⏳ Pending" :
-                         appt.status === "confirmed" ? "✅ Confirmed" : "❌ Cancelled"}
+                        {appt.status === "pending" ? "Pending" :
+                         appt.status === "confirmed" ? "Confirmed" : "Cancelled"}
                       </Text>
                     </View>
                   </View>
-                  <Text style={[styles.apptSub, { fontSize: 12 * fontScale }]}>
-                    📅 {appt.date} at {appt.time}
+                  <Text style={[styles.apptSub, { fontSize: 14 * fontScale }]}>
+                    {appt.date} at {appt.time}
                   </Text>
                   {appt.notes ? (
                     <Text style={[styles.apptSub, { fontSize: 12 * fontScale, color: "#9CA3AF" }]}>
-                      📝 {appt.notes}
+                      {appt.notes}
                     </Text>
                   ) : null}
                   {appt.submittedToFirebase && (
-                    <Text style={[{ fontSize: 11 * fontScale, color: "#10B981", marginTop: 4 }]}>
-                      ✔ Sent to 3S Center
+                    <Text style={[{ fontSize: 13 * fontScale, color: "#047857", marginTop: 4 }]}>
+                      Sent to 3S Center
                     </Text>
                   )}
                 </View>
@@ -531,16 +534,17 @@ export default function Healthcare() {
         </TouchableOpacity>
       </View>
 
-      {/* ── ADD MEDICINE MODAL ── */}
+      {/* Add Medicine Modal */}
       <Modal visible={medicineModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={[styles.modalTitle, { fontSize: 20 * fontScale }]}>Add Medicine & Set Alarm</Text>
+              <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>Add Medicine & Set Alarm</Text>
 
               <Text style={styles.label}>Medicine Name</Text>
               <TextInput
                 placeholder="e.g. Metformin"
+                placeholderTextColor="#6B7280"
                 value={medicineName}
                 onChangeText={setMedicineName}
                 style={styles.input}
@@ -549,6 +553,7 @@ export default function Healthcare() {
               <Text style={styles.label}>Description / Purpose</Text>
               <TextInput
                 placeholder="e.g. For blood sugar"
+                placeholderTextColor="#6B7280"
                 value={description}
                 onChangeText={setDescription}
                 style={styles.input}
@@ -557,6 +562,7 @@ export default function Healthcare() {
               <Text style={styles.label}>Dosage Amount</Text>
               <TextInput
                 placeholder="e.g. 500"
+                placeholderTextColor="#6B7280"
                 value={dosage}
                 onChangeText={setDosage}
                 keyboardType="decimal-pad"
@@ -579,6 +585,7 @@ export default function Healthcare() {
               <Text style={styles.label}>Alarm Interval (hours)</Text>
               <TextInput
                 placeholder="e.g. 8 (every 8 hours)"
+                placeholderTextColor="#6B7280"
                 value={interval}
                 onChangeText={setInterval}
                 keyboardType="number-pad"
@@ -586,7 +593,7 @@ export default function Healthcare() {
               />
 
               <TouchableOpacity style={styles.saveBtn} onPress={addMedicine}>
-                <Text style={[styles.saveBtnText, { fontSize: 15 * fontScale }]}>💊 Save & Set Alarm</Text>
+                <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>Save & Set Alarm</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.cancelLink}
@@ -599,16 +606,16 @@ export default function Healthcare() {
         </View>
       </Modal>
 
-      {/* ── MEDICINE DETAILS MODAL ── */}
+      {/* Medicine Details Modal */}
       <Modal visible={detailsModalVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             {selectedMedicine && (
               <>
-                <Text style={[styles.modalTitle, { fontSize: 20 * fontScale }]}>{selectedMedicine.name}</Text>
+                <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>{selectedMedicine.name}</Text>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Description</Text>
-                  <Text style={styles.detailVal}>{selectedMedicine.description || "—"}</Text>
+                  <Text style={styles.detailVal}>{selectedMedicine.description || "Not set"}</Text>
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Dosage</Text>
@@ -628,7 +635,7 @@ export default function Healthcare() {
                   style={[styles.saveBtn, { backgroundColor: "#10B981", marginTop: 20 }]}
                   onPress={takeMedicineNow}
                 >
-                  <Text style={[styles.saveBtnText, { fontSize: 15 * fontScale }]}>✅ Mark as Taken Now</Text>
+                  <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>Mark as Taken Now</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.cancelLink}
@@ -642,28 +649,28 @@ export default function Healthcare() {
         </View>
       </Modal>
 
-      {/* ── BOOK APPOINTMENT MODAL ── */}
+      {/* Book Appointment Modal */}
       <Modal visible={appointModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={[styles.modalTitle, { fontSize: 20 * fontScale }]}>
-                📋 Book Appointment
+              <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>
+                Book Appointment
               </Text>
-              <Text style={[styles.apptCenter, { fontSize: 13 * fontScale }]}>
-                3S Senior Citizens Center — Valenzuela City
+              <Text style={[styles.apptCenter, { fontSize: 15 * fontScale }]}>
+                3S Senior Citizens Center, Valenzuela City
               </Text>
 
               {selectedDate ? (
                 <View style={styles.selectedDateBox}>
-                  <Text style={{ fontSize: 13 * fontScale, color: "#4B5563" }}>Date selected:</Text>
-                  <Text style={{ fontWeight: "bold", color: "#1E3A8A", fontSize: 14 * fontScale }}>
+                  <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>Date selected:</Text>
+                  <Text style={{ fontWeight: "bold", color: "#1E3A8A", fontSize: 16 * fontScale }}>
                     {selectedDate}
                   </Text>
                 </View>
               ) : (
-                <Text style={{ color: "#EF4444", marginBottom: 8, fontSize: 12 * fontScale }}>
-                  ⚠ Please go back and select a date from the calendar first.
+                <Text style={{ color: "#DC2626", marginBottom: 8, fontSize: 14 * fontScale }}>
+                  Please go back and select a date from the calendar first.
                 </Text>
               )}
 
@@ -684,6 +691,7 @@ export default function Healthcare() {
               <View style={styles.timeRow}>
                 <TextInput
                   placeholder="HH"
+                  placeholderTextColor="#6B7280"
                   value={apptHour}
                   onChangeText={(v) => setApptHour(v.replace(/[^0-9]/g, ""))}
                   style={[styles.input, styles.timeInput]}
@@ -693,6 +701,7 @@ export default function Healthcare() {
                 <Text style={styles.timeSep}>:</Text>
                 <TextInput
                   placeholder="MM"
+                  placeholderTextColor="#6B7280"
                   value={apptMinute}
                   onChangeText={(v) => setApptMinute(v.replace(/[^0-9]/g, ""))}
                   style={[styles.input, styles.timeInput]}
@@ -715,6 +724,7 @@ export default function Healthcare() {
               <Text style={styles.label}>Notes (optional)</Text>
               <TextInput
                 placeholder="Any special concerns?"
+                placeholderTextColor="#6B7280"
                 value={apptNotes}
                 onChangeText={setApptNotes}
                 style={[styles.input, { height: 70 }]}
@@ -735,8 +745,8 @@ export default function Healthcare() {
                 {submittingAppt ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text style={[styles.saveBtnText, { fontSize: 15 * fontScale }]}>
-                    📤 Submit to 3S Center
+                  <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>
+                    Submit to 3S Center
                   </Text>
                 )}
               </TouchableOpacity>
@@ -762,11 +772,16 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: "#F4F6F9",
   },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#1F2937",
-    marginBottom: 12,
   },
   tabSwitcher: {
     flexDirection: "row",
@@ -780,12 +795,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 9,
+    paddingVertical: 12,
     borderRadius: 10,
     gap: 6,
+    minHeight: 44,
   },
   tabBtnActive: { backgroundColor: "#2356E1" },
-  tabBtnText: { fontSize: 13, color: "#2356E1", fontWeight: "600" },
+  tabBtnText: { fontSize: 15, color: "#2356E1", fontWeight: "600" },
   tabBtnTextActive: { color: "white" },
   scrollView: { flex: 1 },
   tabContent: {
@@ -796,14 +812,15 @@ const styles = StyleSheet.create({
   primaryBtn: {
     backgroundColor: "#2356E1",
     borderRadius: 12,
-    padding: 14,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
     marginBottom: 20,
+    minHeight: 52,
   },
-  primaryBtnText: { color: "white", fontWeight: "bold", fontSize: 15 },
+  primaryBtnText: { color: "white", fontWeight: "bold", fontSize: 17 },
   card: {
     backgroundColor: "white",
     borderRadius: 12,
@@ -813,14 +830,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#D1D5DB",
   },
-  cardTitle: { fontSize: 17, fontWeight: "bold", color: "#1F2937", marginBottom: 3 },
-  cardSub: { fontSize: 13, color: "#4B5563", marginBottom: 2 },
-  cardNext: { fontSize: 12, color: "#2563EB", fontWeight: "600", marginTop: 2 },
+  cardTitle: { fontSize: 19, fontWeight: "bold", color: "#1F2937", marginBottom: 3 },
+  cardSub: { fontSize: 15, color: "#374151", marginBottom: 2 },
+  cardNext: { fontSize: 14, color: "#2563EB", fontWeight: "600", marginTop: 2 },
   emptyState: { alignItems: "center", paddingVertical: 50 },
-  emptyText: { fontSize: 16, fontWeight: "bold", color: "#6B7280", marginTop: 14 },
-  emptySubText: { fontSize: 13, color: "#9CA3AF", marginTop: 6 },
+  emptyText: { fontSize: 18, fontWeight: "bold", color: "#6B7280", marginTop: 14 },
+  emptySubText: { fontSize: 15, color: "#6B7280", marginTop: 6 },
   infoBox: {
     flexDirection: "row",
     backgroundColor: "#EFF6FF",
@@ -830,7 +847,7 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: "flex-start",
   },
-  infoText: { flex: 1, fontSize: 12, color: "#1E40AF", lineHeight: 18 },
+  infoText: { flex: 1, fontSize: 14, color: "#1E40AF", lineHeight: 20 },
   calendarWrapper: {
     borderRadius: 16,
     overflow: "hidden",
@@ -848,7 +865,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "bold",
     color: "#374151",
     marginTop: 20,
@@ -861,24 +878,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: "#D1D5DB",
   },
   apptConfirmed: { borderColor: "#10B981", backgroundColor: "#ECFDF5" },
   apptCancelled: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
   apptRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  apptType: { fontSize: 15, fontWeight: "bold", color: "#1F2937", flex: 1 },
-  apptSub: { fontSize: 12, color: "#6B7280", marginTop: 2 },
-  apptCenter: { color: "#2356E1", fontWeight: "600", marginBottom: 14, textAlign: "center" },
-  badge: { backgroundColor: "#FEF3C7", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  apptType: { fontSize: 17, fontWeight: "bold", color: "#1F2937", flex: 1 },
+  apptSub: { fontSize: 14, color: "#374151", marginTop: 2 },
+  apptCenter: { color: "#2356E1", fontWeight: "600", marginBottom: 14, textAlign: "center", fontSize: 15 },
+  badge: { backgroundColor: "#FEF3C7", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   badgeConfirmed: { backgroundColor: "#D1FAE5" },
   badgeCancelled: { backgroundColor: "#FEE2E2" },
-  badgeText: { fontSize: 11, fontWeight: "bold", color: "#374151" },
+  badgeText: { fontSize: 13, fontWeight: "bold", color: "#374151" },
   fab: { position: "absolute", bottom: 100, right: 20 },
   fabBtn: {
     backgroundColor: "#2356E1",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
     elevation: 8,
@@ -897,30 +914,31 @@ const styles = StyleSheet.create({
     maxHeight: "92%",
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "bold",
     color: "#1F2937",
     marginBottom: 16,
     textAlign: "center",
   },
   label: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "600",
     color: "#374151",
     marginBottom: 6,
   },
   input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderWidth: 1.5,
+    borderColor: "#D1D5DB",
     borderRadius: 10,
-    padding: 12,
+    padding: 14,
     marginBottom: 14,
-    fontSize: 15,
+    fontSize: 17,
     backgroundColor: "#F9FAFB",
+    minHeight: 50,
   },
   pickerBox: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderWidth: 1.5,
+    borderColor: "#D1D5DB",
     borderRadius: 10,
     marginBottom: 14,
     overflow: "hidden",
@@ -928,17 +946,19 @@ const styles = StyleSheet.create({
   },
   saveBtn: {
     backgroundColor: "#2356E1",
-    padding: 14,
+    padding: 16,
     borderRadius: 12,
     alignItems: "center",
     marginTop: 6,
+    minHeight: 52,
+    justifyContent: "center",
   },
-  saveBtnText: { color: "white", fontWeight: "bold", fontSize: 15 },
-  cancelLink: { marginTop: 12, alignItems: "center", padding: 10 },
-  cancelLinkText: { color: "#EF4444", fontWeight: "bold", fontSize: 15 },
+  saveBtnText: { color: "white", fontWeight: "bold", fontSize: 17 },
+  cancelLink: { marginTop: 12, alignItems: "center", padding: 12 },
+  cancelLinkText: { color: "#EF4444", fontWeight: "bold", fontSize: 17 },
   detailRow: { marginBottom: 12 },
-  detailLabel: { fontSize: 13, color: "#6B7280", marginBottom: 2 },
-  detailVal: { fontSize: 17, color: "#1F2937", fontWeight: "500" },
+  detailLabel: { fontSize: 15, color: "#6B7280", marginBottom: 2 },
+  detailVal: { fontSize: 18, color: "#1F2937", fontWeight: "500" },
   nextDoseHighlight: {
     backgroundColor: "#EFF6FF",
     padding: 10,
@@ -947,27 +967,29 @@ const styles = StyleSheet.create({
   },
   timeRow: { flexDirection: "row", alignItems: "center", marginBottom: 14 },
   timeInput: { flex: 1, textAlign: "center", marginBottom: 0 },
-  timeSep: { marginHorizontal: 8, fontSize: 18, fontWeight: "bold" },
+  timeSep: { marginHorizontal: 8, fontSize: 20, fontWeight: "bold" },
   amPmRow: { flexDirection: "row", marginLeft: 8 },
   amPmBtn: {
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    paddingVertical: 8,
-    paddingHorizontal: 11,
+    borderWidth: 1.5,
+    borderColor: "#9CA3AF",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     borderRadius: 8,
     marginLeft: 4,
     backgroundColor: "#F9FAFB",
+    minHeight: 44,
+    justifyContent: "center",
   },
   amPmBtnActive: { backgroundColor: "#2356E1", borderColor: "#2356E1" },
-  amPmTxt: { color: "#374151", fontWeight: "bold", fontSize: 13 },
+  amPmTxt: { color: "#374151", fontWeight: "bold", fontSize: 15 },
   amPmTxtActive: { color: "white" },
   errorBox: {
     backgroundColor: "rgba(239,68,68,0.1)",
     borderWidth: 1,
     borderColor: "#EF4444",
     borderRadius: 10,
-    padding: 10,
+    padding: 12,
     marginBottom: 12,
   },
-  errorText: { color: "#B91C1C", fontWeight: "bold", textAlign: "center" },
+  errorText: { color: "#B91C1C", fontWeight: "bold", textAlign: "center", fontSize: 15 },
 });
