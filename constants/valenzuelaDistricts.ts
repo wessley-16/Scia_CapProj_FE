@@ -59,8 +59,13 @@ const normalize = (s: string) =>
     .replace(/^brgy\.?\s+/, "")
     .replace(/^barangay\s+/, "");
 
-const DISTRICT_1_SET = new Set(DISTRICT_1_BARANGAYS.map(normalize));
-const DISTRICT_2_SET = new Set(DISTRICT_2_BARANGAYS.map(normalize));
+// Normalized name -> the exact, canonically-cased string the admin dashboard
+// expects (i.e. the spelling that appears in the arrays above).
+const DISTRICT_1_MAP = new Map(DISTRICT_1_BARANGAYS.map((b) => [normalize(b), b]));
+const DISTRICT_2_MAP = new Map(DISTRICT_2_BARANGAYS.map((b) => [normalize(b), b]));
+
+const DISTRICT_1_SET = new Set(DISTRICT_1_MAP.keys());
+const DISTRICT_2_SET = new Set(DISTRICT_2_MAP.keys());
 
 /**
  * Returns "DISTRICT_1" or "DISTRICT_2" for a Valenzuela barangay name, or
@@ -75,4 +80,19 @@ export function getDistrictForBarangay(barangay: string | null | undefined): "DI
   if (DISTRICT_1_SET.has(key)) return "DISTRICT_1";
   if (DISTRICT_2_SET.has(key)) return "DISTRICT_2";
   return null;
+}
+
+/**
+ * Matches a free-form barangay name (e.g. whatever a phone's reverse
+ * geocoder or a user typed) to the exact, canonically-cased name the admin
+ * dashboard filters on. Returns null if it doesn't match any known
+ * Valenzuela barangay, so callers can fall back to something else instead
+ * of silently sending a value the admin's barangay filter will never match.
+ */
+export function canonicalizeBarangayName(barangay: string | null | undefined): string | null {
+  if (!barangay) return null;
+  let key = normalize(barangay);
+  key = ALIASES[key] ?? key;
+
+  return DISTRICT_1_MAP.get(key) ?? DISTRICT_2_MAP.get(key) ?? null;
 }

@@ -1,18 +1,19 @@
 /**
  * app/(tabs)/voice.tsx
  *
- * Voice Assistant Screen — Gemini Live via Firebase AI Logic (Vertex AI).
+ * Voice Assistant — record, transcribe, answer, speak.
  *
- * Status matrix:
- *   idle       → not connected
- *   connecting → opening session
- *   connected  → session open, mic idle
- *   listening  → mic streaming to model (red pulse)
- *   responding → model speaking (purple ring)
- *   error      → something failed
+ * Design rules for this screen (all deliberate, all for elderly users):
+ *  - ONE control does the main job. The big circle is start/stop/interrupt.
+ *  - Everything the app heard and everything it said is ALSO on screen as
+ *    large text, because hearing loss is common and audio-only fails.
+ *  - Status is written in words, not just colour or animation.
+ *  - Touch targets are 64px+ and never rely on a long-press.
+ *  - Replay is one tap, because "ulitin mo nga" is the most common request.
  */
 
-import { useLiveVoice } from "@/hooks/useLiveVoice";
+import { useSettings } from "@/context/SettingsContext";
+import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef } from "react";
@@ -26,70 +27,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// ─── Animated pulse rings shown while listening ───────────────────────────────
-function PulseRings({ active }: { active: boolean }) {
-  const ring1 = useRef(new Animated.Value(0)).current;
-  const ring2 = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!active) {
-      ring1.setValue(0);
-      ring2.setValue(0);
-      return;
-    }
-    const pulse = (anim: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, { toValue: 1, duration: 1200, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration: 0,    useNativeDriver: true }),
-        ]),
-      );
-    const a1 = pulse(ring1, 0);
-    const a2 = pulse(ring2, 500);
-    a1.start();
-    a2.start();
-    return () => { a1.stop(); a2.stop(); };
-  }, [active, ring1, ring2]);
-
-  if (!active) return null;
-
-  return (
-    <>
-      {[ring1, ring2].map((anim, i) => (
-        <Animated.View
-          key={i}
-          style={[
-            styles.pulseRing,
-            {
-              opacity: anim.interpolate({
-                inputRange:  [0, 0.3, 1],
-                outputRange: [0, 0.4,  0],
-              }),
-              transform: [{
-                scale: anim.interpolate({
-                  inputRange:  [0,   1  ],
-                  outputRange: [1,   2.2],
-                }),
-              }],
-            },
-          ]}
-        />
-      ))}
-    </>
-  );
-}
-
-// ─── Animated responding ring ─────────────────────────────────────────────────
-function RespondingRing({ active }: { active: boolean }) {
+function PulseRing({ active, color }: { active: boolean; color: string }) {
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!active) { pulse.setValue(0); return; }
+    if (!active) {
+      pulse.setValue(0);
+      return;
+    }
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 900,  useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 900,  useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 1100, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 0, useNativeDriver: true }),
       ]),
     );
     anim.start();
@@ -100,449 +49,335 @@ function RespondingRing({ active }: { active: boolean }) {
 
   return (
     <Animated.View
+      pointerEvents="none"
       style={[
-        styles.respondingRing,
+        styles.pulseRing,
         {
-          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] }),
-          transform: [{
-            scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] }),
-          }],
+          borderColor: color,
+          opacity: pulse.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 0.45, 0] }),
+          transform: [
+            { scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] }) },
+          ],
         },
       ]}
     />
   );
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function VoiceScreen() {
   const router = useRouter();
+  const { fontScale } = useSettings();
 
   const {
     status,
-    isConnected,
+    turns,
+    lastTurn,
+    partialQuestion,
+    errorMessage,
     isRecording,
-    inputTranscript,
-    outputTranscript,
-    interrupted,
-    lastError,
-    diagnostic,
-    connect,
-    disconnect,
-    toggleMic,
-    resetTranscripts,
-  } = useLiveVoice();
+    isBusy,
+    isSpeaking,
+    toggleRecording,
+    cancelRecording,
+    replayLast,
+    clearConversation,
+  } = useVoiceAssistant();
 
-  const isListening  = status === "listening";
-  const isResponding = status === "responding";
-  const isConnecting = status === "connecting";
-  const hasError     = status === "error";
+  const scrollRef = useRef<ScrollView>(null);
 
-  // ── Labels ────────────────────────────────────────────────────────────────
-  const statusLabel =
-    isListening  ? "Listening…"        :
-    isConnecting ? "Connecting…"       :
-    isResponding ? "Responding…"       :
-    isConnected  ? "Connected"         :
-    hasError     ? "Connection error"  :
-                   "Not connected";
+  useEffect(() => {
+    // Always keep the newest answer in view.
+    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+    return () => clearTimeout(t);
+  }, [turns.length, partialQuestion, errorMessage]);
 
-  const greetingText =
-    isListening  ? "I'm listening…"    :
-    isResponding ? "Let me answer…"    :
-    isConnected  ? "How can I help?"   :
-                   "HealthAI Assistant";
+  const fs = (n: number) => n * fontScale;
 
-  const micHintText =
-    isConnecting ? "Opening session…"      :
-    isListening  ? "Tap to stop mic"       :
-    isResponding ? "Speaking…"             :
-    isConnected  ? "Tap to speak"          :
-                   "Tap to connect & speak";
+  // ── Words, not just colours ──────────────────────────────────────────
+  const statusText =
+    isRecording        ? "Nakikinig po ako…"      :
+    status === "transcribing" ? "Naiintindihan ko pa po…" :
+    status === "thinking"     ? "Sandali po, iniisip ko…" :
+    isSpeaking         ? "Sinasagot ko po…"       :
+    status === "error" ? "May problema po"        :
+                         "Handa na po ako";
 
-  // ── Mic icon & colour ────────────────────────────────────────────────────
-  const micIcon =
-    isConnecting ? "timer-sand"          :
-    isListening  ? "stop-circle-outline" :
-    isConnected  ? "microphone"          :
-                   "microphone-plus";
+  const hintText =
+    isRecording        ? "Pindutin ulit kapag tapos na kayong magsalita" :
+    isBusy             ? "Sandali lang po…"                              :
+    isSpeaking         ? "Pindutin para itigil ang pagsasalita"          :
+                         "Pindutin ang butones, tapos magsalita";
 
-  const micColor =
-    isListening  ? "#DC2626" :
-    isResponding ? "#7C3AED" :
-    isConnected  ? "#2563EB" :
-                   "#6B7280";
+  const buttonColor =
+    isRecording ? "#DC2626" :
+    isBusy      ? "#6B7280" :
+    isSpeaking  ? "#7C3AED" :
+                  "#2563EB";
 
-  // ── Status dot colour ─────────────────────────────────────────────────────
-  const dotColor =
-    hasError ? "#DC2626" :
-    isConnected
-      ? (isListening  ? "#DC2626"
-       : isResponding ? "#7C3AED"
-       :                "#16A34A")
-      : "#9CA3AF";
-
-  const hasTranscripts = !!(inputTranscript || outputTranscript);
+  const buttonIcon =
+    isRecording ? "stop"           :
+    isBusy      ? "dots-horizontal":
+    isSpeaking  ? "volume-high"    :
+                  "microphone";
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-
-      {/* ── Header ──────────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => {
-            disconnect(); // close session before navigating away
-            router.back();
-          }}
+          onPress={() => router.back()}
           style={styles.iconBtn}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityLabel="Isara"
         >
-          <Ionicons name="close" size={28} color="#111827" />
+          <Ionicons name="close" size={30} color="#111827" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>Voice Assistant</Text>
+        <Text style={[styles.headerTitle, { fontSize: fs(20) }]}>HealthAI</Text>
 
-        {hasTranscripts ? (
-          <TouchableOpacity
-            onPress={resetTranscripts}
-            style={styles.iconBtn}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="refresh" size={22} color="#6B7280" />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.iconBtn} />
-        )}
+        <TouchableOpacity
+          onPress={clearConversation}
+          style={styles.iconBtn}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityLabel="Bagong tanong"
+          disabled={isBusy}
+        >
+          <Ionicons name="refresh" size={26} color={isBusy ? "#D1D5DB" : "#111827"} />
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.body}>
-
-        {/* ── AI avatar + status ───────────────────────────────────────── */}
-        <View style={styles.avatarSection}>
-          <View style={[
-            styles.avatarRing,
-            isListening  && styles.avatarRingListening,
-            isResponding && styles.avatarRingResponding,
-          ]}>
-            <MaterialCommunityIcons
-              name="robot-outline"
-              size={44}
-              color={isConnected ? "#2356E1" : "#9CA3AF"}
-            />
+      <ScrollView
+        ref={scrollRef}
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {turns.length === 0 && !partialQuestion && !errorMessage && (
+          <View style={styles.emptyCard}>
+            <Text style={[styles.emptyTitle, { fontSize: fs(22) }]}>
+              Magtanong po kayo sa akin
+            </Text>
+            <Text style={[styles.emptyBody, { fontSize: fs(17) }]}>
+              Pindutin ang asul na butones sa ibaba, tapos magsalita nang normal.
+              Pindutin ulit kapag tapos na kayo. Babasahin ko po ang sagot.
+            </Text>
+            <Text style={[styles.emptyHint, { fontSize: fs(15) }]}>
+              Halimbawa: “Ano po ang gamot sa sipon?” o “Paano mag-book ng
+              appointment sa health center?”
+            </Text>
           </View>
+        )}
 
-          <Text style={styles.greeting}>{greetingText}</Text>
+        {turns.map((turn) => (
+          <View key={turn.id} style={styles.turnBlock}>
+            <Text style={[styles.label, { fontSize: fs(14) }]}>SINABI NINYO</Text>
+            <View style={styles.questionCard}>
+              <Text style={[styles.questionText, { fontSize: fs(18) }]}>
+                {turn.question}
+              </Text>
+            </View>
 
-          <View style={styles.statusRow}>
-            <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
-            <Text style={styles.statusText}>{statusLabel}</Text>
+            <Text style={[styles.label, { fontSize: fs(14) }]}>SAGOT NI HEALTHAI</Text>
+            <View style={styles.answerCard}>
+              <Text style={[styles.answerText, { fontSize: fs(19) }]}>
+                {turn.answer}
+              </Text>
+            </View>
           </View>
+        ))}
 
-          {/* Connect / Disconnect button */}
-          <View style={styles.ctrlRow}>
+        {!!partialQuestion && (
+          <View style={styles.turnBlock}>
+            <Text style={[styles.label, { fontSize: fs(14) }]}>SINABI NINYO</Text>
+            <View style={styles.questionCard}>
+              <Text style={[styles.questionText, { fontSize: fs(18) }]}>
+                {partialQuestion}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {!!errorMessage && (
+          <View style={styles.errorCard}>
+            <Ionicons name="alert-circle" size={fs(24)} color="#B91C1C" />
+            <Text style={[styles.errorText, { fontSize: fs(17) }]}>{errorMessage}</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* ── Controls ──────────────────────────────────────────────────── */}
+      <View style={styles.controls}>
+        <Text style={[styles.statusText, { fontSize: fs(19) }]}>{statusText}</Text>
+
+        <View style={styles.micWrap}>
+          <PulseRing active={isRecording} color="#DC2626" />
+          <PulseRing active={isSpeaking} color="#7C3AED" />
+          <TouchableOpacity
+            onPress={toggleRecording}
+            activeOpacity={0.85}
+            disabled={isBusy}
+            style={[styles.micButton, { backgroundColor: buttonColor }]}
+            accessibilityLabel={isRecording ? "Itigil ang pagrekord" : "Magsalita"}
+          >
+            <MaterialCommunityIcons name={buttonIcon as any} size={58} color="#fff" />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={[styles.hintText, { fontSize: fs(16) }]}>{hintText}</Text>
+
+        <View style={styles.secondaryRow}>
+          {isRecording ? (
             <TouchableOpacity
-              style={[
-                styles.ctrlBtn,
-                isConnected  ? styles.ctrlBtnRed  : styles.ctrlBtnBlue,
-                isConnecting && styles.ctrlBtnGray,
-              ]}
-              onPress={isConnected ? disconnect : connect}
-              disabled={isConnecting}
-              activeOpacity={0.8}
+              onPress={cancelRecording}
+              style={[styles.secondaryBtn, styles.cancelBtn]}
+              accessibilityLabel="Kanselahin"
             >
-              <Text style={styles.ctrlBtnText}>
-                {isConnected  ? "Disconnect" :
-                 isConnecting ? "Connecting…" :
-                                "Connect"}
+              <Ionicons name="close-circle-outline" size={fs(22)} color="#B91C1C" />
+              <Text style={[styles.cancelLabel, { fontSize: fs(16) }]}>Kanselahin</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              onPress={replayLast}
+              disabled={!lastTurn || isBusy}
+              style={[
+                styles.secondaryBtn,
+                (!lastTurn || isBusy) && styles.secondaryBtnDisabled,
+              ]}
+              accessibilityLabel="Ulitin ang sagot"
+            >
+              <Ionicons
+                name="volume-high-outline"
+                size={fs(22)}
+                color={!lastTurn || isBusy ? "#9CA3AF" : "#1D4ED8"}
+              />
+              <Text
+                style={[
+                  styles.secondaryLabel,
+                  { fontSize: fs(16) },
+                  (!lastTurn || isBusy) && { color: "#9CA3AF" },
+                ]}
+              >
+                Ulitin ang sagot
               </Text>
             </TouchableOpacity>
-          </View>
-
-          {interrupted && (
-            <Text style={styles.interruptedText}>↩ Response interrupted</Text>
-          )}
-
-          {/* Error message (shown in red) */}
-          {!!lastError && (
-            <View style={styles.errorBox}>
-              <Ionicons name="warning-outline" size={16} color="#B91C1C" />
-              <Text style={styles.errorText}>{lastError}</Text>
-            </View>
-          )}
-
-          {/* Diagnostic hint (shown in gray, only when no error) */}
-          {!!diagnostic && !lastError && (
-            <Text style={styles.diagText}>{diagnostic}</Text>
           )}
         </View>
-
-        {/* ── Transcript card ───────────────────────────────────────────── */}
-        <ScrollView
-          style={styles.transcriptCard}
-          contentContainerStyle={styles.transcriptContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={[styles.txLabel, styles.txLabelUser]}>
-            YOU SAID
-          </Text>
-          <Text style={[styles.txText, isListening && styles.txTextActive]}>
-            {inputTranscript || "Connect and start speaking…"}
-          </Text>
-
-          <View style={styles.txDivider} />
-
-          <Text style={[styles.txLabel, styles.txLabelModel]}>
-            HEALTHAI
-          </Text>
-          <Text style={[styles.txText, styles.txTextModel]}>
-            {outputTranscript || "Response will appear here."}
-          </Text>
-        </ScrollView>
-
-        {/* ── Mic button ───────────────────────────────────────────────── */}
-        <View style={styles.micSection}>
-          <PulseRings     active={isListening} />
-          <RespondingRing active={isResponding} />
-
-          <TouchableOpacity
-            style={[
-              styles.micBtn,
-              { backgroundColor: micColor, shadowColor: micColor },
-            ]}
-            onPress={toggleMic}
-            activeOpacity={0.82}
-            disabled={isConnecting}
-          >
-            <MaterialCommunityIcons
-              name={micIcon as any}
-              size={44}
-              color="#fff"
-            />
-          </TouchableOpacity>
-
-          <Text style={styles.micHint}>{micHintText}</Text>
-        </View>
-
       </View>
     </SafeAreaView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-const MIC_SIZE = 90;
-
 const styles = StyleSheet.create({
-  safe: {
-    flex:            1,
-    backgroundColor: "#F4F6F9",
-  },
+  safe: { flex: 1, backgroundColor: "#F9FAFB" },
 
-  // Header
   header: {
-    flexDirection:     "row",
-    alignItems:        "center",
-    justifyContent:    "space-between",
-    paddingHorizontal: 20,
-    paddingVertical:   14,
-    backgroundColor:   "#fff",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#E5E7EB",
-    elevation:         2,
-    shadowColor:       "#000",
-    shadowOffset:      { width: 0, height: 1 },
-    shadowOpacity:     0.06,
-    shadowRadius:      3,
-  },
-  iconBtn: {
-    padding:    4,
-    width:      38,
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize:   17,
-    fontWeight: "700",
-    color:      "#111827",
-  },
-
-  // Body
-  body: {
-    flex:              1,
-    paddingHorizontal: 20,
-    paddingBottom:     24,
-    justifyContent:    "space-between",
-  },
-
-  // Avatar
-  avatarSection: {
-    alignItems: "center",
-    paddingTop: 28,
-    gap:        8,
-  },
-  avatarRing: {
-    width:           88,
-    height:          88,
-    borderRadius:    44,
-    backgroundColor: "#EFF6FF",
-    alignItems:      "center",
-    justifyContent:  "center",
-    borderWidth:     2,
-    borderColor:     "#BFDBFE",
-  },
-  avatarRingListening: {
-    borderColor:     "#DC2626",
-    backgroundColor: "#FEF2F2",
-  },
-  avatarRingResponding: {
-    borderColor:     "#7C3AED",
-    backgroundColor: "#F5F3FF",
-  },
-  greeting: {
-    fontSize:   22,
-    fontWeight: "700",
-    color:      "#111827",
-    textAlign:  "center",
-    marginTop:  8,
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems:    "center",
-    gap:           6,
-    marginTop:     4,
-  },
-  statusDot: {
-    width:        8,
-    height:       8,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 14,
-    color:    "#4B5563",
-  },
-
-  // Connect / Disconnect
-  ctrlRow: {
-    flexDirection:  "row",
-    justifyContent: "center",
-    marginTop:      10,
-  },
-  ctrlBtn: {
-    paddingHorizontal: 24,
-    paddingVertical:    9,
-    borderRadius:      999,
-  },
-  ctrlBtnBlue: { backgroundColor: "#2563EB" },
-  ctrlBtnRed:  { backgroundColor: "#DC2626" },
-  ctrlBtnGray: { backgroundColor: "#9CA3AF" },
-  ctrlBtnText: {
-    color:      "#fff",
-    fontWeight: "700",
-    fontSize:   13,
-  },
-
-  interruptedText: {
-    fontSize:  13,
-    color:     "#B45309",
-    marginTop: 4,
-  },
-  errorBox: {
-    flexDirection:     "row",
-    alignItems:        "flex-start",
-    gap:               6,
-    backgroundColor:   "#FEF2F2",
-    borderRadius:      10,
-    paddingHorizontal: 14,
-    paddingVertical:   10,
-    marginTop:         6,
-    maxWidth:          "90%",
-  },
-  errorText: {
-    flex:       1,
-    fontSize:   13,
-    color:      "#B91C1C",
-    lineHeight: 18,
-  },
-  diagText: {
-    fontSize:          12,
-    color:             "#6B7280",
-    textAlign:         "center",
-    marginTop:         4,
-    paddingHorizontal: 20,
-  },
-
-  // Transcript
-  transcriptCard: {
-    flex:            1,
     backgroundColor: "#fff",
-    borderRadius:    20,
-    marginVertical:  18,
-    elevation:       2,
-    shadowColor:     "#000",
-    shadowOffset:    { width: 0, height: 1 },
-    shadowOpacity:   0.08,
-    shadowRadius:    4,
   },
-  transcriptContent: {
-    padding: 20,
-  },
-  txLabel: {
-    fontSize:      11,
-    fontWeight:    "700",
-    letterSpacing: 0.6,
-    marginBottom:  6,
-  },
-  txLabelUser:  { color: "#1D4ED8" },
-  txLabelModel: { color: "#047857" },
-  txText: {
-    fontSize:   15,
-    color:      "#9CA3AF",
-    lineHeight: 22,
-  },
-  txTextActive: {
-    color:      "#111827",
-    fontWeight: "500",
-  },
-  txTextModel: {
-    color: "#111827",
-  },
-  txDivider: {
-    height:          1,
-    backgroundColor: "#F3F4F6",
-    marginVertical:  14,
-  },
+  headerTitle: { fontWeight: "700", color: "#111827" },
+  iconBtn: { padding: 8, minWidth: 46, minHeight: 46, alignItems: "center", justifyContent: "center" },
 
-  // Mic
-  micSection: {
-    alignItems:     "center",
+  body: { flex: 1 },
+  bodyContent: { padding: 16, paddingBottom: 24 },
+
+  emptyCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    gap: 10,
+  },
+  emptyTitle: { fontWeight: "700", color: "#111827" },
+  emptyBody: { color: "#374151", lineHeight: 26 },
+  emptyHint: { color: "#6B7280", fontStyle: "italic", lineHeight: 22 },
+
+  turnBlock: { marginBottom: 20, gap: 6 },
+  label: { fontWeight: "700", color: "#6B7280", letterSpacing: 0.6, marginTop: 6 },
+
+  questionCard: {
+    backgroundColor: "#EFF6FF",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+  },
+  questionText: { color: "#1E3A8A", lineHeight: 26 },
+
+  answerCard: {
+    backgroundColor: "#fff",
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  answerText: { color: "#111827", lineHeight: 30 },
+
+  errorCard: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+    backgroundColor: "#FEF2F2",
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  errorText: { color: "#991B1B", flex: 1, lineHeight: 24 },
+
+  controls: {
+    alignItems: "center",
+    paddingTop: 14,
+    paddingBottom: 22,
+    paddingHorizontal: 16,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    gap: 10,
+  },
+  statusText: { fontWeight: "700", color: "#111827" },
+
+  micWrap: { alignItems: "center", justifyContent: "center", height: 150, width: 150 },
+  micButton: {
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    alignItems: "center",
     justifyContent: "center",
-    height:         MIC_SIZE + 64,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
   pulseRing: {
-    position:        "absolute",
-    width:           MIC_SIZE,
-    height:          MIC_SIZE,
-    borderRadius:    MIC_SIZE / 2,
-    backgroundColor: "#DC2626",
+    position: "absolute",
+    width: 128,
+    height: 128,
+    borderRadius: 64,
+    borderWidth: 4,
   },
-  respondingRing: {
-    position:        "absolute",
-    width:           MIC_SIZE,
-    height:          MIC_SIZE,
-    borderRadius:    MIC_SIZE / 2,
-    backgroundColor: "#7C3AED",
+
+  hintText: { color: "#4B5563", textAlign: "center" },
+
+  secondaryRow: { flexDirection: "row", justifyContent: "center", marginTop: 4 },
+  secondaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: "#EFF6FF",
+    minHeight: 52,
   },
-  micBtn: {
-    width:          MIC_SIZE,
-    height:         MIC_SIZE,
-    borderRadius:   MIC_SIZE / 2,
-    alignItems:     "center",
-    justifyContent: "center",
-    elevation:      10,
-    shadowOffset:   { width: 0, height: 4 },
-    shadowOpacity:  0.35,
-    shadowRadius:   10,
-  },
-  micHint: {
-    marginTop: 12,
-    fontSize:  13,
-    color:     "#6B7280",
-  },
+  secondaryBtnDisabled: { backgroundColor: "#F3F4F6" },
+  secondaryLabel: { color: "#1D4ED8", fontWeight: "600" },
+  cancelBtn: { backgroundColor: "#FEF2F2" },
+  cancelLabel: { color: "#B91C1C", fontWeight: "600" },
 });

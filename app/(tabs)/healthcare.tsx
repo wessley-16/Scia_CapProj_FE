@@ -23,7 +23,6 @@ import { useFocusEffect } from "expo-router";
 import { useSettings } from "@/context/SettingsContext";
 import { Medicine } from "@/interfaces/interfaces";
 import { submitAppointment } from "@/lib/firebase";
-import AsyncStorageLib from "@react-native-async-storage/async-storage";
 
 // Configure notifications
 Notifications.setNotificationHandler({
@@ -50,6 +49,9 @@ type AppointmentType = {
 
 type ActiveTab = "medicine" | "appointment";
 
+// Today's date as YYYY-MM-DD, matching react-native-calendars' dateString format.
+const getTodayStr = () => new Date().toISOString().split("T")[0];
+
 export default function Healthcare() {
   const { fontScale, t } = useSettings();
   const router = useRouter();
@@ -71,7 +73,6 @@ export default function Healthcare() {
   // Appointment State
   const [selectedDate, setSelectedDate] = useState("");
   const [appointModalVisible, setAppointModalVisible] = useState(false);
-  const [apptTime, setApptTime] = useState("");
   const [apptHour, setApptHour] = useState("");
   const [apptMinute, setApptMinute] = useState("");
   const [apptAmPm, setApptAmPm] = useState<"AM" | "PM">("AM");
@@ -80,6 +81,11 @@ export default function Healthcare() {
   const [appointments, setAppointments] = useState<AppointmentType[]>([]);
   const [apptError, setApptError] = useState("");
   const [submittingAppt, setSubmittingAppt] = useState(false);
+  // Scoped per logged-in user so switching accounts on the same device
+  // never shows someone else's appointments.
+  const [userId, setUserId] = useState<string>("guest");
+
+  const appointmentsStorageKey = `appointments_local_${userId}`;
 
   // Load Data
   useFocusEffect(
@@ -226,8 +232,23 @@ export default function Healthcare() {
   // Appointment Functions
   const loadAppointments = async () => {
     try {
-      const stored = await AsyncStorage.getItem("appointments_local");
-      if (stored) setAppointments(JSON.parse(stored));
+      const uid = (await AsyncStorage.getItem("userId")) || "guest";
+      setUserId(uid);
+      const key = `appointments_local_${uid}`;
+      const stored = await AsyncStorage.getItem(key);
+      if (!stored) {
+        setAppointments([]);
+        return;
+      }
+      const parsed: AppointmentType[] = JSON.parse(stored);
+      // Drop appointments whose date has already passed so old entries
+      // don't linger in the list forever.
+      const today = getTodayStr();
+      const upcoming = parsed.filter((a) => a.date >= today);
+      if (upcoming.length !== parsed.length) {
+        await AsyncStorage.setItem(key, JSON.stringify(upcoming));
+      }
+      setAppointments(upcoming);
     } catch (e) {
       console.log("Error loading appointments:", e);
     }
@@ -235,11 +256,29 @@ export default function Healthcare() {
 
   const saveAppointmentsLocal = async (updated: AppointmentType[]) => {
     try {
-      await AsyncStorage.setItem("appointments_local", JSON.stringify(updated));
+      await AsyncStorage.setItem(appointmentsStorageKey, JSON.stringify(updated));
       setAppointments(updated);
     } catch (e) {
       console.log("Error saving appointments:", e);
     }
+  };
+
+  const cancelAppointment = (id?: string) => {
+    if (!id) return;
+    Alert.alert("Cancel Appointment", "Are you sure you want to cancel this appointment?", [
+      { text: "No", style: "cancel" },
+      {
+        text: "Yes, Cancel",
+        style: "destructive",
+        onPress: async () => {
+          await saveAppointmentsLocal(appointments.filter((a) => a.id !== id));
+          // Note: this only removes the local copy. If the 3S Center's
+          // sub-admin also needs to see the cancellation reflected on
+          // their side, a corresponding Firestore update/delete call
+          // belongs here too — see lib/firebase.ts.
+        },
+      },
+    ]);
   };
 
   const submitAppointmentHandler = async () => {
@@ -258,8 +297,8 @@ export default function Healthcare() {
     setApptError("");
     try {
       // Get senior info from storage
-      const seniorName = (await AsyncStorageLib.getItem("userName")) || "Senior";
-      const seniorId = (await AsyncStorageLib.getItem("userId")) || "N/A";
+      const seniorName = (await AsyncStorage.getItem("userName")) || "Senior";
+      const seniorId = (await AsyncStorage.getItem("userId")) || "N/A";
       // Submit to Firebase; the sub-admin receives this
       await submitAppointment({
         seniorName,
@@ -517,6 +556,17 @@ export default function Healthcare() {
                       Sent to 3S Center
                     </Text>
                   )}
+
+                  {appt.status !== "cancelled" && (
+                    <TouchableOpacity
+                      style={styles.apptCancelBtn}
+                      onPress={() => cancelAppointment(appt.id)}
+                      hitSlop={8}
+                    >
+                      <MaterialCommunityIcons name="trash-can-outline" size={18} color="#EF4444" />
+                      <Text style={styles.apptCancelBtnText}>Cancel</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </>
@@ -681,8 +731,8 @@ export default function Healthcare() {
                   onValueChange={(v) => setApptType(v)}
                   style={{ height: 50 }}
                 >
-                  {appointmentTypes.map((t) => (
-                    <Picker.Item key={t} label={t} value={t} />
+                  {appointmentTypes.map((tName) => (
+                    <Picker.Item key={tName} label={tName} value={tName} />
                   ))}
                 </Picker>
               </View>
@@ -890,6 +940,18 @@ const styles = StyleSheet.create({
   badgeConfirmed: { backgroundColor: "#D1FAE5" },
   badgeCancelled: { backgroundColor: "#FEE2E2" },
   badgeText: { fontSize: 13, fontWeight: "bold", color: "#374151" },
+  apptCancelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 10,
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: "#FEF2F2",
+  },
+  apptCancelBtnText: { color: "#EF4444", fontWeight: "600", fontSize: 13 },
   fab: { position: "absolute", bottom: 100, right: 20 },
   fabBtn: {
     backgroundColor: "#2356E1",

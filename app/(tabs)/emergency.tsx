@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import { sendSOSAlert, subscribeToSOSAlert } from '../../lib/firebase';
+import { canonicalizeBarangayName } from '../../constants/barangays';
 
 const HOLD_DURATION_MS = 5000;
 const COOLDOWN_MS = 5 * 60 * 1000;
@@ -62,6 +63,10 @@ const valenzuelaBarangays = [
   { name: 'Wawang Pulo',         lat: 14.7185, lng: 120.9845 },
 ];
 
+// LAST-RESORT FALLBACK ONLY. Each entry is a single hardcoded point for a
+// whole barangay, so "nearest point" is just a coarse guess and is wrong
+// near any barangay border. Only used when the phone's reverse geocoder
+// didn't return a barangay we recognize.
 const getBarangayFromCoords = (lat: number, lng: number): string => {
   let closest = { name: 'Unknown Barangay', dist: Number.MAX_VALUE };
   for (const b of valenzuelaBarangays) {
@@ -104,6 +109,23 @@ const buildGoogleMapsAppUrl = (lat: number, lng: number) =>
 const buildGoogleMapsWebUrl = (lat: number, lng: number) =>
   `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
+// How long we let the GPS try for its best (BestForNavigation) fix before
+// giving up and settling for a faster, lower-accuracy one. Indoors or with a
+// weak signal a high-accuracy fix can take a while (or never lock), and an
+// SOS button can't just hang — it's better to send a slightly-less-precise
+// location than none at all.
+const HIGH_ACCURACY_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Location request timed out')), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
 export default function EmergencyScreen() {
   const { fontScale, t } = useSettings();
   const { user } = useAuth();
@@ -130,6 +152,9 @@ export default function EmergencyScreen() {
   const [mapKey, setMapKey] = useState(0);
   const [mapLoadFailed, setMapLoadFailed] = useState(false);
 
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
   useEffect(() => {
     fetchLocation();
     return () => { sosUnsubRef.current?.(); };
@@ -153,22 +178,93 @@ export default function EmergencyScreen() {
   }, [activeSosId]);
 
   const fetchLocation = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Location access is required to send SOS alerts.');
-      return;
-    }
-    const loc = await Location.getCurrentPositionAsync({});
-    const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-    setLocation(coords);
-    setMapLoadFailed(false);
-    setMapKey(k => k + 1);
+    setLocationError(null);
+    setIsFetchingLocation(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationError('Location permission denied.');
+        Alert.alert('Permission Denied', 'Location access is required to send SOS alerts.');
+        return;
+      }
 
-    const geo = await Location.reverseGeocodeAsync(loc.coords);
-    if (geo.length > 0) {
-      const place: any = geo[0];
-      setFullAddress(`${place.street || ''}, ${place.city || ''}`);
-      setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
+      // Permission can be "granted" while the device's location/GPS toggle is
+      // off entirely (common on Android). Catch that up front instead of
+      // letting getCurrentPositionAsync hang or throw a confusing error.
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        setLocationError('Location services are turned off.');
+        Alert.alert(
+          'Location Services Off',
+          'Please turn on Location/GPS in your device settings so an accurate location can be sent with your SOS.',
+        );
+        return;
+      }
+
+      // Ask for the most precise fix the device can give (real GPS lock, not
+      // just cell/Wi-Fi triangulation) since a responder needs to find the
+      // exact spot, not just the general area. Indoors or with a weak signal
+      // that can take a while or never resolve, so we cap the wait and fall
+      // back to a faster, still-reasonable fix rather than leaving the SOS
+      // screen stuck with no location at all.
+      let loc: Location.LocationObject;
+      try {
+        loc = await withTimeout(
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation }),
+          HIGH_ACCURACY_TIMEOUT_MS,
+        );
+      } catch {
+        loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      }
+
+      const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      setLocation(coords);
+      setMapLoadFailed(false);
+      setMapKey((k) => k + 1);
+
+      try {
+        const geo = await Location.reverseGeocodeAsync(loc.coords);
+        const place: any = geo[0];
+
+        if (place) {
+          const streetLine = [place.streetNumber, place.street].filter(Boolean).join(' ');
+          setFullAddress([streetLine, place.city].filter(Boolean).join(', ') || 'Address unavailable');
+
+          // The reverse geocoder's "district" is the phone's real,
+          // boundary-aware sublocality (i.e. the actual barangay for that
+          // street), unlike the single-point nearest-neighbor guess below.
+          // Try it first, canonicalized to the exact spelling the admin
+          // dashboard filters on. "subregion" is tried next since some
+          // Android devices report the barangay there instead. Only fall
+          // back to the coordinate guess if neither matches a real
+          // Valenzuela barangay, so a wrong-but-confident guess never
+          // overrides a correct geocoded one.
+          const geocodedBarangay =
+            canonicalizeBarangayName(place.district) ??
+            canonicalizeBarangayName(place.subregion);
+
+          setBarangay(geocodedBarangay ?? getBarangayFromCoords(coords.latitude, coords.longitude));
+        } else {
+          setFullAddress(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
+          setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
+        }
+      } catch {
+        // Reverse geocoding needs network/provider access and can fail even
+        // when the GPS coordinates themselves are perfectly good (no
+        // signal, provider hiccup, etc). Never let that block the SOS: keep
+        // the accurate coordinates, show them as the address, and still use
+        // the coordinate-based barangay guess so a barangay is always sent.
+        setFullAddress(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
+        setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
+      }
+    } catch (error: any) {
+      setLocationError(error?.message || 'Could not get your location.');
+      Alert.alert(
+        'Location Error',
+        'Could not get your current location. Please check that GPS is on and try again.',
+      );
+    } finally {
+      setIsFetchingLocation(false);
     }
   };
 
@@ -210,7 +306,12 @@ export default function EmergencyScreen() {
 
   const triggerSOS = async () => {
     if (!location) {
-      Alert.alert('Location unavailable', 'Still fetching your location. Please wait a moment.');
+      Alert.alert(
+        locationError ? 'Location unavailable' : 'Please wait',
+        locationError
+          ? 'We could not get your location. Tap the locate button to try again before sending an SOS.'
+          : 'Still fetching your location. Please wait a moment.',
+      );
       return;
     }
     const now = Date.now();
@@ -345,9 +446,26 @@ export default function EmergencyScreen() {
                 onError={() => setMapLoadFailed(true)}
                 onHttpError={() => setMapLoadFailed(true)}
               />
+            ) : locationError ? (
+              <View style={styles.mapPlaceholder}>
+                <Ionicons name="warning-outline" size={36} color="#C0181F" style={{ opacity: 0.6, marginBottom: 8 }} />
+                <Text style={[styles.mapPlaceholderText, { fontSize: 16 * fontScale, textAlign: 'center', paddingHorizontal: 16 }]}>
+                  {locationError}
+                </Text>
+                <View style={styles.mapRetryRow}>
+                  <TouchableOpacity style={styles.mapRetryBtn} onPress={fetchLocation}>
+                    <Ionicons name="refresh" size={16} color="#C0181F" />
+                    <Text style={[styles.mapRetryBtnText, { fontSize: 15 * fontScale }]}>{t('retry')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             ) : (
               <View style={styles.mapPlaceholder}>
-                <Ionicons name="map-outline" size={40} color="#C0181F" style={{ opacity: 0.4, marginBottom: 8 }} />
+                {isFetchingLocation ? (
+                  <ActivityIndicator color="#C0181F" style={{ marginBottom: 8 }} />
+                ) : (
+                  <Ionicons name="map-outline" size={40} color="#C0181F" style={{ opacity: 0.4, marginBottom: 8 }} />
+                )}
                 <Text style={[styles.mapPlaceholderText, { fontSize: 16 * fontScale }]}>Fetching location…</Text>
               </View>
             )}

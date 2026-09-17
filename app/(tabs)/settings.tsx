@@ -1,3 +1,4 @@
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useRouter } from "expo-router";
 import React from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -21,6 +22,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { fontScale, language, setFontScale, setLanguage, t } = useSettings();
   const { clearUser } = useAuth();
+  const tabBarHeight = useBottomTabBarHeight();
 
   const handleSaveChanges = () => {
     // Changes are already persisted via AsyncStorage as they're made.
@@ -48,7 +50,13 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { paddingBottom: tabBarHeight + 20 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={[styles.title, { fontSize: 28 * fontScale }]}>{t("accountSettings")}</Text>
 
         <View style={styles.section}>
@@ -131,7 +139,6 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: 20,
-    paddingBottom: 70,
   },
   title: {
     fontWeight: "700",
@@ -228,4 +235,3 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
-  

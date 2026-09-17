@@ -1,4 +1,14 @@
 // hooks/useChatbot.ts
+//
+// Same public API as before (AiChat.tsx needs no changes). What changed:
+//  - uses the rebuilt lib/firebaseAI.ts (GoogleAI backend, current model)
+//  - reads chunk text through readText(), so it works whether the SDK
+//    exposes text as a method or a property
+//  - the non-streaming fallback no longer re-sends into the SAME chat
+//    object, which used to push a duplicate user turn into the history
+//  - errors are mapped to plain sentences a senior can act on
+//  - greeting is Taglish, matching the app's default language
+
 import {
   CHATBOT_SESSIONS_KEY_PREFIX,
   CHATBOT_STORAGE_KEY,
@@ -8,6 +18,8 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import {
   createNativeChatSession,
+  friendlyAIError,
+  readText,
   type ChatHistoryItem,
 } from "@/lib/firebaseAI";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -38,7 +50,7 @@ const GUEST_SCOPE = "guest";
 const INITIAL_MESSAGE: ChatMessage = {
   id: "initial",
   role: "assistant",
-  text: "Hello! I'm HealthAI, your personal health assistant. How can I help you today? 😊",
+  text: "Kumusta po! Ako si HealthAI, ang inyong katulong sa kalusugan. Ano po ang maitutulong ko sa inyo ngayon? 😊",
 };
 
 const getTrimmedMessages = (msgs: ChatMessage[]) =>
@@ -82,14 +94,15 @@ const isValidSessions = (v: unknown): v is ChatSession[] =>
 
 function toFirebaseHistory(messages: ChatMessage[]): ChatHistoryItem[] {
   const mapped: ChatHistoryItem[] = messages
-    .filter((m) => m.id !== "initial") // drop the static greeting — it's not a real turn
+    .filter((m) => m.id !== "initial") // drop the static greeting — not a real turn
+    .filter((m) => m.text.trim().length > 0) // drop the empty streaming placeholder
     .slice(-MAX_CONTEXT_MESSAGES)
     .map((m) => ({
       role: m.role === "assistant" ? ("model" as const) : ("user" as const),
       parts: [{ text: m.text }],
     }));
 
-  // Firebase requires history to START with a "user" turn.
+  // Gemini requires history to START with a "user" turn.
   const firstUserIndex = mapped.findIndex((m) => m.role === "user");
   if (firstUserIndex === -1) return [];
   return mapped.slice(firstUserIndex);
@@ -106,9 +119,7 @@ function safeCreateSession(history: ChatHistoryItem[]) {
 }
 
 // One-time migration of the old single global conversation (from before chat
-// history was per-account) into the new sessions list, so an existing
-// account doesn't just lose what it already had. Only ever runs for a real,
-// persistable account — guests always start clean.
+// history was per-account) into the new sessions list.
 async function migrateLegacyConversation(): Promise<ChatSession | null> {
   try {
     const legacy = await AsyncStorage.getItem(CHATBOT_STORAGE_KEY);
@@ -117,7 +128,7 @@ async function migrateLegacyConversation(): Promise<ChatSession | null> {
     const parsed: unknown = JSON.parse(legacy);
     if (!isValidMessages(parsed) || parsed.length === 0) return null;
     const messages = parsed.map((m) => ({ ...m, id: m.id ?? generateId() }));
-    if (!messages.some((m) => m.role === "user")) return null; // nothing real to keep
+    if (!messages.some((m) => m.role === "user")) return null;
     return {
       id: generateId(),
       title: deriveTitle(messages),
@@ -132,10 +143,6 @@ async function migrateLegacyConversation(): Promise<ChatSession | null> {
 export const useChatbot = () => {
   const { user, isGuest } = useAuth();
 
-  // Real accounts get their own persisted history, keyed by Firebase uid, so
-  // one account never sees another's conversations. Guest gets a clean,
-  // in-memory-only slate that is NEVER written to disk — that's what
-  // guarantees it disappears on app exit or when a real account signs in.
   const scopeKey = isGuest ? GUEST_SCOPE : (user?.uid ?? GUEST_SCOPE);
   const isPersistable = scopeKey !== GUEST_SCOPE;
   const storageKey = `${CHATBOT_SESSIONS_KEY_PREFIX}${scopeKey}`;
@@ -147,17 +154,12 @@ export const useChatbot = () => {
   const chatRef = useRef<ReturnType<typeof createNativeChatSession> | null>(null);
   const loadedScopeRef = useRef<string | null>(null);
 
-  // (Re)load whenever the signed-in identity changes — a different account,
-  // a logout, or entering/leaving Guest mode. This is what makes account
-  // switching (without an app restart) show the right person's history
-  // instead of whoever was signed in a moment ago.
+  // (Re)load whenever the signed-in identity changes.
   useEffect(() => {
     let cancelled = false;
     setHydrated(false);
     chatRef.current = null;
 
-    // Clear immediately (not just after the async load resolves) so a scope
-    // switch never flashes the PREVIOUS account's messages, even briefly.
     const placeholder = createEmptySession();
     setSessions([placeholder]);
     setActiveSessionId(placeholder.id);
@@ -182,7 +184,6 @@ export const useChatbot = () => {
           loaded = null;
         }
       }
-      // Guest mode never reads from disk — always starts fresh.
 
       if (cancelled) return;
       const finalSessions = loaded && loaded.length > 0 ? loaded : [createEmptySession()];
@@ -197,9 +198,6 @@ export const useChatbot = () => {
     };
   }, [scopeKey, isPersistable, storageKey]);
 
-  // Persist on every change — real accounts only, and only once the load for
-  // THIS scope has actually finished (otherwise we could briefly overwrite
-  // storage with placeholder data while switching accounts).
   useEffect(() => {
     if (!hydrated || !isPersistable || loadedScopeRef.current !== scopeKey) return;
     const trimmed = sessions
@@ -240,29 +238,19 @@ export const useChatbot = () => {
     [updateActiveSession],
   );
 
-  // Appends a chunk of text to the LAST message in place (same id, same
-  // position) instead of adding a new message — this is what lets a
-  // streamed reply grow smoothly in the UI instead of appearing as one
-  // big block once the whole response has arrived.
   const appendToLastMessage = useCallback(
     (chunk: string) => {
       updateActiveSession((session) => {
         const msgs = session.messages;
         const last = msgs[msgs.length - 1];
-        if (!last || last.role !== "assistant") return session; // safety guard
-        const updated = [
-          ...msgs.slice(0, -1),
-          { ...last, text: last.text + chunk },
-        ];
+        if (!last || last.role !== "assistant") return session;
+        const updated = [...msgs.slice(0, -1), { ...last, text: last.text + chunk }];
         return { ...session, messages: updated, updatedAt: Date.now() };
       });
     },
     [updateActiveSession],
   );
 
-  // Replaces the LAST message's text outright — used for the "No
-  // response." / error fallback so we fill the already-visible empty
-  // bubble instead of leaving it stranded and adding a second one.
   const setLastMessageText = useCallback(
     (text: string) => {
       updateActiveSession((session) => {
@@ -280,16 +268,18 @@ export const useChatbot = () => {
     const trimmed = message.trim();
     if (!trimmed || loading) return;
 
-    // Create session lazily on first send, seeded from the ACTIVE
-    // conversation's own history (not whichever one was open before).
+    // Snapshot the history BEFORE this turn — needed if we have to rebuild
+    // the session for the fallback path below.
+    const historyBefore = toFirebaseHistory(messages);
+
     if (!chatRef.current) {
-      chatRef.current = safeCreateSession(toFirebaseHistory(messages));
+      chatRef.current = safeCreateSession(historyBefore);
     }
 
     if (!chatRef.current) {
       addMessage(
         "assistant",
-        "Could not connect to HealthAI. Please restart the app and try again. 😊",
+        "Hindi ko po ma-simulan ang chat. Pakisara at buksan ulit ang app. 😊",
       );
       return;
     }
@@ -297,42 +287,42 @@ export const useChatbot = () => {
     addMessage("user", trimmed);
     setLoading(true);
 
-    // Seed an empty assistant bubble right away — every chunk that arrives
-    // (streaming path) or the eventual full reply (fallback paths) fills
-    // THIS SAME bubble instead of appending a new one each time.
+    // Empty assistant bubble that every chunk fills in place.
     addMessage("assistant", "");
 
     try {
       const result = await chatRef.current.sendMessageStream(trimmed);
       let reply = "";
       for await (const chunk of result.stream) {
-        const text = chunk.text();
+        const text = readText(chunk);
+        if (!text) continue;
         reply += text;
         appendToLastMessage(text);
       }
       if (!reply.trim()) {
-        setLastMessageText("No response.");
+        setLastMessageText("Wala akong nakuhang sagot. Pakisubukan ulit po.");
       }
     } catch (streamErr) {
-      console.warn("Stream failed, trying non-stream:", streamErr);
+      console.warn("Stream failed, retrying without streaming:", streamErr);
       try {
-        const result = await chatRef.current.sendMessage(trimmed);
-        const reply = result.response.text();
-        setLastMessageText(reply.trim() || "No response.");
+        // IMPORTANT: build a FRESH session from the pre-turn history. Reusing
+        // chatRef here would append `trimmed` a second time, because the
+        // failed stream may already have recorded it internally.
+        const retry = safeCreateSession(historyBefore);
+        if (!retry) throw streamErr;
+        const result = await retry.sendMessage(trimmed);
+        const reply = readText(result.response).trim();
+        setLastMessageText(reply || "Wala akong nakuhang sagot. Pakisubukan ulit po.");
+        chatRef.current = retry;
       } catch (err) {
-        console.error("HealthAI error:", err);
-        chatRef.current = null; // reset broken session — fresh one on next send
-        setLastMessageText(
-          "I'm having trouble connecting. Please check your internet and try again. 😊",
-        );
+        chatRef.current = null; // drop the broken session; next send rebuilds it
+        setLastMessageText(friendlyAIError(err));
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Starts a brand-new conversation and switches to it, keeping the old one
-  // in history.
   const startNewChat = useCallback(() => {
     const fresh = createEmptySession();
     chatRef.current = null;
@@ -340,18 +330,15 @@ export const useChatbot = () => {
     setActiveSessionId(fresh.id);
   }, []);
 
-  // Opens a past conversation from history.
   const openSession = useCallback(
     (id: string) => {
       if (id === activeSessionId) return;
-      chatRef.current = null; // lazily rebuilt from THAT session's own history on next send
+      chatRef.current = null; // rebuilt from THAT session's history on next send
       setActiveSessionId(id);
     },
     [activeSessionId],
   );
 
-  // Deletes a conversation from history. If it was the active one, falls
-  // back to the next most recent, or a fresh new chat if none are left.
   const deleteSession = useCallback(
     (id: string) => {
       const remaining = sessions.filter((s) => s.id !== id);
@@ -365,7 +352,6 @@ export const useChatbot = () => {
     [sessions, activeSessionId],
   );
 
-  // Newest-first for the history list.
   const sortedSessions = useMemo(
     () => sessions.slice().sort((a, b) => b.updatedAt - a.updatedAt),
     [sessions],

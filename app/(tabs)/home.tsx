@@ -352,7 +352,7 @@ export default function Home() {
         </View>
 
         {/* PROGRAMS */}
-        <BlurView intensity={40} tint="dark" style={styles.programContainer}>
+        <BlurView intensity={20} tint="dark" style={styles.programContainer}>
           <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>{t("programUpdates")}</Text>
 
           <EventCarousel
