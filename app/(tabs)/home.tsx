@@ -7,7 +7,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
-// Events, join/check-in, and everything else go through Firestore directly.
+// 🔥 Firebase — events, join/check-in, and everything else now go through
+// Firestore directly (previously joining hit a hardcoded local dev backend
+// at http://10.142.254.160:3000 that no longer exists)
 import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds, subscribeToAuthState } from "@/lib/firebase";
 import EventCarousel from "@/components/home/EventCarousel";
 import EventJoinFormModal from "@/components/home/EventJoinFormModal";
@@ -52,48 +54,66 @@ export default function Home() {
   const goToEmergency = () => router.push("/(tabs)/emergency");
   const goToDocs = () => router.push("/(tabs)/govdocs");
 
+  /* ---------------- PROGRAM ---------------- */
+  const [isProgramOpen, setIsProgramOpen] = useState(false);
+  const animatedHeight = useState(new Animated.Value(0))[0];
+  const animatedOpacity = useState(new Animated.Value(0))[0];
+  const rotateAnim = useState(new Animated.Value(0))[0];
+
+  const toggleProgram = () => {
+    Animated.parallel([
+      Animated.timing(animatedHeight, {
+        toValue: isProgramOpen ? 0 : 150,
+        duration: 250,
+        useNativeDriver: false,
+      }),
+      Animated.timing(animatedOpacity, {
+        toValue: isProgramOpen ? 0 : 1,
+        duration: 250,
+        useNativeDriver: false,
+      }),
+      Animated.timing(rotateAnim, {
+        toValue: isProgramOpen ? 0 : 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    setIsProgramOpen(!isProgramOpen);
+  };
+
   /* ---------------- FETCH EVENTS ---------------- */
   const fetchEvents = async () => {
-    // Manual refresh delegates to loadEvents, which uses Firebase.
     loadEvents();
   };
 
   /* ---------------- LOAD EVENT ---------------- */
-  // Real-time subscription to Firestore announcements.
+  // Real-time subscription to Firestore announcements, scoped to the
+  // signed-in user's own barangay/district (already loaded on `user` —
+  // no need for a separate AsyncStorage read that could lag behind it).
   const loadEvents = useCallback(() => {
-    let barangay: string | null = null;
-    let district: string | null = null;
-
-    const setup = async () => {
-      barangay = await AsyncStorage.getItem("userBarangay");
-      district = await AsyncStorage.getItem("userDistrict");
-
-      setLoadingEvents(true);
-      // subscribeToEvents returns an unsubscribe fn; React re-renders on each snapshot
-      const unsub = subscribeToEvents(barangay, district, (newEvents) => {
-        setEvents(newEvents as any[]);
-        setLoadingEvents(false);
-      });
-      return unsub;
-    };
-
-    let cleanup: (() => void) | undefined;
-    setup().then((unsub) => { cleanup = unsub; });
-    return () => { if (cleanup) cleanup(); };
-  }, []);
+    setLoadingEvents(true);
+    const unsub = subscribeToEvents(user?.barangay ?? null, user?.district ?? null, (newEvents) => {
+      setEvents(newEvents as any[]);
+      setLoadingEvents(false);
+    });
+    return unsub;
+  }, [user]);
 
   /* ---------------- JOIN EVENT ---------------- */
   const [joinFormEvent, setJoinFormEvent] = useState<FirebaseEvent | null>(null);
   const [joining, setJoining] = useState(false);
 
-  // Tapping "Join" always opens the details/signup form first, whether or
-  // not the event has extra fields. EventCarousel only calls this for
-  // joinable events, so plain announcements never reach here.
+  // Tapping "Join" on a card always opens the details screen first, so the
+  // senior sees exactly what the admin posted (date, location, description)
+  // before confirming — whether or not the event has extra signup fields.
+  // EventCarousel only ever calls this for items with isJoinable === true,
+  // so plain announcements never reach here.
   const handleJoinPress = (event: FirebaseEvent) => {
     if (!user || isGuest) {
       Alert.alert(
         "Log In Required",
-        "Please log in with your account to join events. This is what links your QR code to event check-in.",
+        "Please log in with your account to join events — this is what links your QR code to event check-in.",
       );
       return;
     }
@@ -129,9 +149,12 @@ export default function Home() {
   };
 
   /* ---------------- FIREBASE AUTH READY STATE ---------------- */
-  // Tracks Firebase Auth's own restored session, since AuthContext's `user`
-  // can hydrate a beat before it, which would otherwise cause permission-
-  // denied errors on auth-gated reads like joinedEvents.
+  // Tracks Firebase Auth's own restored session, separately from
+  // AuthContext's `user`. AuthContext may hydrate from AsyncStorage a beat
+  // before the native Firebase Auth SDK finishes restoring its session —
+  // during that gap request.auth is still null on the server, so any
+  // Firestore read gated on auth.uid (like joinedEvents) gets rejected with
+  // permission-denied even though `user` already looks populated here.
   const [firebaseUid, setFirebaseUid] = useState<string | null>(null);
 
   useEffect(() => {
@@ -142,8 +165,10 @@ export default function Home() {
   }, []);
 
   /* ---------------- LOAD JOINED EVENTS ---------------- */
-  // Re-derives from Firestore once Firebase Auth confirms the session.
-  // Guests never have joined events, since they have no stable identity.
+  // Re-derives from Firestore whenever the confirmed Firebase identity or
+  // the event list changes — guests never have joined events (no stable
+  // identity to check in with), and this only fires once Firebase Auth has
+  // actually confirmed the session, matching what the security rules check.
   useEffect(() => {
     let cancelled = false;
     if (!firebaseUid || isGuest) {
@@ -253,8 +278,9 @@ export default function Home() {
   );
 
   /* ---------------- EXIT CONFIRMATION (hardware back button) ---------------- */
-  // Prevents the hardware back button from closing SCIA instantly with no
-  // chance to log out. Android only; iOS has no hardware back button.
+  // Home is the app's root screen — pressing back here would otherwise close
+  // SCIA immediately with no chance to log out first. Android only; iOS has
+  // no hardware back button so this listener simply never fires there.
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== "android") return;
@@ -267,7 +293,8 @@ export default function Home() {
               text: t("exitWithoutLogout"),
               style: "default",
               onPress: () => {
-                // Session stays persisted; the account is still there next launch.
+                // Do nothing to the session — Firebase keeps it persisted so
+                // the account is still there ("Welcome back") next launch.
                 BackHandler.exitApp();
               },
             },
@@ -336,31 +363,62 @@ export default function Home() {
                 size={14}
                 color="#FBBF24"
               />
-              <Text style={[styles.idText, { fontSize: 15 * fontScale }]}>
+              <Text style={[styles.idText, { fontSize: 13 * fontScale }]}>
                 {idNumber}
               </Text>
             </View>
           </View>
 
-          <TouchableOpacity onPress={toggleNotification} style={styles.notifBellBtn} hitSlop={10}>
+          <TouchableOpacity onPress={toggleNotification}>
             <Ionicons
               name={showNotif ? "close" : "notifications"}
-              size={28}
+              size={26}
               color="#2356E1"
             />
           </TouchableOpacity>
         </View>
 
         {/* PROGRAMS */}
-        <BlurView intensity={20} tint="dark" style={styles.programContainer}>
-          <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>{t("programUpdates")}</Text>
+        <BlurView intensity={40} tint="dark" style={styles.programContainer}>
+          {/* HEADER (clickable) */}
+          <TouchableOpacity onPress={toggleProgram} style={styles.programHeader}>
+            <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>{t("programUpdates")}</Text>
 
-          <EventCarousel
-            events={events}
-            joinedEventIds={joinedEvents.map((e) => e.id)}
-            fontScale={fontScale}
-            onJoinPress={handleJoinPress}
-          />
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: rotateAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0deg", "180deg"],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Ionicons name="chevron-down" size={20} color="#fff" />
+            </Animated.View>
+          </TouchableOpacity>
+
+          {/* COLLAPSIBLE CONTENT */}
+          <Animated.View
+            style={{
+              height: animatedHeight,
+              opacity: animatedOpacity,
+              overflow: "hidden",
+            }}
+          >
+
+            <View>
+              <EventCarousel
+                events={events}
+                joinedEventIds={joinedEvents.map((e) => e.id)}
+                fontScale={fontScale}
+                onJoinPress={handleJoinPress}
+              />
+            </View>
+
+          </Animated.View>
         </BlurView>
 
         <View style={styles.assistantContainer}>
@@ -374,7 +432,7 @@ export default function Home() {
 
             <View>
               <Text style={[styles.assistantTitle, { fontSize: 16 * fontScale }]}>{t("chatAssistant")}</Text>
-              <Text style={[styles.assistantSub, { fontSize: 14 * fontScale }]}>
+              <Text style={[styles.assistantSub, { fontSize: 12 * fontScale }]}>
                 {t("howCanIHelp")}
               </Text>
             </View>
@@ -390,7 +448,7 @@ export default function Home() {
 
             <View>
               <Text style={[styles.assistantTitle, { fontSize: 16 * fontScale }]}>{t("voiceAssistant")}</Text>
-              <Text style={[styles.assistantSub, { fontSize: 14 * fontScale }]}>
+              <Text style={[styles.assistantSub, { fontSize: 12 * fontScale }]}>
                 {t("speakAndGetHelp")}
               </Text>
             </View>
@@ -407,14 +465,14 @@ export default function Home() {
 
               {nextMedicine ? (
                 <>
-                  <Text style={[styles.reminderTitle, { fontSize: 17 * fontScale }]}>
-                    {t("takeLabel")} {nextMedicine.dosage} {nextMedicine.dosageUnit} {nextMedicine.name}
+                  <Text style={[styles.reminderTitle, { fontSize: 16 * fontScale }]}>
+                    {t("takeLabel")} {nextMedicine.dosage} {nextMedicine.dosageUnit} {nextMedicine.name}\
                   </Text>
-                  <Text style={[styles.reminderTime, { fontSize: 17 * fontScale }]}>
-                    {t("timeLabel")} {getNextDoseTime(nextMedicine)}
+                  <Text style={[styles.reminderTime, { fontSize: 16 * fontScale }]}>
+                    {t("timeLabel")} {getNextDoseTime(nextMedicine)}\
                   </Text>
-                  <Text style={[styles.reminderTime, { fontSize: 17 * fontScale }]}>
-                    {t("noteLabel")} {nextMedicine.description ? `${nextMedicine.description}` : "Not set"}
+                  <Text style={[styles.reminderTime, { fontSize: 16 * fontScale }]}>
+                    {t("noteLabel")} {nextMedicine.description ? `${nextMedicine.description}` : "---"}\
                   </Text>
                 </>
               ) : (
@@ -501,17 +559,17 @@ export default function Home() {
             </TouchableOpacity>
 
             <View style={{ marginTop: 50 }}>
-              <Text style={{ fontSize: 22 * fontScale, fontWeight: "bold", color: "#111827", marginBottom: 10 }}>
+              <Text style={{ fontSize: 20, fontWeight: "bold", marginBottom: 10 }}>
                 {t("notifications")}
               </Text>
 
               {/* EVENTS NOTIFICATIONS */}
-              <Text style={{ fontSize: 15 * fontScale, color: "#4B5563", marginBottom: 5 }}>
+              <Text style={{ color: "#6B7280", marginBottom: 5 }}>
                 Your Joined Events
               </Text>
 
               {joinedEvents.length === 0 ? (
-                <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>No joined events yet</Text>
+                <Text>No joined events yet</Text>
               ) : (
                 joinedEvents.map((event) => (
                   <View
@@ -523,34 +581,28 @@ export default function Home() {
                       marginBottom: 10,
                     }}
                   >
-                    <Text style={{ fontWeight: "bold", fontSize: 16 * fontScale, color: "#111827" }}>
-                      {event.title}
+                    <Text style={{ fontWeight: "bold" }}>
+                      📌 {event.title}
                     </Text>
 
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-                      <Ionicons name="calendar-outline" size={16} color="#4B5563" />
-                      <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>
-                        {new Date(event.date).toLocaleString()}
-                      </Text>
-                    </View>
+                    <Text>
+                      🗓 {new Date(event.date).toLocaleString()}
+                    </Text>
 
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
-                      <Ionicons name="location-outline" size={16} color="#4B5563" />
-                      <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>
-                        {event.location}
-                      </Text>
-                    </View>
+                    <Text>
+                      📍 {event.location}
+                    </Text>
                   </View>
                 ))
               )}
 
               {/* SYSTEM NOTIFICATIONS */}
-              <Text style={{ fontSize: 15 * fontScale, color: "#4B5563", marginTop: 15, marginBottom: 5 }}>
+              <Text style={{ color: "#6B7280", marginTop: 15, marginBottom: 5 }}>
                 System Alerts
               </Text>
 
               {notifications.length === 0 ? (
-                <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>No alerts yet</Text>
+                <Text>No alerts yet</Text>
               ) : (
                 notifications.map((notif) => (
                   <View
@@ -562,13 +614,13 @@ export default function Home() {
                       marginBottom: 10,
                     }}
                   >
-                    <Text style={{ fontWeight: "bold", fontSize: 16 * fontScale, color: "#111827" }}>
+                    <Text style={{ fontWeight: "bold" }}>
                       {notif.type === "SOS" ? "Emergency Alert" : "Notification"}
                     </Text>
 
-                    <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>{notif.message}</Text>
+                    <Text>{notif.message}</Text>
 
-                    <Text style={{ fontSize: 14 * fontScale, color: "#6B7280" }}>
+                    <Text style={{ fontSize: 14, color: "gray" }}>
                       {new Date(notif.timestamp).toLocaleString()}
                     </Text>
                   </View>
@@ -769,17 +821,17 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
-  notifBellBtn: {
-    padding: 10,
-    borderRadius: 24,
-  },
-
   notifBtn: {
     position: "absolute",
     top: 20,
     right: 15,
     zIndex: 11,
-    padding: 10,
+  },
+
+  programHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   programTitle: {
@@ -803,4 +855,15 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
 
+  joinFunction: {
+    alignItems: "flex-end",
+    marginTop: 10,
+  },
+
+  joinButton: {
+    backgroundColor: "#2563EB",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
 });

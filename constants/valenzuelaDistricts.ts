@@ -48,7 +48,7 @@ const ALIASES: Record<string, string> = {
   "general t. de leon": "gen. t. de leon",
   "general t de leon": "gen. t. de leon",
   "gen t de leon": "gen. t. de leon",
-  "canumay": "canumay east", // pre-split records, best-effort guess
+  "canumay": "canumay east", // pre-split records — best-effort guess
 };
 
 const normalize = (s: string) =>
@@ -59,13 +59,8 @@ const normalize = (s: string) =>
     .replace(/^brgy\.?\s+/, "")
     .replace(/^barangay\s+/, "");
 
-// Normalized name -> the exact, canonically-cased string the admin dashboard
-// expects (i.e. the spelling that appears in the arrays above).
-const DISTRICT_1_MAP = new Map(DISTRICT_1_BARANGAYS.map((b) => [normalize(b), b]));
-const DISTRICT_2_MAP = new Map(DISTRICT_2_BARANGAYS.map((b) => [normalize(b), b]));
-
-const DISTRICT_1_SET = new Set(DISTRICT_1_MAP.keys());
-const DISTRICT_2_SET = new Set(DISTRICT_2_MAP.keys());
+const DISTRICT_1_SET = new Set(DISTRICT_1_BARANGAYS.map(normalize));
+const DISTRICT_2_SET = new Set(DISTRICT_2_BARANGAYS.map(normalize));
 
 /**
  * Returns "DISTRICT_1" or "DISTRICT_2" for a Valenzuela barangay name, or
@@ -83,16 +78,33 @@ export function getDistrictForBarangay(barangay: string | null | undefined): "DI
 }
 
 /**
- * Matches a free-form barangay name (e.g. whatever a phone's reverse
- * geocoder or a user typed) to the exact, canonically-cased name the admin
- * dashboard filters on. Returns null if it doesn't match any known
- * Valenzuela barangay, so callers can fall back to something else instead
- * of silently sending a value the admin's barangay filter will never match.
+ * Resolves any known spelling/alias of a barangay name to one canonical
+ * string (the exact entry in DISTRICT_1_BARANGAYS/DISTRICT_2_BARANGAYS).
+ * Two different apps (or two different dropdowns) can disagree on which
+ * exact spelling they show a person — e.g. the admin dashboard uses
+ * "General T. de Leon" while this app's signup form uses "Gen. T. de Leon".
+ * Comparing barangay strings directly breaks the moment those spellings
+ * differ, so anything that needs to check "is this the same barangay"
+ * should canonicalize both sides first instead of using ===.
+ * Falls back to the original (trimmed) string if nothing matches, so an
+ * unrecognized value still compares consistently against itself.
  */
-export function canonicalizeBarangayName(barangay: string | null | undefined): string | null {
+export function canonicalBarangay(barangay: string | null | undefined): string | null {
   if (!barangay) return null;
   let key = normalize(barangay);
   key = ALIASES[key] ?? key;
 
-  return DISTRICT_1_MAP.get(key) ?? DISTRICT_2_MAP.get(key) ?? null;
+  const match =
+    DISTRICT_1_BARANGAYS.find((b) => normalize(b) === key) ??
+    DISTRICT_2_BARANGAYS.find((b) => normalize(b) === key);
+
+  return match ?? barangay.trim();
+}
+
+/** True if two barangay strings refer to the same barangay, regardless of
+ * which known spelling/alias each one uses. */
+export function barangaysMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const ca = canonicalBarangay(a);
+  const cb = canonicalBarangay(b);
+  return ca !== null && ca === cb;
 }

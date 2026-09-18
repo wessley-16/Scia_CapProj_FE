@@ -29,24 +29,24 @@ export const auth = getAuth();
 const db = getFirestore();
 export const storage = getStorage();
 
-// Must run before any AI Logic (Gemini) call. See lib/appCheck.ts for the
+// Must run before any AI Logic (Gemini) call — see lib/appCheck.ts for the
 // remaining console-side setup this still needs.
 initAppCheck();
 
-// Helper: build a synthetic email from idNumber
+// ── Helper: build a synthetic email from idNumber ────────────────────────────
 export const idToEmail = (idNumber: string) => {
   const cleaned = idNumber.trim().replace(/[^a-z0-9]/gi, "").toLowerCase();
   return `${cleaned}@scia.app`;
 };
 
-// Helper: strip undefined so Firestore doesn't complain
+// ── Helper: strip undefined so Firestore doesn't complain ────────────────────
 function stripUndefined<T extends Record<string, any>>(obj: T): T {
   return Object.fromEntries(
     Object.entries(obj).filter(([, v]) => v !== undefined),
   ) as T;
 }
 
-// Collection names
+// ── Collection names ──────────────────────────────────────────────────────────
 export const COLLECTIONS = {
   USERS: "users",
   EVENTS: "editorial_health",
@@ -58,7 +58,7 @@ export const COLLECTIONS = {
   USER_LOOKUP: "user_lookup",
 };
 
-// AUTH STATE
+// ── AUTH STATE ────────────────────────────────────────────────────────────────
 export function subscribeToAuthState(
   callback: (user: FirebaseAuthTypes.User | null) => void,
 ) {
@@ -69,7 +69,7 @@ export async function logoutUser() {
   await signOut(auth);
 }
 
-// USER REGISTRATION
+// ── USER REGISTRATION ─────────────────────────────────────────────────────────
 export interface UserRegistration {
   firstName: string;
   midName: string;
@@ -151,7 +151,7 @@ export async function registerUser(data: UserRegistration) {
   return { id: uid, ...data, idNumber: effectiveIdNumber, status, isVerified };
 }
 
-// LOGIN
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
 export async function loginUser(idNumber: string, password: string) {
   const email = idToEmail(idNumber);
   const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -165,7 +165,7 @@ export async function loginUser(idNumber: string, password: string) {
 export async function loginByIdentifier(identifier: string, password: string) {
   const trimmed = identifier.trim();
 
-  // Build lookup keys to try, using the same normalization as registration
+  // Build lookup keys to try — same normalization used during registration
   const isNameInput = /\s/.test(trimmed); // contains spaces → likely a name
 
   const keysToTry: string[] = [];
@@ -196,7 +196,7 @@ export async function loginByIdentifier(identifier: string, password: string) {
         break;
       }
     } catch (_) {
-      // key not found, try next
+      // key not found — try next
     }
   }
 
@@ -228,12 +228,12 @@ export async function loginByIdentifier(identifier: string, password: string) {
   }
 }
 
-// EVENTS
-// A single field in an event's admin-defined signup form. For example, a
+// ── EVENTS ────────────────────────────────────────────────────────────────────
+// A single field in an event's admin-defined signup form — e.g. for a
 // medical checkup event the admin might add a "Current medications" text
 // field, or for an ayuda distribution a "Household size" number field.
 export interface EventFormField {
-  id: string; // stable key, used as the answer's key in formResponses
+  id: string; // stable key — used as the answer's key in formResponses
   label: string;
   type: "text" | "number" | "textarea" | "select";
   options?: string[]; // required when type === "select"
@@ -258,7 +258,7 @@ export interface Event {
   Status?: string;
   // Present only on events the admin marked as joinable (e.g. medical
   // checkup, free medicine, ayuda). Absent/empty = a plain announcement
-  // with no signup. Join just shows an instant RSVP, no form. Simple
+  // with no signup — Join just shows an instant RSVP, no form. Simple
   // announcements (from the ANNOUNCEMENTS collection) never have this.
   formFields?: EventFormField[];
   FormFields?: EventFormField[]; // tolerate either casing from the admin app
@@ -267,7 +267,7 @@ export interface Event {
 
 // Firestore's serverTimestamp() comes back as a Timestamp object (with
 // .toMillis()) from a live snapshot, but can also arrive as a plain
-// {seconds, nanoseconds} shape in some cached/offline cases. This handles
+// {seconds, nanoseconds} shape in some cached/offline cases — this handles
 // both, and treats a missing timestamp as "oldest" rather than throwing.
 function toMillis(ts: any): number {
   if (!ts) return 0;
@@ -276,8 +276,16 @@ function toMillis(ts: any): number {
   return 0;
 }
 
+import { canonicalBarangay } from "@/constants/valenzuelaDistricts";
+
+function normalizeDistrict(d: string | null | undefined): string | null {
+  if (!d) return null;
+  return d.trim().toUpperCase().replace(/\s+/g, "_"); // "District 1" -> "DISTRICT_1"
+}
+
 function filterEvents(docs: any[], barangay?: string | null, district?: string | null): Event[] {
   const now = new Date();
+  const myDistrict = normalizeDistrict(district);
   return docs
     .map((d) => ({ id: d.id, ...d.data() }) as Event)
     .filter((event) => {
@@ -288,20 +296,24 @@ function filterEvents(docs: any[], barangay?: string | null, district?: string |
       }
       const audience = event.Audience || event.audience || "ALL";
       if (audience === "ALL") return true;
-      if (audience === "DISTRICT_1" && district === "DISTRICT_1") return true;
-      if (audience === "DISTRICT_2" && district === "DISTRICT_2") return true;
-      if (audience === "BARANGAY" && barangay === event.barangay) return true;
+      if (audience === "DISTRICT_1" && myDistrict === "DISTRICT_1") return true;
+      if (audience === "DISTRICT_2" && myDistrict === "DISTRICT_2") return true;
+      // Two different apps' barangay dropdowns can disagree on the exact
+      // spelling of the same barangay (e.g. "Gen. T. de Leon" vs "General
+      // T. de Leon"), so this resolves both sides to one canonical name
+      // instead of comparing the raw strings.
+      if (audience === "BARANGAY" && canonicalBarangay(barangay) === canonicalBarangay(event.barangay)) return true;
       return false;
     })
     // Merging two collections means Firestore's own per-query ordering no
-    // longer guarantees a globally sorted result, so re-sort explicitly so
+    // longer guarantees a globally sorted result — re-sort explicitly so
     // announcements and joinable events interleave correctly by recency.
     .sort((a, b) => toMillis((b as any).createdAt) - toMillis((a as any).createdAt));
 }
 
 // Both the joinable-events collection (editorial_health) and the simple
-// announcements collection (announcements) use the same field shape,
-// Title/Body/Location/Date/Audience/etc, so they can be merged directly.
+// announcements collection (announcements) use the same field shape —
+// Title/Body/Location/Date/Audience/etc — so they can be merged directly.
 // Only editorial_health documents will ever have formFields/isJoinable set;
 // plain announcements simply won't, and the UI already treats an event with
 // no formFields as a no-signup announcement.
@@ -331,7 +343,7 @@ export function subscribeToEvents(
   let unsubEventsSnapshot: (() => void) | null = null;
   let unsubAnnouncementsSnapshot: (() => void) | null = null;
 
-  // Each collection's listener only knows about its own docs. We keep the
+  // Each collection's listener only knows about ITS OWN docs — we keep the
   // latest snapshot from each side and re-merge/re-filter/re-emit whenever
   // either one fires, so a change in either collection updates the list.
   let latestEventDocs: any[] = [];
@@ -383,12 +395,12 @@ export function subscribeToEvents(
   };
 }
 
-// EVENT ATTENDANCE / QR CHECK-IN
+// ── EVENT ATTENDANCE / QR CHECK-IN ──────────────────────────────────────────
 //
 // How this connects to the QR code shown on the senior's profile:
 //   1. Signing in gives every senior a stable identity (their Firebase uid).
 //      Their profile screen renders that identity as a QR code (see
-//      buildUserQRPayload below). It's the SAME code every time, not
+//      buildUserQRPayload below) — it's the SAME code every time, not
 //      regenerated per event.
 //   2. Tapping "Join" on an event writes a record under that event marking
 //      this senior as a registered attendee (joinEvent below).
@@ -396,11 +408,11 @@ export function subscribeToEvents(
 //      app (separate repo). It reads the uid out of the payload, looks up
 //      editorial_health/{eventId}/attendees/{uid}, confirms they're
 //      registered, and marks checkedIn true.
-// The QR code itself never changes. It's just "who is this person". The
+// The QR code itself never changes — it's just "who is this person". The
 // event-specific part lives entirely in Firestore, keyed by uid.
 //
 // NOTE: attendance/joining only makes sense for editorial_health documents
-// (the ones with formFields/isJoinable). Plain announcements have no
+// (the ones with formFields/isJoinable) — plain announcements have no
 // attendees subcollection, so joinEvent should only ever be called for
 // events that came from COLLECTIONS.EVENTS, not COLLECTIONS.ANNOUNCEMENTS.
 
@@ -412,18 +424,18 @@ export interface EventAttendee {
   joinedAt?: any;
   checkedIn: boolean;
   checkedInAt?: any;
-  // Answers to the event's admin-defined signup form, if it has one, keyed
+  // Answers to the event's admin-defined signup form, if it has one — keyed
   // by EventFormField.id. Empty/absent for events with no form.
   formResponses?: Record<string, string>;
 }
 
 // Called when a senior taps "Join" on an event. Writes two records in one
 // atomic batch:
-//   - editorial_health/{eventId}/attendees/{uid}: what the admin scanner
+//   • editorial_health/{eventId}/attendees/{uid} — what the admin scanner
 //     looks up when it scans this senior's QR code at the event. Includes
 //     their signup form answers, if the event had a form.
-//   - users/{uid}/joinedEvents/{eventId}: a fast local mirror so the app
-//     itself can show "Joined" without a collection-group query.
+//   • users/{uid}/joinedEvents/{eventId} — a fast local mirror so the app
+//     itself can show "Joined ✅" without a collection-group query.
 export async function joinEvent(
   eventId: string,
   profile: { uid: string; name: string; barangay?: string | null; idNumber?: string | null },
@@ -449,11 +461,11 @@ export async function joinEvent(
 }
 
 // Which events has this senior already joined? Used on Home screen mount so
-// the button shows "Joined" instead of "Join" for events already RSVP'd.
+// the button shows "Joined ✅" instead of "Join" for events already RSVP'd.
 //
 // Guarded against firing before Firebase Auth has finished restoring its
 // session (or with a stale cached uid that no longer matches the live
-// session). The security rule requires request.auth.uid == userId, and
+// session) — the security rule requires request.auth.uid == userId, and
 // during that restore window request.auth is still null server-side even
 // though targetUid looks valid here in JS, which produces the
 // permission-denied you saw in the log.
@@ -486,7 +498,7 @@ export function buildUserQRPayload(profile: { uid: string; idNumber?: string | n
   });
 }
 
-// SOS / EMERGENCY
+// ── SOS / EMERGENCY ───────────────────────────────────────────────────────────
 export interface EmergencyAlert {
   name: string;
   latitude: number;
@@ -523,7 +535,7 @@ export function subscribeToSOSAlert(
   );
 }
 
-// APPOINTMENTS
+// ── APPOINTMENTS ──────────────────────────────────────────────────────────────
 export interface AppointmentRequest {
   seniorName: string;
   seniorId: string;
@@ -582,7 +594,7 @@ export function subscribeToUserAppointments(
   };
 }
 
-// HEALTH CENTERS
+// ── HEALTH CENTERS ────────────────────────────────────────────────────────────
 export interface HealthCenter {
   id: string;
   name: string;
@@ -636,7 +648,7 @@ export function subscribeToHealthCenters(
   };
 }
 
-// PHYSICAL ID REQUEST
+// ── PHYSICAL ID REQUEST ───────────────────────────────────────────────────────
 export interface IDRequest {
   seniorName: string;
   seniorId: string;
