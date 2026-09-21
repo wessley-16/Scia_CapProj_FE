@@ -1,8 +1,15 @@
+import { useAuth } from "@/context/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import Entypo from "@expo/vector-icons/Entypo";
 import { Tabs, useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Host } from "react-native-portalize";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -83,12 +90,61 @@ const CustomTabBar = ({
   );
 };
 
+// Shown instead of the tab navigator when a real (non-guest) account exists
+// in Firestore but hasn't been approved by an admin yet. Without this check,
+// `router.replace("/(tabs)/home")` after signup/login sent everyone straight
+// into the app regardless of `isVerified`, so the "pending verification"
+// notice on the signup screen was never actually enforced anywhere.
+const PendingVerificationScreen = ({ onLogout }: { onLogout: () => void }) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[styles.pendingWrapper, { paddingTop: insets.top + 24 }]}>
+      <View style={styles.pendingCard}>
+        <Text style={styles.pendingTitle}>Account Pending Verification</Text>
+        <Text style={styles.pendingBody}>
+          Your account has been created but is still awaiting review by an
+          OSCA admin. You'll be able to access the app once it's approved.
+        </Text>
+        <TouchableOpacity
+          style={styles.pendingButton}
+          onPress={onLogout}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.pendingButtonText}>Log Out</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
 export default function Layout() {
   const router = useRouter();
+  const { user, loading, isGuest, clearUser } = useAuth();
 
   const onScanPress = () => {
     router.push("/voice" as any);
   };
+
+  const handleLogout = () => {
+    clearUser();
+    router.replace("/");
+  };
+
+  // Auth state is still resolving (e.g. right after signup/login) — avoid a
+  // flash of the pending screen or the tabs before we actually know status.
+  if (loading) {
+    return (
+      <View style={styles.loadingWrapper}>
+        <ActivityIndicator size="large" color="#2356E1" />
+      </View>
+    );
+  }
+
+  // Guests never went through registration, so there's no verification
+  // status to gate on. Only block real accounts that are still PENDING.
+  if (user && !isGuest && !user.isVerified) {
+    return <PendingVerificationScreen onLogout={handleLogout} />;
+  }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -196,5 +252,49 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+  },
+  loadingWrapper: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
+  },
+  pendingWrapper: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 24,
+  },
+  pendingCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    alignItems: "center",
+  },
+  pendingTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111827",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  pendingBody: {
+    fontSize: 15,
+    color: "#4B5563",
+    textAlign: "center",
+    lineHeight: 21,
+    marginBottom: 20,
+  },
+  pendingButton: {
+    backgroundColor: "#1D4ED8",
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+  },
+  pendingButtonText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });

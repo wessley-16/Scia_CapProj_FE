@@ -22,7 +22,7 @@ import { Calendar } from "react-native-calendars";
 import { useFocusEffect } from "expo-router";
 import { useSettings } from "@/context/SettingsContext";
 import { Medicine } from "@/interfaces/interfaces";
-import { submitAppointment } from "@/lib/firebase";
+import { submitAppointment, subscribeToUserAppointments } from "@/lib/firebase";
 
 // Configure notifications
 Notifications.setNotificationHandler({
@@ -42,15 +42,11 @@ type AppointmentType = {
   date: string;
   time: string;
   type: string;
-  notes: string;
+  notes?: string;
   status: AppointmentStatus;
-  submittedToFirebase?: boolean;
 };
 
 type ActiveTab = "medicine" | "appointment";
-
-// Today's date as YYYY-MM-DD, matching react-native-calendars' dateString format.
-const getTodayStr = () => new Date().toISOString().split("T")[0];
 
 export default function Healthcare() {
   const { fontScale, t } = useSettings();
@@ -69,6 +65,7 @@ export default function Healthcare() {
   const [interval, setInterval] = useState("8");
   const notifListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
+  const notificationsGranted = useRef(true);
 
   // Appointment State
   const [selectedDate, setSelectedDate] = useState("");
@@ -81,19 +78,27 @@ export default function Healthcare() {
   const [appointments, setAppointments] = useState<AppointmentType[]>([]);
   const [apptError, setApptError] = useState("");
   const [submittingAppt, setSubmittingAppt] = useState(false);
-  // Scoped per logged-in user so switching accounts on the same device
-  // never shows someone else's appointments.
-  const [userId, setUserId] = useState<string>("guest");
-
-  const appointmentsStorageKey = `appointments_local_${userId}`;
 
   // Load Data
   useFocusEffect(
     useCallback(() => {
       loadMedicines();
-      loadAppointments();
     }, [])
   );
+
+  // Appointments come straight from Firestore, scoped to the signed-in
+  // uid both by this query and by firestore.rules (`isOwner()` checks
+  // `resource.data.uid == request.auth.uid`), so one account can never
+  // see another account's bookings — past or upcoming. This replaces the
+  // old on-device cache, which (a) was wiped/rebuilt independently of the
+  // real record and (b) actively deleted any appointment once its date
+  // passed, so there was never a real history to show.
+  useEffect(() => {
+    const unsubscribe = subscribeToUserAppointments((data) => {
+      setAppointments(data as AppointmentType[]);
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     registerNotifications();
@@ -113,11 +118,21 @@ export default function Healthcare() {
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#FF231F7C",
+          sound: "default",
         });
       }
       const { status: existing } = await Notifications.getPermissionsAsync();
+      let finalStatus = existing;
       if (existing !== "granted") {
-        await Notifications.requestPermissionsAsync();
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      notificationsGranted.current = finalStatus === "granted";
+      if (!notificationsGranted.current) {
+        Alert.alert(
+          "Notifications Disabled",
+          "Medicine reminders won't ring unless notifications are allowed for this app. You can enable them in your device settings.",
+        );
       }
     } catch (e) {
       console.log("Notif permission error:", e);
@@ -143,22 +158,45 @@ export default function Healthcare() {
     }
   };
 
+  // NOTE: this previously passed `{ seconds, repeats } as any` with no
+  // `type` field. expo-notifications ~0.32 requires every schedulable
+  // trigger to declare its `type` (Notifications.SchedulableTriggerInputTypes)
+  // — without it, scheduleNotificationAsync throws "The trigger object you
+  // provided is invalid" immediately. That throw was being swallowed by the
+  // catch block below and silently returning `undefined`, so no alarm was
+  // ever actually scheduled even though the medicine still saved
+  // successfully and the UI looked fine. Adding `type: TIME_INTERVAL` (and
+  // a channelId so Android uses the MAX-importance/sound channel set up in
+  // registerNotifications) is what makes the reminder actually fire.
   const scheduleNotification = async (name: string, intervalHours: number) => {
+    if (!notificationsGranted.current) {
+      Alert.alert(
+        "Notifications Disabled",
+        "Please enable notifications in your device settings so this reminder can ring.",
+      );
+      return undefined;
+    }
     try {
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title: "Medicine Reminder",
           body: `Time to take ${name}!`,
-          sound: true,
+          sound: "default",
         },
         trigger: {
-          seconds: intervalHours * 3600,
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: Math.max(intervalHours * 3600, 60),
           repeats: true,
-        } as any,
+          channelId: Platform.OS === "android" ? "default" : undefined,
+        },
       });
       return id;
     } catch (e) {
       console.log("Notif schedule error:", e);
+      Alert.alert(
+        "Reminder Not Set",
+        "The alarm for this medicine could not be scheduled. Please try again.",
+      );
       return undefined;
     }
   };
@@ -169,6 +207,10 @@ export default function Healthcare() {
       return;
     }
     const intervalNum = parseInt(interval);
+    if (isNaN(intervalNum) || intervalNum < 1) {
+      Alert.alert("Invalid Interval", "Alarm interval must be at least 1 hour.");
+      return;
+    }
     const notificationId = await scheduleNotification(medicineName, intervalNum);
     const newMedicine: Medicine = {
       id: Date.now().toString(),
@@ -230,57 +272,6 @@ export default function Healthcare() {
   };
 
   // Appointment Functions
-  const loadAppointments = async () => {
-    try {
-      const uid = (await AsyncStorage.getItem("userId")) || "guest";
-      setUserId(uid);
-      const key = `appointments_local_${uid}`;
-      const stored = await AsyncStorage.getItem(key);
-      if (!stored) {
-        setAppointments([]);
-        return;
-      }
-      const parsed: AppointmentType[] = JSON.parse(stored);
-      // Drop appointments whose date has already passed so old entries
-      // don't linger in the list forever.
-      const today = getTodayStr();
-      const upcoming = parsed.filter((a) => a.date >= today);
-      if (upcoming.length !== parsed.length) {
-        await AsyncStorage.setItem(key, JSON.stringify(upcoming));
-      }
-      setAppointments(upcoming);
-    } catch (e) {
-      console.log("Error loading appointments:", e);
-    }
-  };
-
-  const saveAppointmentsLocal = async (updated: AppointmentType[]) => {
-    try {
-      await AsyncStorage.setItem(appointmentsStorageKey, JSON.stringify(updated));
-      setAppointments(updated);
-    } catch (e) {
-      console.log("Error saving appointments:", e);
-    }
-  };
-
-  const cancelAppointment = (id?: string) => {
-    if (!id) return;
-    Alert.alert("Cancel Appointment", "Are you sure you want to cancel this appointment?", [
-      { text: "No", style: "cancel" },
-      {
-        text: "Yes, Cancel",
-        style: "destructive",
-        onPress: async () => {
-          await saveAppointmentsLocal(appointments.filter((a) => a.id !== id));
-          // Note: this only removes the local copy. If the 3S Center's
-          // sub-admin also needs to see the cancellation reflected on
-          // their side, a corresponding Firestore update/delete call
-          // belongs here too — see lib/firebase.ts.
-        },
-      },
-    ]);
-  };
-
   const submitAppointmentHandler = async () => {
     if (!selectedDate || !apptHour || !apptMinute || !apptType) {
       setApptError("Please fill in date, time and appointment type.");
@@ -296,10 +287,12 @@ export default function Healthcare() {
     setSubmittingAppt(true);
     setApptError("");
     try {
-      // Get senior info from storage
       const seniorName = (await AsyncStorage.getItem("userName")) || "Senior";
       const seniorId = (await AsyncStorage.getItem("userId")) || "N/A";
-      // Submit to Firebase; the sub-admin receives this
+      // Submit to Firebase; the sub-admin receives this. The appointment
+      // list is a live Firestore subscription (see the useEffect above),
+      // so the new booking appears automatically once it's written —
+      // no separate local save needed.
       await submitAppointment({
         seniorName,
         seniorId,
@@ -308,17 +301,6 @@ export default function Healthcare() {
         type: apptType,
         notes: apptNotes,
       });
-      // Also save locally
-      const newAppt: AppointmentType = {
-        id: Date.now().toString(),
-        date: selectedDate,
-        time: formattedTime,
-        type: apptType,
-        notes: apptNotes,
-        status: "pending",
-        submittedToFirebase: true,
-      };
-      await saveAppointmentsLocal([...appointments, newAppt]);
       setAppointModalVisible(false);
       setApptHour("");
       setApptMinute("");
@@ -551,21 +533,11 @@ export default function Healthcare() {
                       {appt.notes}
                     </Text>
                   ) : null}
-                  {appt.submittedToFirebase && (
-                    <Text style={[{ fontSize: 13 * fontScale, color: "#047857", marginTop: 4 }]}>
-                      Sent to 3S Center
-                    </Text>
-                  )}
 
-                  {appt.status !== "cancelled" && (
-                    <TouchableOpacity
-                      style={styles.apptCancelBtn}
-                      onPress={() => cancelAppointment(appt.id)}
-                      hitSlop={8}
-                    >
-                      <MaterialCommunityIcons name="trash-can-outline" size={18} color="#EF4444" />
-                      <Text style={styles.apptCancelBtnText}>Cancel</Text>
-                    </TouchableOpacity>
+                  {appt.status === "pending" && (
+                    <Text style={styles.apptCancelHint}>
+                      To cancel or reschedule, please contact the 3S Center.
+                    </Text>
                   )}
                 </View>
               ))}
@@ -940,18 +912,12 @@ const styles = StyleSheet.create({
   badgeConfirmed: { backgroundColor: "#D1FAE5" },
   badgeCancelled: { backgroundColor: "#FEE2E2" },
   badgeText: { fontSize: 13, fontWeight: "bold", color: "#374151" },
-  apptCancelBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 10,
-    alignSelf: "flex-start",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: "#FEF2F2",
+  apptCancelHint: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    marginTop: 8,
+    fontStyle: "italic",
   },
-  apptCancelBtnText: { color: "#EF4444", fontWeight: "600", fontSize: 13 },
   fab: { position: "absolute", bottom: 100, right: 20 },
   fabBtn: {
     backgroundColor: "#2356E1",
