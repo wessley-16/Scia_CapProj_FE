@@ -2,7 +2,7 @@
 //
 // Single place where SCIA talks to Firebase AI Logic (Gemini).
 // Used by BOTH the text chatbot (hooks/useChatbot.ts) and the voice
-// assistant (hooks/useVoiceAssistant.ts).
+// assistant (hooks/useVoiceAssistant.ts, via lib/voiceAI.ts).
 //
 // Backend: VertexAIBackend (the "Agent Platform Gemini API", formerly
 // Vertex AI). This project is now on the Blaze (pay-as-you-go) plan, so it
@@ -28,6 +28,13 @@
 //    rejected by the API — a system instruction is just content).
 //  - Imports the AbortSignal.any polyfill, which was never imported
 //    anywhere before. Without it, sendMessageStream() can throw on Hermes.
+//  - Every call here is billed once the project is on Vertex AI/Blaze —
+//    there is no free tier on this backend. See lib/aiUsage.ts for the
+//    per-user spending cap that both the chatbot and the voice assistant
+//    check before every request.
+//  - aiInstance() and VOICE_PROMPT are exported (not just used internally)
+//    so lib/voiceAI.ts can reuse this exact same Vertex AI setup and base
+//    voice prompt instead of duplicating it.
 
 import "@/lib/polyfills";
 
@@ -38,13 +45,14 @@ import {
 } from "@react-native-firebase/ai";
 import { getApp } from "@react-native-firebase/app";
 
-// Same region useLiveVoice.ts uses for the Live API. Vertex AI Gemini
-// models are not available in the "global" location, so pick a real region.
+// Same region useLiveVoice.ts uses for the Live API. Also used by
+// lib/voiceAI.ts through aiInstance(), so the whole app (chat + voice)
+// talks to Gemini through this one region.
 const VERTEX_REGION = "asia-southeast1";
 
 // ── Models ───────────────────────────────────────────────────────────────
 // Keep these in ONE place. When Google retires a model you change 2 lines,
-// not 5 files. Both are free-tier on the Gemini Developer API.
+// not 5 files.
 export const CHAT_MODEL = "gemini-3.5-flash-lite";
 export const AUDIO_MODEL = "gemini-3.5-flash-lite";
 
@@ -83,7 +91,10 @@ Format for the chat screen:
 - Use short paragraphs, or a short numbered list for steps.
 - No tables. No headings. Keep formatting simple — it is read on a phone in large text.`;
 
-const VOICE_PROMPT = `${SENIOR_BASE}
+// Exported: lib/voiceAI.ts appends a language-override rule to this same
+// base prompt, so the chatbot and the voice assistant share one source of
+// truth for tone/safety instead of two prompts drifting apart over time.
+export const VOICE_PROMPT = `${SENIOR_BASE}
 
 Format for the voice assistant — this answer will be READ ALOUD:
 - Answer in 1 to 3 short sentences. Under 60 words. Nothing more.
@@ -93,7 +104,10 @@ Format for the voice assistant — this answer will be READ ALOUD:
 - If the request is not clear, ask one short question back.`;
 
 // ── Internals ────────────────────────────────────────────────────────────
-function aiInstance() {
+// Exported: lib/voiceAI.ts calls this directly so the voice models are
+// built with the exact same backend + region as the text chatbot, instead
+// of a second, possibly-drifting copy of this setup.
+export function aiInstance() {
   // Vertex AI (Agent Platform Gemini API) backend — requires Blaze billing
   // and the Vertex AI API enabled on the GCP project. See notes at the top
   // of this file.
@@ -153,6 +167,11 @@ export function createNativeChatSession(history: ChatHistoryItem[] = []) {
 }
 
 // ── Voice: speech -> text ────────────────────────────────────────────────
+// NOTE: hooks/useVoiceAssistant.ts uses transcribeAudioWithUsage() from
+// lib/voiceAI.ts instead of this function, because that version also
+// returns response.usageMetadata for the spending cap in lib/aiUsage.ts.
+// Kept here for backward compatibility / anything else that might still
+// import it; safe to delete once nothing else calls it.
 /**
  * Sends the recorded clip to Gemini and gets back just the words that were
  * spoken. Gemini handles Tagalog/Taglish far better than a generic STT
@@ -191,6 +210,11 @@ export async function transcribeAudio(params: {
 }
 
 // ── Voice: text -> answer ────────────────────────────────────────────────
+// NOTE: hooks/useVoiceAssistant.ts uses askHealthAIVoiceWithUsage() from
+// lib/voiceAI.ts instead of this function, because that version forces the
+// reply language from the app's language setting and also returns
+// response.usageMetadata for the spending cap. Kept here for backward
+// compatibility; safe to delete once nothing else calls it.
 /**
  * One-shot question for the voice assistant, with the previous turns passed
  * in so follow-ups like "ano ulit yung una?" still make sense.
