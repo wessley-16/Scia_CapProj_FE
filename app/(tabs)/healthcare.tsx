@@ -120,6 +120,20 @@ export default function Healthcare() {
           lightColor: "#FF231F7C",
           sound: "default",
         });
+
+        // Dedicated channel for medication reminders — Android ties sound
+        // to the CHANNEL, not the individual notification, so a distinct
+        // alarm-style tone needs its own channel rather than reusing
+        // "default". If you ever swap the sound file, bump this ID (e.g.
+        // "medication-reminders-v2") since an existing channel's sound
+        // can't be changed except by recreating it under a new ID.
+        await Notifications.setNotificationChannelAsync("medication-reminders", {
+          name: "Medication Reminders",
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 400, 200, 400, 200, 400],
+          lightColor: "#EF4444",
+          sound: "alarm.wav",
+        });
       }
       const { status: existing } = await Notifications.getPermissionsAsync();
       let finalStatus = existing;
@@ -179,15 +193,19 @@ export default function Healthcare() {
     try {
       const id = await Notifications.scheduleNotificationAsync({
         content: {
-          title: "Medicine Reminder",
+          title: "⏰ Medicine Reminder",
           body: `Time to take ${name}!`,
-          sound: "default",
+          // iOS reads sound off the notification itself; Android reads it
+          // off the channel (registered above) and just needs channelId
+          // pointing at the dedicated one.
+          sound: "alarm.wav",
+          priority: Notifications.AndroidNotificationPriority.MAX,
         },
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: Math.max(intervalHours * 3600, 60),
           repeats: true,
-          channelId: Platform.OS === "android" ? "default" : undefined,
+          channelId: Platform.OS === "android" ? "medication-reminders" : undefined,
         },
       });
       return id;

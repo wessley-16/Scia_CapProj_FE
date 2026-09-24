@@ -13,6 +13,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds, subscribeToAuthState } from "@/lib/firebase";
 import EventCarousel from "@/components/home/EventCarousel";
 import EventJoinFormModal from "@/components/home/EventJoinFormModal";
+import DigitalIdCard from "@/components/DigitalIdCard";
 import { useAuth } from "@/context/AuthContext";
 import { Medicine } from "@/interfaces/interfaces";
 
@@ -378,6 +379,13 @@ export default function Home() {
           </TouchableOpacity>
         </View>
 
+        {/* DIGITAL ID — only rendered (and only unlocked) once the admin has
+            verified the senior actually holds a physical Senior Citizen ID
+            card; DigitalIdCard itself handles the verified/pending states. */}
+        <View style={styles.digitalIdContainer}>
+          <DigitalIdCard user={user} fontScale={fontScale} />
+        </View>
+
         {/* PROGRAMS */}
         <BlurView intensity={40} tint="dark" style={styles.programContainer}>
           {/* HEADER (clickable) */}
@@ -709,6 +717,11 @@ const styles = StyleSheet.create({
   idText: {
     fontSize: 13,
     marginLeft: 4,
+  },
+
+  digitalIdContainer: {
+    marginHorizontal: 10,
+    marginTop: 16,
   },
 
   assistantContainer: {

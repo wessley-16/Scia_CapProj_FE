@@ -202,6 +202,16 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         mapLoadFailed: 'Map could not load. Check your internet connection.',
         retry: 'Retry',
         openInMaps: 'Open in Maps',
+        // Digital ID
+        digitalId: 'Digital ID',
+        digitalIdDescription: 'Your verified Senior Citizen digital ID, released by the admin.',
+        digitalIdVerifiedBadge: 'Verified',
+        digitalIdControlNo: 'Control No:',
+        digitalIdReleasedOn: 'Released:',
+        digitalIdPendingTitle: 'Digital ID Not Yet Available',
+        digitalIdPendingMessage: 'Your digital ID will appear here once the admin confirms your physical Senior Citizen ID and releases it.',
+        digitalIdRevokedTitle: 'Digital ID Unavailable',
+        digitalIdRevokedMessage: 'This digital ID has been put on hold by the admin. Please contact your barangay OSCA office.',
       },
       tl: {
         fontSize: 'Laki ng Font',
@@ -342,6 +352,16 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         mapLoadFailed: 'Hindi ma-load ang mapa. I-check ang iyong internet connection.',
         retry: 'Subukan Muli',
         openInMaps: 'Buksan sa Maps',
+        // Digital ID
+        digitalId: 'Digital ID',
+        digitalIdDescription: 'Ang iyong verified Senior Citizen digital ID, na inilabas ng admin.',
+        digitalIdVerifiedBadge: 'Verified',
+        digitalIdControlNo: 'Control No:',
+        digitalIdReleasedOn: 'Inilabas:',
+        digitalIdPendingTitle: 'Wala Pang Digital ID',
+        digitalIdPendingMessage: 'Lalabas dito ang iyong digital ID kapag kinumpirma ng admin ang iyong physical Senior Citizen ID at inilabas na ito.',
+        digitalIdRevokedTitle: 'Hindi Available ang Digital ID',
+        digitalIdRevokedMessage: 'Isinuspinde ng admin ang digital ID na ito. Mangyaring makipag-ugnayan sa inyong barangay OSCA office.',
       },
     };
     const langMap = translations[language] || translations.en;

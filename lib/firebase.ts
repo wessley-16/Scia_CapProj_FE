@@ -56,6 +56,7 @@ export const COLLECTIONS = {
   ANNOUNCEMENTS: "announcements",
   HEALTH_CENTERS: "health_centers",
   USER_LOOKUP: "user_lookup",
+  DIGITAL_IDS: "digital_ids",
 };
 
 // ── AUTH STATE ────────────────────────────────────────────────────────────────
@@ -670,4 +671,59 @@ export async function submitIDRequest(data: IDRequest) {
     }),
   );
   return docRef.id;
+}
+
+// ── DIGITAL ID ────────────────────────────────────────────────────────────────
+// The admin app (SCIA_Admin_Firebase) only ever writes a `digital_ids/{uid}`
+// doc after OSCA has approved that senior's ID Verification AND the admin
+// has clicked "Release Digital ID" — see src/pages/DigitalID.jsx there. So
+// a doc existing here (with a non-invalidated/suspended status) is the
+// single source of truth for "this senior has a real physical Senior
+// Citizen ID and the admin has confirmed it." Firestore rules only let a
+// signed-in user read their own doc at this path (or a super admin any).
+export interface DigitalId {
+  uid: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  dob?: string;
+  sex?: string;
+  address?: string;
+  barangay?: string;
+  idNumber?: string;
+  controlNumber?: string;
+  idImageUrl?: string;
+  // Admin sets "active" on release; older/other tooling may use "released"
+  // or "valid" — all three mean the ID is currently good. "invalidated" and
+  // "suspended" mean the admin has revoked it.
+  status?: "active" | "released" | "valid" | "invalidated" | "suspended" | string;
+  invalidatedReason?: string;
+  // Firestore Timestamp (has a .toDate() method) — typed loosely here since
+  // this file doesn't otherwise import FirebaseFirestoreTypes.
+  releasedAt?: { toDate?: () => Date } | null;
+}
+
+export function subscribeToDigitalId(
+  uid: string | null | undefined,
+  callback: (digitalId: DigitalId | null) => void,
+) {
+  if (!uid) {
+    callback(null);
+    return () => {};
+  }
+  return onSnapshot(
+    doc(db, COLLECTIONS.DIGITAL_IDS, uid),
+    (snap) => {
+      if (!snap || !snap.exists()) {
+        callback(null);
+        return;
+      }
+      callback({ uid, ...snap.data() } as DigitalId);
+    },
+    (error) => {
+      console.warn("subscribeToDigitalId error:", error);
+      callback(null);
+    },
+  );
 }

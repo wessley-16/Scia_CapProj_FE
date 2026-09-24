@@ -1,11 +1,12 @@
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useRouter } from "expo-router";
-import React from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { logoutUser } from "@/lib/firebase";
+import DigitalIdCard from "@/components/DigitalIdCard";
 
 const fontOptions = [
   { labelKey: "small", value: 0.75 },
@@ -21,8 +22,16 @@ const languageOptions = [
 export default function SettingsScreen() {
   const router = useRouter();
   const { fontScale, language, setFontScale, setLanguage, t } = useSettings();
-  const { clearUser } = useAuth();
+  const { user, clearUser, refreshUser } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
+
+  // Re-pull the profile whenever Settings gains focus so a status the admin
+  // just flipped (isVerified) shows up here without needing a full re-login.
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+    }, [refreshUser]),
+  );
 
   const handleSaveChanges = () => {
     // Changes are already persisted via AsyncStorage as they're made.
@@ -58,6 +67,10 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={[styles.title, { fontSize: 28 * fontScale }]}>{t("accountSettings")}</Text>
+
+        {/* Digital ID — locked behind admin verification (physical Senior
+            Citizen ID confirmed); DigitalIdCard handles both states. */}
+        <DigitalIdCard user={user} fontScale={fontScale} />
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>{t("fontSize")}</Text>
