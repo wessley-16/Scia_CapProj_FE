@@ -4,27 +4,43 @@
 // Used by BOTH the text chatbot (hooks/useChatbot.ts) and the voice
 // assistant (hooks/useVoiceAssistant.ts).
 //
-// WHAT CHANGED vs the old file (why it stopped working):
-//  1. Backend: VertexAIBackend -> GoogleAIBackend.
-//     "Vertex AI" is now "Agent Platform Gemini API" and it requires the
-//     Blaze (pay-as-you-go) plan + the API enabled in Google Cloud. The
-//     Gemini Developer API (GoogleAIBackend) works on the free Spark plan,
-//     which is what a capstone should be on.
-//  2. Model: "gemini-2.5-flash" is deprecated (shuts down Oct 2026) and
-//     already returns 404 for some projects. Now on a current 3.x model.
-//  3. systemInstruction no longer passes role: "system" (that shape is
-//     rejected by the API — a system instruction is just content).
-//  4. Imports the AbortSignal.any polyfill, which was never imported
-//     anywhere before. Without it, sendMessageStream() can throw on Hermes.
+// Backend: VertexAIBackend (the "Agent Platform Gemini API", formerly
+// Vertex AI). This project is now on the Blaze (pay-as-you-go) plan, so it
+// can use this backend — it was previously downgraded to GoogleAIBackend
+// (Gemini Developer API) because Vertex AI requires Blaze. Uses the same
+// backend + region as hooks/useLiveVoice.ts so the whole app talks to
+// Gemini through one path.
+//
+// Before this works you must, in the Google Cloud console for this
+// Firebase project (scia-b5440):
+//  1. Confirm billing is on Blaze (Firebase console > Usage and billing).
+//  2. Enable the "Vertex AI API" (search console shows it as "Agent
+//     Platform API") for this project: console.cloud.google.com/apis/library/aiplatform.googleapis.com?project=scia-b5440
+//  3. Firebase AI Logic will require App Check enforcement starting
+//     Nov 2, 2026 — lib/appCheck.ts already sets a debug token, so local
+//     dev is covered; production builds need a real App Check provider
+//     (Play Integrity / App Attest) registered before then.
+//
+// Other notes:
+//  - Model: "gemini-2.5-flash" is deprecated (shuts down Oct 2026) and
+//    already returns 404 for some projects. Now on a current 3.x model.
+//  - systemInstruction no longer passes role: "system" (that shape is
+//    rejected by the API — a system instruction is just content).
+//  - Imports the AbortSignal.any polyfill, which was never imported
+//    anywhere before. Without it, sendMessageStream() can throw on Hermes.
 
 import "@/lib/polyfills";
 
 import {
   getAI,
   getGenerativeModel,
-  GoogleAIBackend,
+  VertexAIBackend,
 } from "@react-native-firebase/ai";
 import { getApp } from "@react-native-firebase/app";
+
+// Same region useLiveVoice.ts uses for the Live API. Vertex AI Gemini
+// models are not available in the "global" location, so pick a real region.
+const VERTEX_REGION = "asia-southeast1";
 
 // ── Models ───────────────────────────────────────────────────────────────
 // Keep these in ONE place. When Google retires a model you change 2 lines,
@@ -78,8 +94,10 @@ Format for the voice assistant — this answer will be READ ALOUD:
 
 // ── Internals ────────────────────────────────────────────────────────────
 function aiInstance() {
-  // Gemini Developer API backend — no Blaze plan required.
-  return getAI(getApp(), { backend: new GoogleAIBackend() });
+  // Vertex AI (Agent Platform Gemini API) backend — requires Blaze billing
+  // and the Vertex AI API enabled on the GCP project. See notes at the top
+  // of this file.
+  return getAI(getApp(), { backend: new VertexAIBackend(VERTEX_REGION) });
 }
 
 /**
