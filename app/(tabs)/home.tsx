@@ -16,6 +16,9 @@ import EventJoinFormModal from "@/components/home/EventJoinFormModal";
 import DigitalIdCard from "@/components/DigitalIdCard";
 import { useAuth } from "@/context/AuthContext";
 import { Medicine } from "@/interfaces/interfaces";
+import DigitalIDCard from "@/components/DigitalIDCard";
+
+<DigitalIDCard />
 
 const background = require("../../assets/images/Foreground.png");
 

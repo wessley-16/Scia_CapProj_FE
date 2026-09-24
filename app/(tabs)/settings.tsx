@@ -6,7 +6,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { logoutUser } from "@/lib/firebase";
-import DigitalIdCard from "@/components/DigitalIdCard";
+import DigitalIDCard from "@/components/DigitalIDCard";
+
+<DigitalIDCard />
 
 const fontOptions = [
   { labelKey: "small", value: 0.75 },

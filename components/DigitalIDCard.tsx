@@ -1,252 +1,132 @@
-import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
-import QRCode from "react-native-qrcode-svg";
-import { buildUserQRPayload, DigitalId, subscribeToDigitalId } from "@/lib/firebase";
-import { UserProfile } from "@/context/AuthContext";
-import { useSettings } from "@/context/SettingsContext";
-
-const C = {
-  primary: "#1A56C4",
-  primaryLight: "#EBF2FF",
-  success: "#059669",
-  successLight: "#ECFDF5",
-  warning: "#D97706",
-  warningLight: "#FFFBEB",
-  danger: "#DC2626",
-  dangerLight: "#FEF2F2",
-  card: "#FFFFFF",
-  text: "#111827",
-  textMuted: "#6B7280",
-  border: "#E5E7EB",
-};
+import { useDigitalId } from "@/hooks/useDigitalId";
 
 interface Props {
-  user: UserProfile | null;
-  fontScale: number;
+  /** Optional. Defaults to the currently signed-in user. */
+  uid?: string;
 }
 
-const fmtDate = (ts?: { toDate?: () => Date } | null) => {
-  try {
-    return ts?.toDate?.()?.toLocaleDateString("en-PH") ?? null;
-  } catch {
-    return null;
+const DEFAULT_THEME = "#1E3A8A";
+const DEFAULT_ACCENT = "#FACC15";
+
+function formatDate(value: any): string {
+  if (!value) return "—";
+  const date: Date =
+    typeof value?.toDate === "function" ? value.toDate() : new Date(value);
+  if (isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+  });
+}
+
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0]?.toUpperCase())
+    .join("");
+}
+
+export default function DigitalIDCard({ uid }: Props) {
+  const { data, loading, error } = useDigitalId(uid);
+
+  if (loading) {
+    return (
+      <View style={[styles.card, styles.center, { backgroundColor: DEFAULT_THEME }]}>
+        <ActivityIndicator color="#fff" />
+      </View>
+    );
   }
-};
 
-/**
- * Shows the senior's Digital ID — but ONLY once the admin has actually
- * released one for them.
- *
- * Source of truth: the `digital_ids/{uid}` Firestore doc, written by the
- * admin app (SCIA_Admin_Firebase → src/pages/DigitalID.jsx) only after
- * OSCA approves that senior's ID Verification and an admin clicks
- * "Release Digital ID". No doc = the admin hasn't confirmed a physical
- * card yet. A doc with status "invalidated"/"suspended" = the admin has
- * revoked it. Anything else (active/released/valid) = good to show.
- *
- * This mirrors the mobile app's own firestore.rules, which already let a
- * signed-in user read their own /digital_ids/{uid} doc.
- */
-export default function DigitalIdCard({ user, fontScale }: Props) {
-  const { t } = useSettings();
-  const [digitalId, setDigitalId] = useState<DigitalId | null>(null);
-  const [loading, setLoading] = useState(true);
+  if (error || !data) {
+    return (
+      <View style={[styles.card, styles.center, { backgroundColor: "#E5E7EB" }]}>
+        <Text style={styles.emptyTitle}>No digital ID yet</Text>
+        <Text style={styles.emptySub}>
+          {error ? "Couldn't load your ID." : "Your ID hasn't been issued by the admin."}
+        </Text>
+      </View>
+    );
+  }
 
-  useEffect(() => {
-    setLoading(true);
-    const unsubscribe = subscribeToDigitalId(user?.uid, (result) => {
-      setDigitalId(result);
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, [user?.uid]);
-
-  if (!user) return null;
-
-  const isRevoked = digitalId?.status === "invalidated" || digitalId?.status === "suspended";
-  const isActive = !!digitalId && !isRevoked;
-
-  const displayName =
-    digitalId?.fullName ||
-    `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
-    "Senior Citizen";
-  const controlNo = digitalId?.controlNumber || digitalId?.idNumber || user.idNumber || "—";
-  const releasedDate = fmtDate(digitalId?.releasedAt);
+  const theme = data.themeColor || DEFAULT_THEME;
+  const accent = data.accentColor || DEFAULT_ACCENT;
+  const status = data.status ?? "active";
+  const statusColor =
+    status === "active" ? "#22C55E" : status === "suspended" ? "#F59E0B" : "#EF4444";
 
   return (
-    <View style={s.card}>
-      <View style={s.header}>
-        <Ionicons name="card-outline" size={22} color={C.primary} />
-        <Text style={[s.title, { fontSize: 17 * fontScale }]}>{t("digitalId")}</Text>
+    <View style={[styles.card, { backgroundColor: theme }]}>
+      <View style={[styles.stripe, { backgroundColor: accent }]} />
+
+      <View style={styles.header}>
+        <Text style={styles.org}>{data.organization ?? "SCIA"}</Text>
+        <View style={[styles.badge, { backgroundColor: statusColor }]}>
+          <Text style={styles.badgeText}>{status.toUpperCase()}</Text>
+        </View>
       </View>
 
-      {loading ? (
-        <View style={s.loadingBox}>
-          <ActivityIndicator color={C.primary} />
-        </View>
-      ) : isActive ? (
-        <>
-          <Text style={[s.description, { fontSize: 14 * fontScale }]}>
-            {t("digitalIdDescription")}
-          </Text>
-
-          {digitalId?.idImageUrl ? (
-            <Image source={{ uri: digitalId.idImageUrl }} style={s.idPhoto} />
-          ) : null}
-
-          <View style={s.qrWrapper}>
-            <QRCode
-              value={buildUserQRPayload({ uid: user.uid, idNumber: controlNo })}
-              size={160}
-              backgroundColor="#ffffff"
-              color={C.text}
-            />
+      <View style={styles.body}>
+        {data.photoUrl ? (
+          <Image source={{ uri: data.photoUrl }} style={styles.photo} />
+        ) : (
+          <View style={[styles.photo, styles.photoFallback]}>
+            <Text style={styles.initials}>{initials(data.fullName)}</Text>
           </View>
+        )}
 
-          <View style={[s.badge, s.badgeVerified]}>
-            <Ionicons name="checkmark-circle" size={16} color={C.success} />
-            <Text style={[s.badgeText, { color: C.success, fontSize: 13 * fontScale }]}>
-              {t("digitalIdVerifiedBadge")}
-            </Text>
-          </View>
-
-          <Text style={[s.idName, { fontSize: 15 * fontScale }]}>{displayName}</Text>
-          <Text style={[s.idLabel, { fontSize: 14 * fontScale }]}>
-            {t("digitalIdControlNo")} {controlNo}
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={2}>
+            {data.fullName}
           </Text>
-          {releasedDate ? (
-            <Text style={[s.idLabel, { fontSize: 12 * fontScale }]}>
-              {t("digitalIdReleasedOn")} {releasedDate}
-            </Text>
-          ) : null}
-        </>
-      ) : isRevoked ? (
-        <View style={s.revokedBox}>
-          <Ionicons name="close-circle-outline" size={26} color={C.danger} />
-          <Text style={[s.revokedTitle, { fontSize: 15 * fontScale }]}>
-            {t("digitalIdRevokedTitle")}
-          </Text>
-          <Text style={[s.pendingMessage, { fontSize: 13 * fontScale }]}>
-            {digitalId?.invalidatedReason || t("digitalIdRevokedMessage")}
-          </Text>
+          {!!data.role && <Text style={[styles.role, { color: accent }]}>{data.role}</Text>}
+          <Text style={styles.label}>ID NO.</Text>
+          <Text style={styles.value}>{data.idNumber}</Text>
+          <Text style={styles.label}>VALID UNTIL</Text>
+          <Text style={styles.value}>{formatDate(data.validUntil)}</Text>
         </View>
-      ) : (
-        <View style={s.pendingBox}>
-          <Ionicons name="lock-closed-outline" size={26} color={C.warning} />
-          <Text style={[s.pendingTitle, { fontSize: 15 * fontScale }]}>
-            {t("digitalIdPendingTitle")}
-          </Text>
-          <Text style={[s.pendingMessage, { fontSize: 13 * fontScale }]}>
-            {t("digitalIdPendingMessage")}
-          </Text>
-        </View>
-      )}
+      </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const styles = StyleSheet.create({
   card: {
-    backgroundColor: C.card,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 20,
+    width: "100%",
+    aspectRatio: 1.586, // standard ID card ratio
+    borderRadius: 16,
+    padding: 16,
+    overflow: "hidden",
+    elevation: 4,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
+  center: { alignItems: "center", justifyContent: "center" },
+  stripe: { position: "absolute", left: 0, top: 0, bottom: 0, width: 6 },
   header: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
-  },
-  title: {
-    fontWeight: "700",
-    color: C.text,
-  },
-  description: {
-    color: C.textMuted,
-    lineHeight: 20,
-    marginBottom: 14,
-  },
-  loadingBox: {
-    paddingVertical: 24,
-    alignItems: "center",
-  },
-  idPhoto: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    alignSelf: "center",
-    marginBottom: 12,
-    backgroundColor: C.primaryLight,
-  },
-  qrWrapper: {
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 14,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    alignSelf: "center",
     marginBottom: 12,
   },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 10,
-  },
-  badgeVerified: { backgroundColor: C.successLight },
-  badgeText: { fontWeight: "700" },
-  idName: {
-    textAlign: "center",
-    color: C.text,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  idLabel: {
-    textAlign: "center",
-    color: C.textMuted,
-    fontWeight: "600",
-  },
-  pendingBox: {
-    alignItems: "center",
-    backgroundColor: C.warningLight,
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  pendingTitle: {
-    fontWeight: "700",
-    color: C.warning,
-    marginTop: 8,
-    marginBottom: 6,
-    textAlign: "center",
-  },
-  pendingMessage: {
-    color: C.textMuted,
-    textAlign: "center",
-    lineHeight: 19,
-  },
-  revokedBox: {
-    alignItems: "center",
-    backgroundColor: C.dangerLight,
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  revokedTitle: {
-    fontWeight: "700",
-    color: C.danger,
-    marginTop: 8,
-    marginBottom: 6,
-    textAlign: "center",
-  },
+  org: { color: "#fff", fontSize: 16, fontWeight: "800", letterSpacing: 1 },
+  badge: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999 },
+  badgeText: { color: "#fff", fontSize: 10, fontWeight: "700" },
+  body: { flex: 1, flexDirection: "row", gap: 14 },
+  photo: { width: 90, height: 110, borderRadius: 10, backgroundColor: "#fff" },
+  photoFallback: { alignItems: "center", justifyContent: "center" },
+  initials: { fontSize: 28, fontWeight: "700", color: "#6B7280" },
+  info: { flex: 1, justifyContent: "center" },
+  name: { color: "#fff", fontSize: 18, fontWeight: "700" },
+  role: { fontSize: 12, fontWeight: "600", marginBottom: 8 },
+  label: { color: "rgba(255,255,255,0.65)", fontSize: 9, letterSpacing: 1, marginTop: 4 },
+  value: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  emptyTitle: { fontSize: 16, fontWeight: "700", color: "#111827" },
+  emptySub: { fontSize: 12, color: "#6B7280", marginTop: 4, textAlign: "center" },
 });
