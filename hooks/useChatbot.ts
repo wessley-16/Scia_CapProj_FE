@@ -1,13 +1,15 @@
 // hooks/useChatbot.ts
 //
 // Same public API as before (AiChat.tsx needs no changes). What changed:
-//  - uses the rebuilt lib/firebaseAI.ts (GoogleAI backend, current model)
+//  - uses the rebuilt lib/firebaseAI.ts (Vertex AI backend, current model)
 //  - reads chunk text through readText(), so it works whether the SDK
 //    exposes text as a method or a property
 //  - the non-streaming fallback no longer re-sends into the SAME chat
 //    object, which used to push a duplicate user turn into the history
 //  - errors are mapped to plain sentences a senior can act on
 //  - greeting is Taglish, matching the app's default language
+//  - NEW: every user has a spending cap (lib/aiUsage.ts). It is checked
+//    before each request and updated from the token counts after it.
 
 import {
   CHATBOT_SESSIONS_KEY_PREFIX,
@@ -16,6 +18,13 @@ import {
   MAX_CHAT_SESSIONS,
 } from "@/constants/constants";
 import { useAuth } from "@/context/AuthContext";
+import {
+  AI_LIMIT_MESSAGE,
+  assertWithinBudget,
+  isBudgetError,
+  recordUsage,
+  type UsageLike,
+} from "@/lib/aiUsage";
 import {
   createNativeChatSession,
   friendlyAIError,
@@ -272,51 +281,86 @@ export const useChatbot = () => {
     // the session for the fallback path below.
     const historyBefore = toFirebaseHistory(messages);
 
-    if (!chatRef.current) {
-      chatRef.current = safeCreateSession(historyBefore);
-    }
-
-    if (!chatRef.current) {
-      addMessage(
-        "assistant",
-        "Hindi ko po ma-simulan ang chat. Pakisara at buksan ulit ang app. 😊",
-      );
-      return;
-    }
-
-    addMessage("user", trimmed);
+    // Lock the input for the whole send, including the budget check, so a
+    // double-tap cannot fire two requests.
     setLoading(true);
 
-    // Empty assistant bubble that every chunk fills in place.
-    addMessage("assistant", "");
-
     try {
-      const result = await chatRef.current.sendMessageStream(trimmed);
-      let reply = "";
-      for await (const chunk of result.stream) {
-        const text = readText(chunk);
-        if (!text) continue;
-        reply += text;
-        appendToLastMessage(text);
-      }
-      if (!reply.trim()) {
-        setLastMessageText("Wala akong nakuhang sagot. Pakisubukan ulit po.");
-      }
-    } catch (streamErr) {
-      console.warn("Stream failed, retrying without streaming:", streamErr);
+      // 1. Spending cap. Refuse BEFORE calling the model if the user has
+      //    used up their allowance (or if we cannot verify it).
       try {
-        // IMPORTANT: build a FRESH session from the pre-turn history. Reusing
-        // chatRef here would append `trimmed` a second time, because the
-        // failed stream may already have recorded it internally.
-        const retry = safeCreateSession(historyBefore);
-        if (!retry) throw streamErr;
-        const result = await retry.sendMessage(trimmed);
-        const reply = readText(result.response).trim();
-        setLastMessageText(reply || "Wala akong nakuhang sagot. Pakisubukan ulit po.");
-        chatRef.current = retry;
-      } catch (err) {
-        chatRef.current = null; // drop the broken session; next send rebuilds it
-        setLastMessageText(friendlyAIError(err));
+        await assertWithinBudget(scopeKey);
+      } catch (budgetErr) {
+        addMessage("user", trimmed);
+        addMessage(
+          "assistant",
+          isBudgetError(budgetErr) ? AI_LIMIT_MESSAGE : friendlyAIError(budgetErr),
+        );
+        return;
+      }
+
+      if (!chatRef.current) {
+        chatRef.current = safeCreateSession(historyBefore);
+      }
+
+      if (!chatRef.current) {
+        addMessage(
+          "assistant",
+          "Hindi ko po ma-simulan ang chat. Pakisara at buksan ulit ang app. 😊",
+        );
+        return;
+      }
+
+      addMessage("user", trimmed);
+
+      // Empty assistant bubble that every chunk fills in place.
+      addMessage("assistant", "");
+
+      let reply = "";
+      let usage: UsageLike = null;
+
+      try {
+        const result = await chatRef.current.sendMessageStream(trimmed);
+        for await (const chunk of result.stream) {
+          const text = readText(chunk);
+          if (!text) continue;
+          reply += text;
+          appendToLastMessage(text);
+        }
+        if (!reply.trim()) {
+          setLastMessageText("Wala akong nakuhang sagot. Pakisubukan ulit po.");
+        }
+        // Token counts arrive on the aggregated response. Read them in their
+        // own try so a failure here can never trigger the resend below.
+        try {
+          const final: any = await result.response;
+          usage = final?.usageMetadata ?? null;
+        } catch {
+          usage = null; // recordUsage() falls back to a conservative estimate
+        }
+      } catch (streamErr) {
+        console.warn("Stream failed, retrying without streaming:", streamErr);
+        try {
+          // IMPORTANT: build a FRESH session from the pre-turn history. Reusing
+          // chatRef here would append `trimmed` a second time, because the
+          // failed stream may already have recorded it internally.
+          const retry = safeCreateSession(historyBefore);
+          if (!retry) throw streamErr;
+          const result = await retry.sendMessage(trimmed);
+          reply = readText(result.response).trim();
+          usage = (result.response as any)?.usageMetadata ?? null;
+          setLastMessageText(reply || "Wala akong nakuhang sagot. Pakisubukan ulit po.");
+          chatRef.current = retry;
+        } catch (err) {
+          chatRef.current = null; // drop the broken session; next send rebuilds it
+          setLastMessageText(friendlyAIError(err));
+        }
+      }
+
+      // 2. Add this turn's cost to the user's running total. Only when the
+      //    model actually answered — a failed request costs nothing.
+      if (usage || reply.trim()) {
+        void recordUsage(scopeKey, usage, reply.length);
       }
     } finally {
       setLoading(false);
