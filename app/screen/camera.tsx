@@ -1,20 +1,20 @@
+import { MedicationReminder, useMedAi } from "@/hooks/useMedAi";
+import { AntDesign, FontAwesome } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import React, { useRef, useState } from "react";
 import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
-  Image,
   ActivityIndicator,
   Alert,
+  Image,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import React, { useState, useRef } from "react";
-import * as ImagePicker from "expo-image-picker";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import { AntDesign, FontAwesome } from "@expo/vector-icons";
-import { useMedAi, MedicationReminder } from "@/hooks/useMedAi";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
 
 const CameraScreen = () => {
   const { analyzeImage, reminders, isLoading, error, clearReminders } =
@@ -54,25 +54,27 @@ const CameraScreen = () => {
       const stored = await AsyncStorage.getItem("medicines");
       const existingMeds = stored ? JSON.parse(stored) : [];
 
-      const newMeds = reminders.map((med: MedicationReminder, index: number) => {
-        // Keep the full dose string if it's complex, or just use what AI gave
-        const finalDosage = med.dose || "1";
+      const newMeds = reminders.map(
+        (med: MedicationReminder, index: number) => {
+          // Keep the full dose string if it's complex, or just use what AI gave
+          const finalDosage = med.dose || "1";
 
-        return {
-          id: med.id || (Date.now() + index).toString(),
-          name: med.medicationName || "Unknown Med",
-          description: med.description || med.body || "",
-          dosage: finalDosage,
-          dosageUnit: "capsule",
-          interval: med.intervalHours || 8, // Default fallback
-          notificationTimes: med.notificationTimes, // Keep array if present
-          startDate: med.startDate,
-          endDate: med.endDate,
-          startTime: Date.now(),
-          lastTakenTime: Date.now(),
-          createdAt: Date.now(),
-        };
-      });
+          return {
+            id: med.id || (Date.now() + index).toString(),
+            name: med.medicationName || "Unknown Med",
+            description: med.description || med.body || "",
+            dosage: finalDosage,
+            dosageUnit: "capsule",
+            interval: med.intervalHours || 8, // Default fallback
+            notificationTimes: med.notificationTimes, // Keep array if present
+            startDate: med.startDate,
+            endDate: med.endDate,
+            startTime: Date.now(),
+            lastTakenTime: Date.now(),
+            createdAt: Date.now(),
+          };
+        },
+      );
 
       await AsyncStorage.setItem(
         "medicines",
@@ -207,7 +209,7 @@ const CameraScreen = () => {
       <CameraView style={styles.camera} facing="back" ref={cameraRef} />
 
       {/* FIXED: Overlay is placed outside and uses absolute positioning to float on top */}
-      <View style={[styles.cameraOverlay, StyleSheet.absoluteFillObject]}>
+      <View style={[styles.cameraOverlay, StyleSheet.absoluteFill]}>
         {/* PREVIEW STRIP */}
         {imageUris.length > 0 && (
           <View style={styles.thumbnailContainer}>

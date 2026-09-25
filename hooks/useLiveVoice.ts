@@ -171,26 +171,22 @@ export function useLiveVoice() {
         });
         const player = createAudioPlayer({ uri });
         soundRef.current = player;
-        player.play();
 
         await new Promise<void>((resolve) => {
           let resolved = false;
           const finish = () => {
             if (resolved) return;
             resolved = true;
-            clearInterval(intervalId);
             clearTimeout(safetyTimeout);
+            try { sub.remove(); } catch {}
             resolve();
           };
-          const intervalId = setInterval(() => {
-            const p = soundRef.current;
-            if (!p) return finish();
-            if (p.isLoaded && p.duration > 0 && p.currentTime >= p.duration - 0.05) {
-              finish();
-            }
-          }, 100);
-          // Safety net in case duration/currentTime metadata never lines up
+          const sub = (player as any).addListener("playbackStatusUpdate", (playerStatus: any) => {
+            if (playerStatus?.didJustFinish) finish();
+          });
+          // Safety net in case the "finished" event never fires
           const safetyTimeout = setTimeout(finish, 15000);
+          player.play();
         });
 
         try { player.remove(); } catch {}
