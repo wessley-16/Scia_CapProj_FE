@@ -51,7 +51,7 @@
         }
       ],
       [
-        "expo-av",
+        "expo-audio",
         {
           "microphonePermission": "Allow SCIA to access your microphone for real-time voice assistant."
         }

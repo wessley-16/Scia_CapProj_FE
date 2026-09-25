@@ -28,7 +28,13 @@ import {
   transcribeAudioWithUsage,
   type VoiceLang,
 } from "@/lib/voiceAI";
-import { Audio } from "expo-av";
+import {
+  AudioModule,
+  RecordingPresets,
+  setAudioModeAsync,
+  useAudioRecorder,
+  type RecordingOptions,
+} from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -47,11 +53,15 @@ const MAX_HISTORY_ITEMS = 8; // last 4 question/answer pairs
 
 // Small, mono, 16 kHz AAC (.m4a). Speech does not need more, and smaller
 // files upload faster on a weak connection.
-const HQ = Audio.RecordingOptionsPresets.HIGH_QUALITY;
-const RECORDING_OPTIONS: Audio.RecordingOptions = {
+// sampleRate / numberOfChannels / bitRate live at the TOP LEVEL of
+// RecordingOptions in expo-audio, not nested inside android/ios
+// (those sub-objects only hold format/encoder settings).
+const HQ = RecordingPresets.HIGH_QUALITY;
+const RECORDING_OPTIONS: RecordingOptions = {
   ...HQ,
-  android: { ...HQ.android, sampleRate: 16000, numberOfChannels: 1, bitRate: 32000 },
-  ios: { ...HQ.ios, sampleRate: 16000, numberOfChannels: 1, bitRate: 32000 },
+  sampleRate: 16000,
+  numberOfChannels: 1,
+  bitRate: 32000,
 };
 
 const SPEECH_LOCALE: Record<VoiceLang, string> = { en: "en-US", tl: "fil-PH" };
@@ -82,7 +92,6 @@ const TEXT: Record<VoiceLang, Record<string, string>> = {
 let voiceCache: Speech.Voice[] | null = null;
 let warnedMissingTagalog = false;
 
-// Prefer a real Filipino voice when the phone has one installed.
 async function pickVoiceId(lang: VoiceLang): Promise<string | undefined> {
   try {
     if (!voiceCache) voiceCache = await Speech.getAvailableVoicesAsync();
@@ -133,7 +142,13 @@ export function useVoiceAssistant(languageSetting?: string | null) {
   const [reply, setReply] = useState(""); // what the assistant answered (text)
   const [error, setError] = useState<string | null>(null);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  // A single recorder instance persists for the hook's lifetime — reused
+  // across every recording, instead of creating a new instance each time
+  // (the old expo-av pattern).
+  const audioRecorder = useAudioRecorder(RECORDING_OPTIONS);
+  const isRecordingActiveRef = useRef(false);
+  const recordStartRef = useRef(0);
+
   const historyRef = useRef<ChatHistoryItem[]>([]);
   const runIdRef = useRef(0); // bumped on cancel so stale results are ignored
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -153,14 +168,14 @@ export function useVoiceAssistant(languageSetting?: string | null) {
   };
 
   const resetAudioMode = () =>
-    Audio.setAudioModeAsync({
-      allowsRecordingIOS: false, // otherwise iOS plays speech from the earpiece
-      playsInSilentModeIOS: true,
+    setAudioModeAsync({
+      allowsRecording:   false, // otherwise iOS plays speech from the earpiece
+      playsInSilentMode: true,
     }).catch(() => {});
 
   // ── Start recording ────────────────────────────────────────────────────
   const startListening = async () => {
-    if (state !== "idle" || recordingRef.current) return;
+    if (state !== "idle" || isRecordingActiveRef.current) return;
 
     const lang = languageRef.current;
     setError(null);
@@ -186,17 +201,19 @@ export function useVoiceAssistant(languageSetting?: string | null) {
     }
 
     try {
-      const perm = await Audio.requestPermissionsAsync();
+      const perm = await AudioModule.requestRecordingPermissionsAsync();
       if (!perm.granted) {
         setError(TEXT[lang].noMic);
         return;
       }
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      await setAudioModeAsync({
+        allowsRecording:   true,
+        playsInSilentMode: true,
       });
-      const { recording } = await Audio.Recording.createAsync(RECORDING_OPTIONS);
-      recordingRef.current = recording;
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+      isRecordingActiveRef.current = true;
+      recordStartRef.current = Date.now();
       setState("listening");
 
       clearTimer();
@@ -205,7 +222,7 @@ export function useVoiceAssistant(languageSetting?: string | null) {
       }, MAX_RECORD_MS);
     } catch (e) {
       console.warn("[voice] Could not start recording:", e);
-      recordingRef.current = null;
+      isRecordingActiveRef.current = false;
       await resetAudioMode();
       setError(TEXT[lang].error);
       setState("idle");
@@ -214,9 +231,8 @@ export function useVoiceAssistant(languageSetting?: string | null) {
 
   // ── Stop recording, then transcribe -> answer -> speak ─────────────────
   const stopAndSend = async () => {
-    const rec = recordingRef.current;
-    if (!rec) return;
-    recordingRef.current = null;
+    if (!isRecordingActiveRef.current) return;
+    isRecordingActiveRef.current = false;
     clearTimer();
 
     const runId = ++runIdRef.current;
@@ -226,10 +242,9 @@ export function useVoiceAssistant(languageSetting?: string | null) {
     let uri: string | null = null;
     let durationMs = 0;
     try {
-      const status = await rec.getStatusAsync();
-      durationMs = status.durationMillis ?? 0;
-      await rec.stopAndUnloadAsync();
-      uri = rec.getURI();
+      durationMs = Date.now() - recordStartRef.current;
+      await audioRecorder.stop();
+      uri = audioRecorder.uri;
     } catch (e) {
       console.warn("[voice] Could not stop recording:", e);
     }
@@ -296,12 +311,11 @@ export function useVoiceAssistant(languageSetting?: string | null) {
     runIdRef.current += 1; // any request still in flight is now ignored
     clearTimer();
     Speech.stop();
-    const rec = recordingRef.current;
-    recordingRef.current = null;
-    if (rec) {
+    if (isRecordingActiveRef.current) {
+      isRecordingActiveRef.current = false;
       try {
-        await rec.stopAndUnloadAsync();
-        const uri = rec.getURI();
+        await audioRecorder.stop();
+        const uri = audioRecorder.uri;
         if (uri) await FileSystem.deleteAsync(uri, { idempotent: true });
       } catch {
         /* already stopped */
@@ -309,7 +323,7 @@ export function useVoiceAssistant(languageSetting?: string | null) {
     }
     await resetAudioMode();
     setState("idle");
-  }, []);
+  }, [audioRecorder]);
 
   /** Speak the last answer again (nice for people who missed it). */
   const replay = async () => {
@@ -333,11 +347,12 @@ export function useVoiceAssistant(languageSetting?: string | null) {
       runIdRef.current += 1;
       if (timerRef.current) clearTimeout(timerRef.current);
       Speech.stop();
-      const rec = recordingRef.current;
-      recordingRef.current = null;
-      rec?.stopAndUnloadAsync().catch(() => {});
+      if (isRecordingActiveRef.current) {
+        isRecordingActiveRef.current = false;
+        audioRecorder.stop().catch(() => {});
+      }
     };
-  }, []);
+  }, [audioRecorder]);
 
   return {
     state,
