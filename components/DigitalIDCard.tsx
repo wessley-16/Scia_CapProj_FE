@@ -1,6 +1,6 @@
 import React from "react";
 import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
-import { useDigitalId } from "@/hooks/useDigitalId";
+import { useDigitalId } from "@/hooks/useDigitalID";
 
 interface Props {
   /** Optional. Defaults to the currently signed-in user. */

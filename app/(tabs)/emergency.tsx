@@ -20,7 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import { sendSOSAlert, subscribeToSOSAlert } from '../../lib/firebase';
-import { canonicalizeBarangayName } from '../../constants/barangays';
+import { canonicalBarangay } from '../../constants/valenzuelaDistricts';
 
 const HOLD_DURATION_MS = 5000;
 const COOLDOWN_MS = 5 * 60 * 1000;
@@ -240,8 +240,8 @@ export default function EmergencyScreen() {
           // Valenzuela barangay, so a wrong-but-confident guess never
           // overrides a correct geocoded one.
           const geocodedBarangay =
-            canonicalizeBarangayName(place.district) ??
-            canonicalizeBarangayName(place.subregion);
+              canonicalBarangay(place.district) ??
+              canonicalBarangay(place.subregion);
 
           setBarangay(geocodedBarangay ?? getBarangayFromCoords(coords.latitude, coords.longitude));
         } else {

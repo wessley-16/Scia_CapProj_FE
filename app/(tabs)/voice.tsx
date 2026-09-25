@@ -10,13 +10,18 @@
  *  - Status is written in words, not just colour or animation.
  *  - Touch targets are 64px+ and never rely on a long-press.
  *  - Replay is one tap, because "ulitin mo nga" is the most common request.
+ *
+ * NOTE: useVoiceAssistant is a single-turn hook — it only tracks the
+ * current transcript/reply, not a running conversation. This screen builds
+ * its own local `turns` history by watching state/transcript/reply and
+ * folding each completed exchange in once the hook returns to "idle".
  */
 
 import { useSettings } from "@/context/SettingsContext";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   ScrollView,
@@ -26,6 +31,8 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+type Turn = { id: string; question: string; answer: string };
 
 function PulseRing({ active, color }: { active: boolean; color: string }) {
   const pulse = useRef(new Animated.Value(0)).current;
@@ -69,19 +76,60 @@ export default function VoiceScreen() {
   const { fontScale } = useSettings();
 
   const {
-    status,
-    turns,
-    lastTurn,
-    partialQuestion,
-    errorMessage,
-    isRecording,
+    state,
+    isListening,
     isBusy,
-    isSpeaking,
-    toggleRecording,
-    cancelRecording,
-    replayLast,
-    clearConversation,
+    transcript,
+    reply,
+    error,
+    toggleMic,
+    cancel,
+    replay,
   } = useVoiceAssistant();
+
+  // ── Local conversation history ──────────────────────────────────────────
+  // The hook only exposes the current exchange (transcript/reply). We
+  // accumulate completed turns here so the screen can show a scrollback,
+  // same as the original design intent.
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const lastRecordedRef = useRef<string>("");
+
+  useEffect(() => {
+    // A turn is "done" once we're back to idle and have both a transcript
+    // and a reply that hasn't already been folded into history.
+    if (state === "idle" && transcript && reply) {
+      const key = `${transcript}::${reply}`;
+      if (lastRecordedRef.current !== key) {
+        lastRecordedRef.current = key;
+        setTurns((prev) => [
+          ...prev,
+          { id: `${Date.now()}`, question: transcript, answer: reply },
+        ]);
+      }
+    }
+  }, [state, transcript, reply]);
+
+  const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null;
+
+  // Show the live transcript as a "partial" bubble while a turn is still in
+  // progress (i.e. hasn't yet been folded into `turns`).
+  const currentKey = `${transcript}::${reply}`;
+  const partialQuestion =
+    !!transcript && lastRecordedRef.current !== currentKey ? transcript : "";
+
+  const errorMessage = error;
+  const isRecording = isListening;
+  const isSpeaking = state === "speaking";
+
+  const clearConversation = () => {
+    setTurns([]);
+    lastRecordedRef.current = "";
+    void cancel();
+  };
+
+  const toggleRecording = toggleMic;
+  const cancelRecording = cancel;
+  const replayLast = replay;
 
   const scrollRef = useRef<ScrollView>(null);
 
@@ -95,12 +143,12 @@ export default function VoiceScreen() {
 
   // ── Words, not just colours ──────────────────────────────────────────
   const statusText =
-    isRecording        ? "Nakikinig po ako…"      :
-    status === "transcribing" ? "Naiintindihan ko pa po…" :
-    status === "thinking"     ? "Sandali po, iniisip ko…" :
-    isSpeaking         ? "Sinasagot ko po…"       :
-    status === "error" ? "May problema po"        :
-                         "Handa na po ako";
+    isRecording               ? "Nakikinig po ako…"        :
+    state === "transcribing"  ? "Naiintindihan ko pa po…"   :
+    state === "thinking"      ? "Sandali po, iniisip ko…"   :
+    isSpeaking                ? "Sinasagot ko po…"          :
+    errorMessage              ? "May problema po"           :
+                                 "Handa na po ako";
 
   const hintText =
     isRecording        ? "Pindutin ulit kapag tapos na kayong magsalita" :
@@ -167,7 +215,7 @@ export default function VoiceScreen() {
           </View>
         )}
 
-        {turns.map((turn) => (
+        {turns.map((turn: Turn) => (
           <View key={turn.id} style={styles.turnBlock}>
             <Text style={[styles.label, { fontSize: fs(14) }]}>SINABI NINYO</Text>
             <View style={styles.questionCard}>
@@ -214,7 +262,7 @@ export default function VoiceScreen() {
           <TouchableOpacity
             onPress={toggleRecording}
             activeOpacity={0.85}
-            disabled={isBusy}
+            disabled={isBusy && !isRecording}
             style={[styles.micButton, { backgroundColor: buttonColor }]}
             accessibilityLabel={isRecording ? "Itigil ang pagrekord" : "Magsalita"}
           >

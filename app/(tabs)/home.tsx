@@ -1,11 +1,10 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — events, join/check-in, and everything else now go through
 // Firestore directly (previously joining hit a hardcoded local dev backend
@@ -13,12 +12,10 @@ import { useSettings } from "@/context/SettingsContext";
 import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds, subscribeToAuthState } from "@/lib/firebase";
 import EventCarousel from "@/components/home/EventCarousel";
 import EventJoinFormModal from "@/components/home/EventJoinFormModal";
-import DigitalIdCard from "@/components/DigitalIdCard";
 import { useAuth } from "@/context/AuthContext";
 import { Medicine } from "@/interfaces/interfaces";
 import DigitalIDCard from "@/components/DigitalIDCard";
 
-<DigitalIDCard />
 
 const background = require("../../assets/images/Foreground.png");
 
@@ -27,7 +24,8 @@ export default function Home() {
   const { user, isGuest, clearUser } = useAuth();
   const name = user ? (`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Sa inyo") : "Sa inyo";
   const idNumber = user?.idNumber ?? "No ID";
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = insets.bottom + 60; // 60 ≈ typical tab bar height, adjust if yours differs
   const { fontScale, t } = useSettings();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -386,7 +384,7 @@ export default function Home() {
             verified the senior actually holds a physical Senior Citizen ID
             card; DigitalIdCard itself handles the verified/pending states. */}
         <View style={styles.digitalIdContainer}>
-          <DigitalIdCard user={user} fontScale={fontScale} />
+          <DigitalIDCard uid={user?.uid} />
         </View>
 
         {/* PROGRAMS */}

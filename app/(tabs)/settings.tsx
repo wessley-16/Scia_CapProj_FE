@@ -1,14 +1,13 @@
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { logoutUser } from "@/lib/firebase";
 import DigitalIDCard from "@/components/DigitalIDCard";
 
-<DigitalIDCard />
+
 
 const fontOptions = [
   { labelKey: "small", value: 0.75 },
@@ -25,7 +24,8 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { fontScale, language, setFontScale, setLanguage, t } = useSettings();
   const { user, clearUser, refreshUser } = useAuth();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = insets.bottom + 60; // 60 ≈ typical tab bar height, adjust if yours differs
 
   // Re-pull the profile whenever Settings gains focus so a status the admin
   // just flipped (isVerified) shows up here without needing a full re-login.
@@ -72,7 +72,7 @@ export default function SettingsScreen() {
 
         {/* Digital ID — locked behind admin verification (physical Senior
             Citizen ID confirmed); DigitalIdCard handles both states. */}
-        <DigitalIdCard user={user} fontScale={fontScale} />
+        <DigitalIDCard uid={user?.uid} />
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>{t("fontSize")}</Text>
