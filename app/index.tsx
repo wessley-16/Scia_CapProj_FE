@@ -3,6 +3,8 @@ import { useSettings } from "@/context/SettingsContext";
 import { loginByIdentifier, logoutUser } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BlurView } from "expo-blur";
+import { Image as ExpoImage } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -19,8 +21,19 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
 const logo = require("../assets/images/Logo.png");
+const background = require("../assets/images/Background.png");
 const defaultAvatar = require("../assets/images/default-profile.png");
 
 const fontOptions = [
@@ -46,6 +59,56 @@ export default function Index() {
   const [isLoading, setIsLoading] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+
+  // --- Opening-screen animation values ---
+  const bgOpacity = useSharedValue(0);
+  const bgScale = useSharedValue(1.15);
+  const overlayOpacity = useSharedValue(0);
+  const logoOpacity = useSharedValue(0);
+  const logoScale = useSharedValue(0.55);
+
+  useEffect(() => {
+    // Background fades in and gently zooms out to its resting size...
+    bgOpacity.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.ease) });
+    bgScale.value = withTiming(
+      1.05,
+      { duration: 1800, easing: Easing.out(Easing.cubic) },
+      (finished) => {
+        // ...then keeps a slow, subtle "breathing" zoom loop for as long as the screen is open.
+        if (finished) {
+          bgScale.value = withRepeat(
+            withSequence(
+              withTiming(1.12, { duration: 9000, easing: Easing.inOut(Easing.sin) }),
+              withTiming(1.05, { duration: 9000, easing: Easing.inOut(Easing.sin) }),
+            ),
+            -1,
+            true,
+          );
+        }
+      },
+    );
+
+    // Soft frosted overlay fades in shortly after so the illustration is visible first.
+    overlayOpacity.value = withDelay(150, withTiming(1, { duration: 700 }));
+
+    // Logo pops in after the background has started animating.
+    logoOpacity.value = withDelay(300, withTiming(1, { duration: 500 }));
+    logoScale.value = withDelay(300, withSpring(1, { damping: 9, stiffness: 110 }));
+  }, []);
+
+  const bgAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: bgOpacity.value,
+    transform: [{ scale: bgScale.value }],
+  }));
+
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: overlayOpacity.value,
+  }));
+
+  const logoAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: logoOpacity.value,
+    transform: [{ scale: logoScale.value }],
+  }));
 
   // user is populated only for a real, current Firebase session
   const displayName = user
@@ -134,6 +197,25 @@ export default function Index() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      {/* Animated opening background */}
+      <Animated.View
+        style={[StyleSheet.absoluteFill, bgAnimatedStyle]}
+        pointerEvents="none"
+      >
+        <ExpoImage
+          source={background}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+        />
+      </Animated.View>
+      <Animated.View
+        style={[StyleSheet.absoluteFill, overlayAnimatedStyle]}
+        pointerEvents="none"
+      >
+        <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFill} />
+        <View style={styles.backgroundTint} />
+      </Animated.View>
+
       <TouchableOpacity
         style={[styles.settingsBtn, { top: insets.top + 10 }]}
         onPress={() => setSettingsVisible(true)}
@@ -146,7 +228,11 @@ export default function Index() {
       </TouchableOpacity>
 
       <View style={styles.inner}>
-        <Image source={logo} style={styles.logo} />
+        <Animated.View style={[styles.logoShadowWrapper, logoAnimatedStyle]}>
+          <View style={styles.logoBorder}>
+            <Image source={logo} style={styles.logo} />
+          </View>
+        </Animated.View>
 
         {user ? (
           <View style={styles.welcomeCard}>
@@ -357,13 +443,35 @@ export default function Index() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "white" },
+  backgroundTint: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(255,255,255,0.35)",
+  },
   inner: { flex: 1, justifyContent: "center", padding: 24 },
-  logo: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
+  logoShadowWrapper: {
     alignSelf: "center",
-    marginBottom: 20,
+    marginBottom: 22,
+    borderRadius: 160,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 14,
+  },
+  logoBorder: {
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    borderWidth: 5,
+    borderColor: "#ffffff",
+    backgroundColor: "#ffffff",
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  logo: {
+    width: "100%",
+    height: "100%",
     resizeMode: "contain",
   },
   settingsBtn: {
