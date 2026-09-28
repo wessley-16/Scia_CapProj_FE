@@ -6,7 +6,7 @@ import appCheck from "@react-native-firebase/app-check";
 //   Manage debug tokens > Add debug token.
 // If it is not registered there, App Check rejects every token and Gemini
 // calls fail with "401 Firebase App Check token is invalid".
-const APP_CHECK_DEBUG_TOKEN = "E667E464-3DF8-49E1-9CA2-2324AE796CB3";
+const APP_CHECK_DEBUG_TOKEN = "C0071C18-3761-4F4B-8BF0-1D0C84B13742";
 
 export function initAppCheck() {
   if (__DEV__ && !APP_CHECK_DEBUG_TOKEN) {

@@ -182,8 +182,6 @@ export default function Layout() {
           />
 
           {/* Hidden legacy screens, kept so existing links don't break */}
-          <Tabs.Screen name="medicine" options={{ href: null }} />
-          <Tabs.Screen name="appointment" options={{ href: null }} />
           <Tabs.Screen name="govdocs" options={{ href: null }} />
           <Tabs.Screen name="emergency" options={{ href: null }} />
 

@@ -122,7 +122,6 @@ export default function Healthcare() {
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: "#FF231F7C",
-          sound: "default",
         });
 
         // Dedicated channel for medication reminders — Android ties sound
@@ -131,7 +130,7 @@ export default function Healthcare() {
         // "default". If you ever swap the sound file, bump this ID (e.g.
         // "medication-reminders-v2") since an existing channel's sound
         // can't be changed except by recreating it under a new ID.
-        await Notifications.setNotificationChannelAsync("medication-reminders", {
+        await Notifications.setNotificationChannelAsync("medication-reminders-v2", {
           name: "Medication Reminders",
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 400, 200, 400, 200, 400],
@@ -250,7 +249,7 @@ export default function Healthcare() {
           type: Notifications.SchedulableTriggerInputTypes.DAILY,
           hour,
           minute,
-          channelId: Platform.OS === "android" ? "medication-reminders" : undefined,
+          channelId: Platform.OS === "android" ? "medication-reminders-v2" : undefined,
         },
       });
       return id;
