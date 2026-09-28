@@ -181,10 +181,25 @@ export default function EmergencyScreen() {
     setLocationError(null);
     setIsFetchingLocation(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // Signup already asked for this once (see app/(auth)/signup.tsx), so on
+      // a normal visit this is just a status check — no dialog, no delay.
+      // Only fall through to an actual request if the user somehow reached
+      // this screen without ever being asked (e.g. an account created before
+      // that flow existed).
+      let { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        ({ status } = await Location.requestForegroundPermissionsAsync());
+      }
       if (status !== 'granted') {
         setLocationError('Location permission denied.');
-        Alert.alert('Permission Denied', 'Location access is required to send SOS alerts.');
+        Alert.alert(
+          'Location Access Needed',
+          'SCIA needs location access to send accurate SOS alerts. Please enable it in your device settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ],
+        );
         return;
       }
 

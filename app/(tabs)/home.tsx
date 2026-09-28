@@ -29,13 +29,13 @@ export default function Home() {
   const { fontScale, t } = useSettings();
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadProfileImage = async () => {
-  const img = await AsyncStorage.getItem("profileImage");
+  const loadProfileImage = useCallback(async () => {
+    const img = await AsyncStorage.getItem("profileImage");
 
     if (img) {
       setAvatarSource({ uri: img });
     }
-  };
+  }, []);
 
   const [events, setEvents] = useState<any[]>([]);
   const [joinedEvents, setJoinedEvents] = useState<any[]>([]);

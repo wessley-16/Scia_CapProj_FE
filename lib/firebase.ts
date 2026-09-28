@@ -57,6 +57,7 @@ export const COLLECTIONS = {
   HEALTH_CENTERS: "health_centers",
   USER_LOOKUP: "user_lookup",
   DIGITAL_IDS: "digital_ids",
+  NCSC_REGISTRATIONS: "ncsc_registrations",
 };
 
 // ── AUTH STATE ────────────────────────────────────────────────────────────────
@@ -725,5 +726,55 @@ export function subscribeToDigitalId(
       console.warn("subscribeToDigitalId error:", error);
       callback(null);
     },
+  );
+}
+
+
+// ── NCSC REGISTRATION ─────────────────────────────────────────────────────────
+// One doc per senior (doc id = uid) in ncsc_registrations. The senior may only
+// move the status between started / cancelled / completed_claimed; an admin
+// later sets verified / rejected. firestore.rules requires the FIRST write to
+// be status "started", so a new doc is always created as "started" and then
+// moved to the requested status.
+export const NCSC_FORM_URL = "https://www.ncsc.gov.ph/seniorcitizensdataform";
+
+export type NcscSeniorStatus = "started" | "cancelled" | "completed_claimed";
+
+export async function saveNcscStatus(
+  status: NcscSeniorStatus,
+  extra: { barangay?: string; fullName?: string } = {},
+) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+
+  const ref = doc(db, COLLECTIONS.NCSC_REGISTRATIONS, uid);
+  const base = stripUndefined({
+    uid,
+    barangay: extra.barangay ?? null,
+    fullName: extra.fullName ?? null,
+    source: "mobile_app",
+  });
+
+  const existing = await getDoc(ref);
+  if (!existing.exists()) {
+    await setDoc(ref, {
+      ...base,
+      status: "started",
+      startedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    if (status === "started") return;
+  }
+
+  await setDoc(
+    ref,
+    {
+      ...base,
+      status,
+      updatedAt: serverTimestamp(),
+      ...(status === "cancelled" ? { cancelledAt: serverTimestamp() } : {}),
+      ...(status === "completed_claimed" ? { claimedAt: serverTimestamp() } : {}),
+    },
+    { merge: true },
   );
 }

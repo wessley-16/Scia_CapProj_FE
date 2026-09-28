@@ -1,6 +1,11 @@
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { registerUser, submitIDRequest } from "@/lib/firebase";
+import {
+  NCSC_FORM_URL,
+  NcscSeniorStatus,
+  registerUser,
+  saveNcscStatus,
+} from "@/lib/firebase";
 import { DISTRICT_1_BARANGAYS, DISTRICT_2_BARANGAYS } from "@/constants/barangays";
 import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -55,8 +60,9 @@ export default function Signup() {
   const [showDobPicker, setShowDobPicker] = useState(false);
 
   const [hasSciaId, setHasSciaId] = useState<null | boolean>(null);
-  const [idRequestLoading, setIdRequestLoading] = useState(false);
-  const [idRequestReason, setIdRequestReason] = useState("");
+  // The user is not signed in yet on this screen, so the NCSC progress is
+  // kept here and written to Firestore right after the account is created.
+  const [ncscStatus, setNcscStatus] = useState<NcscSeniorStatus | null>(null);
 
   const barangayOptions =
     district === "District 1" ? DISTRICT_1_BARANGAYS
@@ -120,6 +126,20 @@ export default function Signup() {
       Alert.alert("Missing Fields", "Please fill in all required fields.");
       return;
     }
+    if (hasSciaId === null) {
+      Alert.alert(
+        "Registration Status",
+        "Please tell us if you are already registered as a Senior Citizen.",
+      );
+      return;
+    }
+    if (hasSciaId === true && !idNumber.trim()) {
+      Alert.alert(
+        "ID Number Required",
+        "Since you are already registered, please enter your Senior Citizen ID Number.",
+      );
+      return;
+    }
     setLoading(true);
     try {
       await registerUser({
@@ -137,42 +157,22 @@ export default function Signup() {
         password,
         imageBase64: idImage?.base64 ?? undefined,
       });
+      if (hasSciaId === false && ncscStatus) {
+        try {
+          await saveNcscStatus(ncscStatus, {
+            barangay,
+            fullName: `${firstName} ${midName} ${lastName}`.replace(/\s+/g, " ").trim(),
+          });
+        } catch (e) {
+          console.warn("saveNcscStatus failed:", e);
+        }
+      }
       await refreshUser();
       router.replace("/(tabs)/home");
     } catch (error: any) {
       Alert.alert("Error", error?.message || "Registration failed");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleRequestId = async () => {
-    if (!idRequestReason.trim()) {
-      Alert.alert(
-        "Reason Required",
-        "Please enter the reason for requesting a physical ID.",
-      );
-      return;
-    }
-    setIdRequestLoading(true);
-    try {
-      await submitIDRequest({
-        seniorName: `${firstName} ${midName} ${lastName}`.trim(),
-        seniorId: idNumber || "Not yet assigned",
-        address: fullAddress,
-        contactNumber: conNumber,
-        reason: idRequestReason.trim(),
-        imageBase64: idImage?.base64,
-      });
-      Alert.alert(
-        "Request Submitted",
-        "Your Senior Citizen ID request has been sent to the admin.",
-        [{ text: "OK" }],
-      );
-    } catch (error: any) {
-      Alert.alert("Error", error?.message || "Could not submit ID request.");
-    } finally {
-      setIdRequestLoading(false);
     }
   };
 
@@ -194,6 +194,99 @@ export default function Signup() {
               granted.
             </Text>
           </View>
+        </View>
+
+        <View style={styles.noIdSection}>
+          <Text style={styles.noIdQuestion}>
+            Are you already registered as a Senior Citizen? *
+          </Text>
+
+          {hasSciaId === null && (
+            <View style={styles.idAnswerRow}>
+              <TouchableOpacity
+                style={styles.idAnswerYes}
+                onPress={() => setHasSciaId(true)}
+              >
+                <Text style={styles.idAnswerYesText}>Yes, I'm registered</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.idAnswerNo}
+                onPress={() => setHasSciaId(false)}
+              >
+                <Text style={styles.idAnswerNoText}>Not yet</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {hasSciaId === true && (
+            <View style={styles.idActionCard}>
+              <Text style={styles.idActionText}>
+                Please enter your Senior Citizen ID Number below. It is required.
+              </Text>
+              <TouchableOpacity onPress={() => setHasSciaId(null)}>
+                <Text style={styles.changeAnswerText}>Change answer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {hasSciaId === false && (
+            <View style={styles.idActionCard}>
+              {ncscStatus === "started" ? (
+                <>
+                  <Text style={styles.idActionText}>
+                    Did you finish the NCSC registration?
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.oscaButton}
+                    onPress={() => setNcscStatus("completed_claimed")}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.oscaButtonText}>Yes, I finished</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.idAnswerNo}
+                    onPress={() => setNcscStatus("cancelled")}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.idAnswerNoText}>I cancelled</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => Linking.openURL(NCSC_FORM_URL)}>
+                    <Text style={styles.changeAnswerText}>Open the form again</Text>
+                  </TouchableOpacity>
+                </>
+              ) : ncscStatus === "completed_claimed" ? (
+                <Text style={styles.idActionText}>
+                  Thank you. Your NCSC registration will be checked by OSCA
+                  after you create your account.
+                </Text>
+              ) : (
+                <>
+                  <Text style={styles.idActionText}>
+                    You can register now at NCSC, or skip this and just create
+                    your account. Registering is optional.
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.oscaButton}
+                    onPress={() => {
+                      setNcscStatus("started");
+                      Linking.openURL(NCSC_FORM_URL);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.oscaButtonText}>Register at NCSC</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+              <TouchableOpacity
+                onPress={() => {
+                  setHasSciaId(null);
+                  setNcscStatus(null);
+                }}
+              >
+                <Text style={styles.changeAnswerText}>Change answer</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         <Text style={styles.sectionLabel}>Personal Information</Text>
@@ -335,14 +428,20 @@ export default function Signup() {
         <View style={styles.inputGroup}>
           <View style={styles.optionalWrapper}>
             <TextInput
-              placeholder="Senior Citizen ID Number"
+              placeholder={
+                hasSciaId === true
+                  ? "Senior Citizen ID Number *"
+                  : "Senior Citizen ID Number"
+              }
               placeholderTextColor="#6B7280"
               style={[styles.input, { paddingRight: 90 }]}
               value={idNumber}
               onChangeText={setIdNumber}
             />
             <View style={styles.optionalBadge}>
-              <Text style={styles.optionalBadgeText}>Optional</Text>
+              <Text style={styles.optionalBadgeText}>
+                {hasSciaId === true ? "Required" : "Optional"}
+              </Text>
             </View>
           </View>
           <TextInput
@@ -378,86 +477,6 @@ export default function Signup() {
             </>
           )}
         </TouchableOpacity>
-
-        <View style={styles.noIdSection}>
-          <Text style={styles.noIdQuestion}>
-            Don't have a Senior Citizen ID yet?
-          </Text>
-          <Text style={styles.noIdSubtitle}>
-            Are you already registered with OSCA?
-          </Text>
-
-          {hasSciaId === null && (
-            <View style={styles.idAnswerRow}>
-              <TouchableOpacity
-                style={styles.idAnswerYes}
-                onPress={() => setHasSciaId(true)}
-              >
-                <Text style={styles.idAnswerYesText}>Yes, I'm registered</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.idAnswerNo}
-                onPress={() => setHasSciaId(false)}
-              >
-                <Text style={styles.idAnswerNoText}>No, I'm not</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {hasSciaId === true && (
-            <View style={styles.idActionCard}>
-              <Text style={styles.idActionText}>
-                You can request your Senior Citizen ID from the admin.
-              </Text>
-              <TextInput
-                placeholder="Reason for requesting physical ID *"
-                placeholderTextColor="#6B7280"
-                style={styles.reasonInput}
-                value={idRequestReason}
-                onChangeText={setIdRequestReason}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-              />
-              <TouchableOpacity
-                style={styles.requestIdButton}
-                onPress={handleRequestId}
-                disabled={idRequestLoading}
-                activeOpacity={0.8}
-              >
-                {idRequestLoading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.requestIdButtonText}>
-                    Request ID from Admin
-                  </Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setHasSciaId(null)}>
-                <Text style={styles.changeAnswerText}>Change answer</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {hasSciaId === false && (
-            <View style={styles.idActionCard}>
-              <Text style={styles.idActionText}>
-                You can still create an account, but it will be unverified until
-                the admin approves you.
-              </Text>
-              <TouchableOpacity
-                style={styles.oscaButton}
-                onPress={() => Linking.openURL("https://www.osca.gov.ph/")}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.oscaButtonText}>Register at OSCA</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setHasSciaId(null)}>
-                <Text style={styles.changeAnswerText}>Change answer</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
 
         <TouchableOpacity
           style={[styles.createButton, loading && styles.createButtonDisabled]}
@@ -631,7 +650,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   noIdSection: {
-    marginTop: 24,
+    marginBottom: 8,
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
     padding: 20,

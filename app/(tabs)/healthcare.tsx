@@ -6,7 +6,9 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -15,7 +17,6 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar } from "react-native-calendars";
@@ -63,6 +64,9 @@ export default function Healthcare() {
   const [dosage, setDosage] = useState("");
   const [dosageUnit, setDosageUnit] = useState<"ml" | "mg" | "capsule">("mg");
   const [interval, setInterval] = useState("8");
+  const [medStartHour, setMedStartHour] = useState("");
+  const [medStartMinute, setMedStartMinute] = useState("");
+  const [medStartAmPm, setMedStartAmPm] = useState<"AM" | "PM">("AM");
   const notifListener = useRef<Notifications.EventSubscription | null>(null);
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
   const notificationsGranted = useRef(true);
@@ -145,7 +149,11 @@ export default function Healthcare() {
       if (!notificationsGranted.current) {
         Alert.alert(
           "Notifications Disabled",
-          "Medicine reminders won't ring unless notifications are allowed for this app. You can enable them in your device settings.",
+          "Medicine reminders won't ring unless notifications are allowed for this app.",
+          [
+            { text: "Not Now", style: "cancel" },
+            { text: "Open Settings", onPress: () => Linking.openSettings() },
+          ],
         );
       }
     } catch (e) {
@@ -172,17 +180,54 @@ export default function Healthcare() {
     }
   };
 
-  // NOTE: this previously passed `{ seconds, repeats } as any` with no
-  // `type` field. expo-notifications ~0.32 requires every schedulable
-  // trigger to declare its `type` (Notifications.SchedulableTriggerInputTypes)
-  // — without it, scheduleNotificationAsync throws "The trigger object you
-  // provided is invalid" immediately. That throw was being swallowed by the
-  // catch block below and silently returning `undefined`, so no alarm was
-  // ever actually scheduled even though the medicine still saved
-  // successfully and the UI looked fine. Adding `type: TIME_INTERVAL` (and
-  // a channelId so Android uses the MAX-importance/sound channel set up in
-  // registerNotifications) is what makes the reminder actually fire.
-  const scheduleNotification = async (name: string, intervalHours: number) => {
+  // Converts the 12-hour picker fields the user filled in (hour 1-12 +
+  // AM/PM) into a 24-hour hour value.
+  const to24Hour = (hour12: number, ampm: "AM" | "PM") => {
+    let h = hour12 % 12;
+    if (ampm === "PM") h += 12;
+    return h;
+  };
+
+  // Builds the list of clock times (hour/minute) the alarm should ring at
+  // every day, starting at the user's chosen start time and stepping by
+  // `intervalHours` until it has covered a full 24-hour day. e.g. a start
+  // of 7:00 with an 8-hour interval produces 7:00, 15:00, 23:00 — every day,
+  // forever — instead of counting `intervalHours` forward from whatever
+  // moment the user happened to press Save.
+  const computeDailyTimes = (
+    startHour24: number,
+    startMinute: number,
+    intervalHours: number,
+  ) => {
+    const count = Math.max(1, Math.round(24 / intervalHours));
+    const times: { hour: number; minute: number }[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < count; i++) {
+      const totalMinutes =
+        (startHour24 * 60 + startMinute + i * intervalHours * 60) % (24 * 60);
+      const hour = Math.floor(totalMinutes / 60);
+      const minute = totalMinutes % 60;
+      const key = `${hour}:${minute}`;
+      // Intervals that don't evenly divide 24 (e.g. 5h) can otherwise
+      // produce a duplicate time once the rounding wraps back around.
+      if (!seen.has(key)) {
+        seen.add(key);
+        times.push({ hour, minute });
+      }
+    }
+    return times;
+  };
+
+  // Schedules a notification that rings every day at a fixed hour/minute
+  // (an expo-notifications DAILY trigger), rather than a fixed number of
+  // seconds from "now". This is what lets the alarm be anchored to a real
+  // clock time the user picked, and keep firing at that same time every
+  // day indefinitely.
+  const scheduleDailyNotification = async (
+    name: string,
+    hour: number,
+    minute: number,
+  ) => {
     if (!notificationsGranted.current) {
       Alert.alert(
         "Notifications Disabled",
@@ -202,9 +247,9 @@ export default function Healthcare() {
           priority: Notifications.AndroidNotificationPriority.MAX,
         },
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: Math.max(intervalHours * 3600, 60),
-          repeats: true,
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour,
+          minute,
           channelId: Platform.OS === "android" ? "medication-reminders" : undefined,
         },
       });
@@ -220,8 +265,8 @@ export default function Healthcare() {
   };
 
   const addMedicine = async () => {
-    if (!medicineName || !dosage || !interval) {
-      Alert.alert("Missing Fields", "Please fill in all fields.");
+    if (!medicineName || !dosage || !interval || !medStartHour || !medStartMinute) {
+      Alert.alert("Missing Fields", "Please fill in all fields, including the alarm start time.");
       return;
     }
     const intervalNum = parseInt(interval);
@@ -229,7 +274,21 @@ export default function Healthcare() {
       Alert.alert("Invalid Interval", "Alarm interval must be at least 1 hour.");
       return;
     }
-    const notificationId = await scheduleNotification(medicineName, intervalNum);
+    const hour12 = parseInt(medStartHour);
+    const startMinute = parseInt(medStartMinute);
+    if (isNaN(hour12) || hour12 < 1 || hour12 > 12 || isNaN(startMinute) || startMinute < 0 || startMinute > 59) {
+      Alert.alert("Invalid Time", "Start time must be a valid hour (1-12) and minute (0-59).");
+      return;
+    }
+
+    const startHour24 = to24Hour(hour12, medStartAmPm);
+    const dailyTimes = computeDailyTimes(startHour24, startMinute, intervalNum);
+    const notificationIds: string[] = [];
+    for (const t of dailyTimes) {
+      const id = await scheduleDailyNotification(medicineName, t.hour, t.minute);
+      if (id) notificationIds.push(id);
+    }
+
     const newMedicine: Medicine = {
       id: Date.now().toString(),
       name: medicineName,
@@ -237,30 +296,35 @@ export default function Healthcare() {
       dosage,
       dosageUnit,
       interval: intervalNum,
+      notificationTimes: dailyTimes,
+      notificationIds,
       startTime: Date.now(),
       lastTakenTime: Date.now(),
       createdAt: Date.now(),
-      notificationId,
     };
     await saveMedicines([...medicines, newMedicine]);
     resetMedicineForm();
     setMedicineModalVisible(false);
   };
 
-  const deleteMedicine = async (id: string, notifId?: string) => {
-    if (notifId) await Notifications.cancelScheduledNotificationAsync(notifId);
+  const deleteMedicine = async (id: string, notifIds?: string[]) => {
+    if (notifIds?.length) {
+      await Promise.all(
+        notifIds.map((nid) => Notifications.cancelScheduledNotificationAsync(nid)),
+      );
+    }
     await saveMedicines(medicines.filter((m) => m.id !== id));
     if (selectedMedicine?.id === id) setDetailsModalVisible(false);
   };
 
+  // The daily alarms already ring at fixed clock times regardless of when
+  // the user taps this, so "taken now" only needs to record that moment
+  // for display — it must NOT touch or reschedule the notifications,
+  // otherwise every "taken" tap would shift the whole daily schedule
+  // forward from the current moment again (the exact bug being fixed).
   const takeMedicineNow = async () => {
     if (!selectedMedicine) return;
     const updatedMed = { ...selectedMedicine, lastTakenTime: Date.now() };
-    if (selectedMedicine.notificationId) {
-      await Notifications.cancelScheduledNotificationAsync(selectedMedicine.notificationId);
-    }
-    const newNotifId = await scheduleNotification(updatedMed.name, updatedMed.interval);
-    updatedMed.notificationId = newNotifId;
     await saveMedicines(medicines.map((m) => (m.id === updatedMed.id ? updatedMed : m)));
     setSelectedMedicine(updatedMed);
     Alert.alert("Done", "Medicine marked as taken!");
@@ -272,12 +336,35 @@ export default function Healthcare() {
     setDosage("");
     setDosageUnit("mg");
     setInterval("8");
+    setMedStartHour("");
+    setMedStartMinute("");
+    setMedStartAmPm("AM");
   };
 
   const formatDosage = (d: string, u: string) =>
     `${d} ${u === "capsule" ? (d === "1" ? "capsule" : "capsules") : u}`;
 
   const getNextDoseTime = (med: Medicine) => {
+    // Preferred path: medicines created with the fixed daily alarm times.
+    if (med.notificationTimes && med.notificationTimes.length > 0) {
+      const now = new Date();
+      let best: Date | null = null;
+      for (const t of med.notificationTimes) {
+        const candidate = new Date(now);
+        candidate.setHours(t.hour, t.minute, 0, 0);
+        if (candidate.getTime() <= now.getTime()) candidate.setDate(candidate.getDate() + 1);
+        if (!best || candidate.getTime() < best.getTime()) best = candidate;
+      }
+      if (best) {
+        const diff = best.getTime() - now.getTime();
+        const h = best.getHours().toString().padStart(2, "0");
+        const m = best.getMinutes().toString().padStart(2, "0");
+        const hr = Math.floor(diff / (1000 * 60 * 60));
+        const mn = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        return `${h}:${m} (in ${hr}h ${mn}m)`;
+      }
+    }
+    // Fallback for medicines saved before fixed-time alarms existed.
     const nextTime = med.lastTakenTime + med.interval * 60 * 60 * 1000;
     const diff = nextTime - Date.now();
     if (diff <= 0) return "Now (Overdue)";
@@ -457,7 +544,7 @@ export default function Healthcare() {
                       {
                         text: "Delete",
                         style: "destructive",
-                        onPress: () => deleteMedicine(med.id, med.notificationId),
+                        onPress: () => deleteMedicine(med.id, med.notificationIds),
                       },
                     ])
                   }
@@ -631,6 +718,43 @@ export default function Healthcare() {
                 keyboardType="number-pad"
                 style={styles.input}
               />
+
+              <Text style={styles.label}>First Alarm Time</Text>
+              <View style={styles.timeRow}>
+                <TextInput
+                  placeholder="HH"
+                  placeholderTextColor="#6B7280"
+                  value={medStartHour}
+                  onChangeText={(v) => setMedStartHour(v.replace(/[^0-9]/g, ""))}
+                  style={[styles.input, styles.timeInput]}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <Text style={styles.timeSep}>:</Text>
+                <TextInput
+                  placeholder="MM"
+                  placeholderTextColor="#6B7280"
+                  value={medStartMinute}
+                  onChangeText={(v) => setMedStartMinute(v.replace(/[^0-9]/g, ""))}
+                  style={[styles.input, styles.timeInput]}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+                <View style={styles.amPmRow}>
+                  {(["AM", "PM"] as const).map((v) => (
+                    <TouchableOpacity
+                      key={v}
+                      style={[styles.amPmBtn, medStartAmPm === v && styles.amPmBtnActive]}
+                      onPress={() => setMedStartAmPm(v)}
+                    >
+                      <Text style={[styles.amPmTxt, medStartAmPm === v && styles.amPmTxtActive]}>{v}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <Text style={styles.hintText}>
+                The alarm will repeat every {interval || "_"} hour(s) starting from this time, every day.
+              </Text>
 
               <TouchableOpacity style={styles.saveBtn} onPress={addMedicine}>
                 <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>Save & Set Alarm</Text>
@@ -1029,6 +1153,7 @@ const styles = StyleSheet.create({
   amPmBtnActive: { backgroundColor: "#2356E1", borderColor: "#2356E1" },
   amPmTxt: { color: "#374151", fontWeight: "bold", fontSize: 15 },
   amPmTxtActive: { color: "white" },
+  hintText: { fontSize: 13, color: "#6B7280", marginTop: 4, marginBottom: 16, fontStyle: "italic" },
   errorBox: {
     backgroundColor: "rgba(239,68,68,0.1)",
     borderWidth: 1,
