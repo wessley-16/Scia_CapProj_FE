@@ -37,6 +37,10 @@
 //    voice prompt instead of duplicating it.
 
 import "@/lib/polyfills";
+// Side-effect import: lib/firebase.ts calls initAppCheck() at load time.
+// Importing it here guarantees App Check is initialized before any Gemini
+// request, no matter which screen/hook reaches this file first.
+import "@/lib/firebase";
 
 import {
   getAI,
@@ -44,6 +48,8 @@ import {
   VertexAIBackend,
 } from "@react-native-firebase/ai";
 import { getApp } from "@react-native-firebase/app";
+import appCheck from "@react-native-firebase/app-check";
+import { getAuth } from "@react-native-firebase/auth";
 
 // Same region useLiveVoice.ts uses for the Live API. Also used by
 // lib/voiceAI.ts through aiInstance(), so the whole app (chat + voice)
@@ -111,7 +117,19 @@ export function aiInstance() {
   // Vertex AI (Agent Platform Gemini API) backend — requires Blaze billing
   // and the Vertex AI API enabled on the GCP project. See notes at the top
   // of this file.
-  return getAI(getApp(), { backend: new VertexAIBackend(VERTEX_REGION) });
+  //
+  // IMPORTANT: in @react-native-firebase/ai v24, getAI() does NOT attach
+  // App Check or Auth by itself — they must be passed in explicitly, or
+  // every request goes out with no App Check token and gets a 401 once
+  // enforcement is on. Limited-use tokens are OFF on purpose: with them on,
+  // the console flagged every request as "Reused token" (replay protection)
+  // and rejected it. Keep Replay protection unenforced in the console.
+  return getAI(getApp(), {
+    backend: new VertexAIBackend(VERTEX_REGION),
+    appCheck: appCheck(),
+    auth: getAuth(),
+    useLimitedUseAppCheckTokens: false,
+  });
 }
 
 /**

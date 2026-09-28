@@ -1,14 +1,18 @@
 import appCheck from "@react-native-firebase/app-check";
 
-// TODO: paste your debug token here once you've generated one in the
-// Firebase console (see step 2 above). Leave blank until then.
+// Debug token for development builds. It MUST also be registered in the
+// Firebase console, exactly as written here:
+//   Firebase console > App Check > Apps > (your Android app) > ⋮ menu >
+//   Manage debug tokens > Add debug token.
+// If it is not registered there, App Check rejects every token and Gemini
+// calls fail with "401 Firebase App Check token is invalid".
 const APP_CHECK_DEBUG_TOKEN = "E667E464-3DF8-49E1-9CA2-2324AE796CB3";
 
 export function initAppCheck() {
   if (__DEV__ && !APP_CHECK_DEBUG_TOKEN) {
     console.warn(
       "[AppCheck] No debug token set in lib/appCheck.ts yet. Gemini/AI " +
-        "calls will fail until one is added. See the Firebase setup guide.",
+        "calls will fail until one is added.",
     );
     return;
   }
@@ -26,10 +30,42 @@ export function initAppCheck() {
       },
     });
 
-    appCheck().initializeAppCheck({
-      provider,
-      isTokenAutoRefreshEnabled: true,
-    });
+    appCheck()
+      .initializeAppCheck({
+        provider,
+        isTokenAutoRefreshEnabled: true,
+      })
+      .then(() => {
+        if (!__DEV__) return;
+        // Development-only diagnostic: ask for a token right away and print
+        // the real result, so you can see in the Metro log whether App
+        // Check itself works, instead of guessing from the AI 401.
+        appCheck()
+          .getToken(true)
+          .then((r) =>
+            console.log("[AppCheck] token OK (length " + r.token.length + ")"),
+          )
+          .catch((e) =>
+            console.warn(
+              "[AppCheck] token FAILED — the debug token is probably not " +
+                "registered in the Firebase console, or App Check is " +
+                "throttling after repeated failures:",
+              e?.code,
+              e?.message ?? e,
+            ),
+          );
+        appCheck()
+          .getLimitedUseToken()
+          .then(() => console.log("[AppCheck] limited-use token OK"))
+          .catch((e) =>
+            console.warn(
+              "[AppCheck] limited-use token FAILED:",
+              e?.code,
+              e?.message ?? e,
+            ),
+          );
+      })
+      .catch((e) => console.warn("[AppCheck] initializeAppCheck failed:", e));
   } catch (e) {
     // Never let App Check setup crash the app. Worst case, AI calls fail
     // with a clear error and everything else keeps working.

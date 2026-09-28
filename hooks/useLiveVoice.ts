@@ -19,6 +19,10 @@ import {
   getLiveGenerativeModel,
 } from "@react-native-firebase/ai";
 import { getApp } from "@react-native-firebase/app";
+import appCheck from "@react-native-firebase/app-check";
+import { getAuth } from "@react-native-firebase/auth";
+// Ensures lib/firebase.ts (which initializes App Check) has run first.
+import "@/lib/firebase";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -253,7 +257,14 @@ export function useLiveVoice() {
     safe.status("connecting");
 
     try {
-      const ai = getAI(getApp(), { backend: new VertexAIBackend(VERTEX_REGION) });
+      // getAI() in RN Firebase AI v24 does not attach App Check / Auth on its
+      // own — pass them in, or the Live API connection is rejected (401).
+      const ai = getAI(getApp(), {
+        backend: new VertexAIBackend(VERTEX_REGION),
+        appCheck: appCheck(),
+        auth: getAuth(),
+        useLimitedUseAppCheckTokens: false,
+      });
       const liveModel = getLiveGenerativeModel(ai, {
         model: LIVE_MODEL,
         generationConfig: {
