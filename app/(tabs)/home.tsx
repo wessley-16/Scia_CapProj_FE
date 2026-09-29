@@ -2,15 +2,15 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BlurView } from "expo-blur";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — events, join/check-in, and everything else now go through
 // Firestore directly (previously joining hit a hardcoded local dev backend
 // at http://10.142.254.160:3000 that no longer exists)
 import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds, subscribeToAuthState } from "@/lib/firebase";
-import EventCarousel from "@/components/home/EventCarousel";
+import EventCarousel from "@/components/home/Eventcarousel";
 import EventJoinFormModal from "@/components/home/EventJoinFormModal";
 import { useAuth } from "@/context/AuthContext";
 import { Medicine } from "@/interfaces/interfaces";
@@ -43,7 +43,15 @@ export default function Home() {
 
   const [notifications, setNotifications] = useState<any[]>([]);
 
-  const [nextMedicine, setNextMedicine] = useState<Medicine | null>(null);
+  // Every medicine reminder the senior created (Healthcare tab), not just one.
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
+  const [showMedicines, setShowMedicines] = useState(false);
+  // Ticks every minute so "in 2h 15m" stays current while Home is open.
+  const [nowTick, setNowTick] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
   const [avatarSource, setAvatarSource] = useState<any>(
     require("../../assets/images/default-profile.png")
   );
@@ -193,24 +201,11 @@ export default function Home() {
   const loadNextMedicine = useCallback(async () => {
     try {
       const stored = await AsyncStorage.getItem("medicines");
-      if (!stored) return setNextMedicine(null);
-
-      const medicines: Medicine[] = JSON.parse(stored);
-      if (!medicines.length) return setNextMedicine(null);
-
-      const upcoming = medicines
-        .map((med) => ({
-          ...med,
-          nextDoseTime:
-            (med.lastTakenTime || Date.now()) +
-            med.interval * 60 * 60 * 1000,
-        }))
-        .sort((a, b) => a.nextDoseTime - b.nextDoseTime)[0];
-
-      setNextMedicine(upcoming);
+      const list: Medicine[] = stored ? JSON.parse(stored) : [];
+      setMedicines(Array.isArray(list) ? list : []);
     } catch (error) {
       console.log(error);
-      setNextMedicine(null);
+      setMedicines([]);
     }
   }, []);
 
@@ -232,12 +227,40 @@ export default function Home() {
     });
   };
 
-  const getNextDoseTime = (medicine: Medicine) => {
-    return formatTime(
-      (medicine.lastTakenTime || Date.now()) +
-        medicine.interval * 60 * 60 * 1000
-    );
+  // Next time this medicine is due (ms). Same rule as the Healthcare tab:
+  // fixed daily alarm times when the medicine has them, otherwise
+  // last-taken + interval for older medicines.
+  const getNextDoseTimestamp = (med: Medicine, now: number): number => {
+    if (med.notificationTimes && med.notificationTimes.length > 0) {
+      let best: number | null = null;
+      for (const slot of med.notificationTimes) {
+        const c = new Date(now);
+        c.setHours(slot.hour, slot.minute, 0, 0);
+        if (c.getTime() <= now) c.setDate(c.getDate() + 1);
+        if (best === null || c.getTime() < best) best = c.getTime();
+      }
+      if (best !== null) return best;
+    }
+    return (med.lastTakenTime || now) + med.interval * 60 * 60 * 1000;
   };
+
+  const describeNextDose = (timestamp: number, now: number) => {
+    const diff = timestamp - now;
+    if (diff <= 0) return `${formatTime(timestamp)} (${t("overdueLabel")})`;
+    const hr = Math.floor(diff / 3600000);
+    const mn = Math.floor((diff % 3600000) / 60000);
+    return `${formatTime(timestamp)} (${hr}h ${mn}m)`;
+  };
+
+  // All medicines, soonest dose first.
+  const sortedMedicines = useMemo(
+    () =>
+      medicines
+        .map((med) => ({ med, next: getNextDoseTimestamp(med, nowTick) }))
+        .sort((a, b) => a.next - b.next),
+    [medicines, nowTick]
+  );
+  const nextMedicine = sortedMedicines[0]?.med ?? null;
 
   /* ---------------- NOTIFICATION ---------------- */
   const [showNotif, setShowNotif] = useState(false);
@@ -467,22 +490,33 @@ export default function Home() {
         {/* BUTTONS */}
         <View style= {styles.moduleContainer}>
           
-          {/* REMINDER */}
-          <View style={styles.reminder}>
+          {/* REMINDER — tap to see every medicine in a scrollable pop-up */}
+          <TouchableOpacity
+            style={styles.reminder}
+            activeOpacity={nextMedicine ? 0.8 : 1}
+            disabled={!nextMedicine}
+            onPress={() => setShowMedicines(true)}
+          >
             <View style={{ flex: 1 }}>
               <Text style={[styles.reminderLabel, { fontSize: 18 * fontScale }]}>{t("reminder")}</Text>
 
               {nextMedicine ? (
                 <>
                   <Text style={[styles.reminderTitle, { fontSize: 16 * fontScale }]}>
-                    {t("takeLabel")} {nextMedicine.dosage} {nextMedicine.dosageUnit} {nextMedicine.name}\
+                    {t("takeLabel")} {nextMedicine.dosage} {nextMedicine.dosageUnit} {nextMedicine.name}
                   </Text>
                   <Text style={[styles.reminderTime, { fontSize: 16 * fontScale }]}>
-                    {t("timeLabel")} {getNextDoseTime(nextMedicine)}\
+                    {t("timeLabel")} {describeNextDose(sortedMedicines[0].next, nowTick)}
                   </Text>
-                  <Text style={[styles.reminderTime, { fontSize: 16 * fontScale }]}>
-                    {t("noteLabel")} {nextMedicine.description ? `${nextMedicine.description}` : "---"}\
-                  </Text>
+                  {sortedMedicines.length > 1 ? (
+                    <Text style={[styles.reminderMore, { fontSize: 15 * fontScale }]}>
+                      +{sortedMedicines.length - 1} {t("moreMedicines")} · {t("tapToViewAll")}
+                    </Text>
+                  ) : (
+                    <Text style={[styles.reminderMore, { fontSize: 15 * fontScale }]}>
+                      {t("tapToViewAll")}
+                    </Text>
+                  )}
                 </>
               ) : (
                 <Text style={[styles.reminderTitle, { fontSize: 16 * fontScale }]}>
@@ -496,7 +530,7 @@ export default function Home() {
               size={50}
               color="#2356E1"
             />
-          </View>
+          </TouchableOpacity>
 
           <ActionButton
             title={t("sosEmergency")}
@@ -526,6 +560,75 @@ export default function Home() {
           />
         </View>
       </ScrollView>
+
+      {/* MEDICINE REMINDERS POP-UP */}
+      <Modal
+        visible={showMedicines}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMedicines(false)}
+      >
+        <View style={styles.medOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setShowMedicines(false)}
+          />
+          <View style={styles.medSheet}>
+            <View style={styles.medHandle} />
+            <View style={styles.medHeader}>
+              <Text style={[styles.medTitle, { fontSize: 22 * fontScale }]}>
+                {t("myMedicineReminders")} ({sortedMedicines.length})
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowMedicines(false)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="close" size={28} color="#374151" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.medList}
+              contentContainerStyle={{ paddingBottom: 12 }}
+              showsVerticalScrollIndicator
+            >
+              {sortedMedicines.map(({ med, next }, index) => (
+                <View key={med.id ?? String(index)} style={styles.medItem}>
+                  <View style={styles.medItemIcon}>
+                    <MaterialCommunityIcons name="pill" size={28} color="#2356E1" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.medName, { fontSize: 18 * fontScale }]}>{med.name}</Text>
+                    <Text style={[styles.medLine, { fontSize: 15 * fontScale }]}>
+                      {med.dosage} {med.dosageUnit} · {t("everyHours").replace("{n}", String(med.interval))}
+                    </Text>
+                    <Text style={[styles.medLine, { fontSize: 15 * fontScale }]}>
+                      {t("timeLabel")} {describeNextDose(next, nowTick)}
+                    </Text>
+                    {!!med.description && (
+                      <Text style={[styles.medLine, { fontSize: 15 * fontScale }]}>
+                        {t("noteLabel")} {med.description}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.medManageBtn}
+              activeOpacity={0.85}
+              onPress={() => {
+                setShowMedicines(false);
+                goToMedicine();
+              }}
+            >
+              <Text style={[styles.medManageText, { fontSize: 17 * fontScale }]}>{t("manageMedicines")}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <EventJoinFormModal
         visible={!!joinFormEvent}
@@ -761,6 +864,62 @@ const styles = StyleSheet.create({
   reminderTitle: { fontSize: 16 },
 
   reminderTime: { fontSize: 16 },
+
+  reminderMore: { fontWeight: "700", color: "#1D4ED8", marginTop: 4 },
+
+  medOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
+  medSheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+    maxHeight: "75%",
+  },
+  medHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#D1D5DB",
+    marginBottom: 12,
+  },
+  medHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  medTitle: { fontWeight: "800", color: "#111827", flex: 1, paddingRight: 12 },
+  medList: { flexGrow: 0 },
+  medItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: "#F3F6FF",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  medItemIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  medName: { fontWeight: "800", color: "#111827" },
+  medLine: { color: "#4B5563", marginTop: 2, lineHeight: 21 },
+  medManageBtn: {
+    backgroundColor: "#1D4ED8",
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: "center",
+    marginTop: 8,
+  },
+  medManageText: { color: "#fff", fontWeight: "800" },
 
   assistant: {
     flex: 1,
