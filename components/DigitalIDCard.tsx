@@ -53,6 +53,16 @@ export default function DigitalIDCard({ uid }: Props) {
     );
   }
 
+  // Shown on the card: an explicit portrait if the admin set one, otherwise
+  // the verified photo of the physical ID that was uploaded.
+  const photoSource = data.photoUrl
+    ? { uri: data.photoUrl }
+    : data.idImageUrl
+      ? { uri: data.idImageUrl }
+      : data.idImageBase64
+        ? { uri: `data:image/jpeg;base64,${data.idImageBase64}` }
+        : null;
+  const fullName = data.fullName ?? "";
   const theme = data.themeColor || DEFAULT_THEME;
   const accent = data.accentColor || DEFAULT_ACCENT;
   const status = data.status ?? "active";
@@ -71,23 +81,27 @@ export default function DigitalIDCard({ uid }: Props) {
       </View>
 
       <View style={styles.body}>
-        {data.photoUrl ? (
-          <Image source={{ uri: data.photoUrl }} style={styles.photo} />
+        {photoSource ? (
+          <Image source={photoSource} style={styles.photo} resizeMode="cover" />
         ) : (
           <View style={[styles.photo, styles.photoFallback]}>
-            <Text style={styles.initials}>{initials(data.fullName)}</Text>
+            <Text style={styles.initials}>{initials(fullName)}</Text>
           </View>
         )}
 
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={2}>
-            {data.fullName}
+            {fullName}
           </Text>
-          {!!data.role && <Text style={[styles.role, { color: accent }]}>{data.role}</Text>}
+          <Text style={[styles.role, { color: accent }]}>{data.role ?? "Senior Citizen"}</Text>
           <Text style={styles.label}>ID NO.</Text>
           <Text style={styles.value}>{data.idNumber}</Text>
-          <Text style={styles.label}>VALID UNTIL</Text>
-          <Text style={styles.value}>{formatDate(data.validUntil)}</Text>
+          {!!data.validUntil && (
+            <>
+              <Text style={styles.label}>VALID UNTIL</Text>
+              <Text style={styles.value}>{formatDate(data.validUntil)}</Text>
+            </>
+          )}
         </View>
       </View>
     </View>

@@ -21,7 +21,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar } from "react-native-calendars";
 import { useFocusEffect } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
+import { canonicalBarangay } from "@/constants/valenzuelaDistricts";
 import { Medicine } from "@/interfaces/interfaces";
 import { submitAppointment, subscribeToUserAppointments } from "@/lib/firebase";
 
@@ -51,6 +53,9 @@ type ActiveTab = "medicine" | "appointment";
 
 export default function Healthcare() {
   const { fontScale, t } = useSettings();
+  const { user } = useAuth();
+  // Booked automatically at the 3S Center of the barangay filled in at sign-up.
+  const myBarangay = canonicalBarangay(user?.barangay);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActiveTab>("medicine");
 
@@ -413,7 +418,9 @@ export default function Healthcare() {
       setApptNotes("");
       Alert.alert(
         "Appointment Submitted",
-        "Your appointment request has been sent to the 3S Center. Please wait for confirmation."
+        myBarangay
+          ? `Your appointment request has been sent to the 3S Center of Brgy. ${myBarangay}. Please wait for confirmation.`
+          : "Your appointment request has been sent to the 3S Center. Please wait for confirmation."
       );
     } catch (e) {
       setApptError("Failed to submit. Please check your connection.");
@@ -566,7 +573,9 @@ export default function Healthcare() {
           <View style={styles.infoBox}>
             <Ionicons name="information-circle-outline" size={18} color="#1E40AF" />
             <Text style={[styles.infoText, { fontSize: 14 * fontScale }]}>
-              Appointments are sent to the 3S Senior Center in Valenzuela. Sub-admin will confirm your booking.
+              {myBarangay
+                ? `Appointments go to the 3S Senior Center of Brgy. ${myBarangay} (the barangay you signed up with). Its sub-admin will confirm your booking.`
+                : "Appointments are sent to the 3S Senior Center in Valenzuela. Sub-admin will confirm your booking."}
             </Text>
           </View>
 

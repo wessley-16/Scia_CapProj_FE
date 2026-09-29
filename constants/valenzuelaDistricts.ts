@@ -108,3 +108,15 @@ export function barangaysMatch(a: string | null | undefined, b: string | null | 
   const cb = canonicalBarangay(b);
   return ca !== null && ca === cb;
 }
+
+/**
+ * The spelling the admin dashboard (and the admin accounts' `barangay` field)
+ * uses for a barangay. Only Gen. T. de Leon differs from this app's list.
+ * Appointments are stored with this spelling so a barangay sub-admin's account
+ * matches them exactly.
+ */
+export function adminBarangayName(barangay: string | null | undefined): string | null {
+  const canonical = canonicalBarangay(barangay);
+  if (!canonical) return null;
+  return canonical === "Gen. T. de Leon" ? "General T. de Leon" : canonical;
+}

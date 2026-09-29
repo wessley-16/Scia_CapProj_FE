@@ -9,7 +9,7 @@ import {
 import { DISTRICT_1_BARANGAYS, DISTRICT_2_BARANGAYS } from "@/constants/barangays";
 import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import * as ImagePicker from "expo-image-picker";
+import { pickIdImage as pickIdPhoto, PickedIdImage } from "@/lib/idImage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -43,7 +43,7 @@ export default function Signup() {
     }
   }, [user]);
 
-  const [idImage, setIdImage] = useState<any>(null);
+  const [idImage, setIdImage] = useState<PickedIdImage | null>(null);
   const [firstName, setFirstName] = useState("");
   const [midName, setMidName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -74,23 +74,11 @@ export default function Signup() {
     : "";
 
   const pickIdImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        "Permission Required",
-        "Please allow access to your photo library.",
-      );
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      base64: true,
-      allowsEditing: true,
-      aspect: [16, 9],
-    });
-    if (!result.canceled) {
-      setIdImage(result.assets[0]);
+    try {
+      const picked = await pickIdPhoto();
+      if (picked) setIdImage(picked);
+    } catch (e: any) {
+      Alert.alert("Photo", e?.message || "Could not use that photo.");
     }
   };
 
@@ -140,6 +128,13 @@ export default function Signup() {
       );
       return;
     }
+    if (hasSciaId === true && !idImage) {
+      Alert.alert(
+        "ID Photo Required",
+        "Please upload a photo of your Senior Citizen ID so OSCA can verify it.",
+      );
+      return;
+    }
     setLoading(true);
     try {
       await registerUser({
@@ -155,7 +150,7 @@ export default function Signup() {
         dob,
         idNumber: idNumber || "",
         password,
-        imageBase64: idImage?.base64 ?? undefined,
+        imageBase64: hasSciaId === true ? idImage?.base64 : undefined,
       });
       if (hasSciaId === false && ncscStatus) {
         try {
@@ -454,7 +449,9 @@ export default function Signup() {
           />
         </View>
 
-        <Text style={styles.sectionLabel}>Upload Senior Citizen ID Photo</Text>
+        {hasSciaId === true && (
+        <>
+        <Text style={styles.sectionLabel}>Upload Senior Citizen ID Photo *</Text>
         <TouchableOpacity
           style={styles.uploadCard}
           onPress={pickIdImage}
@@ -472,11 +469,13 @@ export default function Signup() {
               </View>
               <Text style={styles.uploadTitle}>Upload ID Photo</Text>
               <Text style={styles.uploadHint}>
-                Only ID photos accepted. Tap to select.
+                OSCA will check this photo against the ID number you entered.
               </Text>
             </>
           )}
         </TouchableOpacity>
+        </>
+        )}
 
         <TouchableOpacity
           style={[styles.createButton, loading && styles.createButtonDisabled]}

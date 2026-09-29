@@ -24,7 +24,9 @@ export interface UserProfile {
   isVerified: boolean;
   role: string;
   uid: string;
-  imageBase64?: string;
+  imageBase64?: string; // legacy: older accounts kept the ID photo here
+  hasTempId?: boolean;
+  previousIdNumber?: string;
   barangay?: string;
   district?: string;
 }

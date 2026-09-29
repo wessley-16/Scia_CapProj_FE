@@ -2,13 +2,19 @@ import { useEffect, useState } from "react";
 import { getAuth } from "@react-native-firebase/auth";
 import { doc, getFirestore, onSnapshot } from "@react-native-firebase/firestore";
 
-// Shape of the document the admin creates at digital_ids/{uid}
+// Shape of the document the admin portal creates at digital_ids/{uid}
+// (fullName/idNumber are always present; the rest is optional).
 export interface DigitalId {
   fullName: string;
   idNumber: string;
   role?: string; // e.g. "Member", "Senior Citizen", "Patient"
   organization?: string; // e.g. "SCIA"
   photoUrl?: string;
+  // Written by the admin's approveIdVerification: the verified ID photo the
+  // senior uploaded (Storage URL, or base64 when it was sent from the app).
+  idImageUrl?: string;
+  idImageBase64?: string;
+  isVerified?: boolean;
   validUntil?: any; // Firestore Timestamp or ISO string
   status?: "active" | "suspended" | "expired";
   themeColor?: string; // card background, e.g. "#1E3A8A"

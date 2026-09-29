@@ -58,6 +58,7 @@ export const COLLECTIONS = {
   USER_LOOKUP: "user_lookup",
   DIGITAL_IDS: "digital_ids",
   NCSC_REGISTRATIONS: "ncsc_registrations",
+  ID_VERIFICATIONS: "id_verifications",
 };
 
 // ── AUTH STATE ────────────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ export async function registerUser(data: UserRegistration) {
       gender: data.gender,
       dob: data.dob,
       idNumber: effectiveIdNumber,
-      imageBase64: data.imageBase64,
+      hasTempId: effectiveIdNumber.startsWith("TEMP"),
       status,
       isVerified,
       role: "SENIOR_CITIZEN",
@@ -149,6 +150,28 @@ export async function registerUser(data: UserRegistration) {
       })
     )
   );
+
+  // A photo of the physical card was sent with a real OSCA ID number: queue it
+  // for the admin's ID Management page. (No number = temporary ID, nothing for
+  // the admin to check yet; the senior can submit the card later from Account.)
+  if (data.imageBase64 && !effectiveIdNumber.startsWith("TEMP")) {
+    try {
+      await writeIdVerification({
+        uid,
+        idNumber: effectiveIdNumber,
+        imageBase64: data.imageBase64,
+        fullName: `${data.firstName} ${data.midName} ${data.lastName}`.replace(/\s+/g, " ").trim(),
+        barangay: data.barangay,
+        address: data.address,
+        dob: data.dob,
+        sex: data.gender,
+        contactNumber: data.conNumber,
+      });
+    } catch (e) {
+      // The account exists already; the senior can resubmit from Account.
+      console.warn("Could not queue the ID photo for verification:", e);
+    }
+  }
 
   return { id: uid, ...data, idNumber: effectiveIdNumber, status, isVerified };
 }
@@ -278,7 +301,7 @@ function toMillis(ts: any): number {
   return 0;
 }
 
-import { canonicalBarangay } from "@/constants/valenzuelaDistricts";
+import { adminBarangayName, canonicalBarangay } from "@/constants/valenzuelaDistricts";
 
 function normalizeDistrict(d: string | null | undefined): string | null {
   if (!d) return null;
@@ -548,13 +571,26 @@ export interface AppointmentRequest {
 }
 
 export async function submitAppointment(data: AppointmentRequest) {
-  const uid = auth.currentUser?.uid ?? "anonymous";
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+
+  // The barangay is never asked again: it is the one the senior filled in at
+  // sign-up. It decides which barangay's sub-admin receives (and can handle)
+  // this appointment; the master admin sees every barangay's.
+  const profile = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+  const signedUpBarangay: string | undefined = profile.exists()
+    ? (profile.data() as any).barangay
+    : undefined;
+  const barangay = adminBarangayName(signedUpBarangay);
+  const barangayLabel = canonicalBarangay(signedUpBarangay);
+
   const docRef = await addDoc(
     collection(db, COLLECTIONS.APPOINTMENTS),
     stripUndefined({
       ...data,
       uid,
-      center: "3S Center Valenzuela",
+      barangay,
+      center: barangayLabel ? `3S Center ${barangayLabel}` : "3S Center Valenzuela",
       status: "pending",
       createdAt: serverTimestamp(),
     }),
@@ -729,6 +765,121 @@ export function subscribeToDigitalId(
   );
 }
 
+
+// ── ID VERIFICATION (photo of the physical OSCA ID) ──────────────────────────
+// The senior sends the OSCA ID number and a photo of the card. The admin's ID
+// Management page shows name + ID number + photo, checks it against OSCA's own
+// list and presses Verify. The `approveIdVerification` Cloud Function then, in
+// one step: counts the senior in ncsc_registrations (with this submittedAt and
+// the approval time), replaces a TEMP ID with the real number, and issues
+// digital_ids/{uid} from the photo. The app never writes any of that itself; it
+// only creates the submission and listens for the result.
+export type IdVerificationStatus = "pending" | "approved" | "rejected";
+
+export interface MyIdVerification {
+  id: string;
+  status: IdVerificationStatus | string;
+  idNumber?: string;
+  submittedAt?: any;
+  reviewedAt?: any;
+}
+
+interface NewIdVerification {
+  uid: string;
+  idNumber: string;
+  imageBase64: string;
+  fullName: string;
+  barangay?: string;
+  address?: string;
+  dob?: string;
+  sex?: string;
+  contactNumber?: string;
+}
+
+async function writeIdVerification(v: NewIdVerification) {
+  const ref = await addDoc(
+    collection(db, COLLECTIONS.ID_VERIFICATIONS),
+    stripUndefined({
+      ...v,
+      status: "pending",
+      submittedAt: serverTimestamp(),
+    }),
+  );
+  return ref.id;
+}
+
+export const isTempIdNumber = (idNumber?: string | null) =>
+  /^TEMP/i.test((idNumber ?? "").trim());
+
+/** For a signed-in senior: send the real OSCA ID number + card photo to OSCA. */
+export async function submitIdVerification(input: {
+  idNumber: string;
+  imageBase64: string;
+}) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+
+  const idNumber = input.idNumber.trim().replace(/\s+/g, " ");
+  if (!idNumber) throw new Error("Please enter the OSCA ID number on your card.");
+  if (isTempIdNumber(idNumber)) {
+    throw new Error("Enter the ID number printed on your physical OSCA card, not a temporary ID.");
+  }
+  if (!input.imageBase64) throw new Error("Please add a photo of your ID.");
+
+  // Only one submission waits at a time, so the admin never sees duplicates.
+  const mine = await getDocs(
+    query(collection(db, COLLECTIONS.ID_VERIFICATIONS), where("uid", "==", uid)),
+  );
+  if (mine.docs.some((d) => d.data().status === "pending")) {
+    throw new Error("Your ID is already waiting for OSCA to verify.");
+  }
+
+  const userSnap = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+  const u: any = userSnap.exists() ? userSnap.data() : {};
+  return writeIdVerification({
+    uid,
+    idNumber,
+    imageBase64: input.imageBase64,
+    fullName: [u.firstName, u.midName, u.lastName].filter(Boolean).join(" "),
+    barangay: u.barangay,
+    address: u.address,
+    dob: u.dob,
+    sex: u.gender,
+    contactNumber: u.conNumber,
+  });
+}
+
+/** Live status of the senior's most recent submission (null if none). */
+export function subscribeToMyIdVerification(
+  uid: string | null | undefined,
+  callback: (latest: MyIdVerification | null) => void,
+) {
+  if (!uid) {
+    callback(null);
+    return () => {};
+  }
+  // No orderBy on purpose: a where + orderBy on different fields needs a
+  // composite index; a senior only ever has a few of these, so sort here.
+  // A just-created doc has no server timestamp yet, so it counts as newest.
+  const time = (v: any) => (v.submittedAt ? toMillis(v.submittedAt) : Number.MAX_SAFE_INTEGER);
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.ID_VERIFICATIONS), where("uid", "==", uid)),
+    (snap) => {
+      const items = (snap?.docs ?? [])
+        .map((d) => {
+          // Leave the photo out: it is large and the screen never shows it.
+          const { imageBase64, ...rest } = d.data() as any;
+          return { id: d.id, ...rest } as MyIdVerification;
+        })
+        .sort((a, b) => time(b) - time(a));
+      callback(items[0] ?? null);
+    },
+    (error) => {
+      console.warn("subscribeToMyIdVerification error:", error);
+      callback(null);
+    },
+  );
+}
 
 // ── NCSC REGISTRATION ─────────────────────────────────────────────────────────
 // One doc per senior (doc id = uid) in ncsc_registrations. The senior may only

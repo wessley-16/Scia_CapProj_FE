@@ -23,6 +23,7 @@ import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
+import IdVerificationCard from "@/components/IdVerificationCard";
 import { submitIDRequest, logoutUser, buildUserQRPayload } from "@/lib/firebase";
 
 // Colour tokens
@@ -297,6 +298,9 @@ export default function Account() {
             </View>
           )}
         </View>
+
+        {/* Physical OSCA ID → admin verifies → real ID number + Digital ID */}
+        <IdVerificationCard />
 
         {/* QR code card: identity for event check-in */}
         {user && (
