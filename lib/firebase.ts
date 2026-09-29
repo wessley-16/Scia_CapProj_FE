@@ -687,6 +687,9 @@ export function subscribeToHealthCenters(
 }
 
 // ── PHYSICAL ID REQUEST ───────────────────────────────────────────────────────
+// Lifecycle (written by the admin dashboard, see src/lib/idRequestStatus.js there):
+//   pending → (approved) → processing → delivered → received → done
+//   and pending / processing / delivered → cancelled (or rejected on review)
 export interface IDRequest {
   seniorName: string;
   seniorId: string;
@@ -694,20 +697,105 @@ export interface IDRequest {
   contactNumber: string;
   reason?: string;
   imageBase64?: string;
+  barangay?: string;
+  district?: string;
+}
+
+export type IdRequestStatus =
+  | "pending"
+  | "approved"
+  | "processing"
+  | "delivered"
+  | "received"
+  | "done"
+  | "cancelled"
+  | "rejected";
+
+/** Statuses where the request is still going through and a new one must not be filed. */
+export const ACTIVE_ID_REQUEST_STATUSES = [
+  "pending",
+  "approved",
+  "processing",
+  "delivered",
+  "received",
+];
+
+export interface MyIdRequest {
+  id: string;
+  status: IdRequestStatus | string;
+  reason?: string;
+  cancelReason?: string;
+  barangay?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  processedAt?: any;
+  deliveredAt?: any;
+  receivedAt?: any;
+  claimedAt?: any;
+  cancelledAt?: any;
 }
 
 export async function submitIDRequest(data: IDRequest) {
-  const uid = auth.currentUser?.uid ?? "anonymous";
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+
+  // One request at a time — otherwise the senior ends up with duplicates and
+  // no way to tell which one the tracker is showing.
+  const mine = await getDocs(
+    query(collection(db, COLLECTIONS.ID_REQUESTS), where("uid", "==", uid)),
+  );
+  if (mine.docs.some((d) => ACTIVE_ID_REQUEST_STATUSES.includes(d.data().status))) {
+    throw new Error("You already have a physical ID request in progress.");
+  }
+
+  // `barangay` is what lets the barangay's sub-admin see the request and mark it
+  // received / claimed (firestore.rules + IDManagement.jsx both filter on it).
+  // Stored with the admin dashboard's spelling of the barangay name.
+  const barangay = adminBarangayName(data.barangay) ?? undefined;
+
   const docRef = await addDoc(
     collection(db, COLLECTIONS.ID_REQUESTS),
     stripUndefined({
       ...data,
+      barangay,
       uid,
       status: "pending",
       createdAt: serverTimestamp(),
     }),
   );
   return docRef.id;
+}
+
+/** Live status of the senior's most recent physical-ID request (null if none). */
+export function subscribeToMyIdRequest(
+  uid: string | null | undefined,
+  callback: (latest: MyIdRequest | null) => void,
+) {
+  if (!uid) {
+    callback(null);
+    return () => {};
+  }
+  // No orderBy on purpose: where("uid") + orderBy("createdAt") needs a composite
+  // index. A senior only has a handful of these, so sort here. A just-created
+  // doc has no server timestamp yet, so it counts as the newest.
+  const time = (r: any) => (r.createdAt ? toMillis(r.createdAt) : Number.MAX_SAFE_INTEGER);
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.ID_REQUESTS), where("uid", "==", uid)),
+    (snap) => {
+      const items = (snap?.docs ?? [])
+        .map((d) => {
+          // Leave the photo out: it is large and the screen never shows it.
+          const { imageBase64, ...rest } = d.data() as any;
+          return { id: d.id, ...rest } as MyIdRequest;
+        })
+        .sort((a, b) => time(b) - time(a));
+      callback(items[0] ?? null);
+    },
+    (error) => {
+      console.warn("subscribeToMyIdRequest error:", error);
+      callback(null);
+    },
+  );
 }
 
 // ── DIGITAL ID ────────────────────────────────────────────────────────────────

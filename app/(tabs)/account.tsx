@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter, useFocusEffect } from "expo-router";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -24,7 +24,14 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import IdVerificationCard from "@/components/IdVerificationCard";
-import { submitIDRequest, logoutUser, buildUserQRPayload } from "@/lib/firebase";
+import IdRequestTracker, { isFinishedIdRequest } from "@/components/IdRequestTracker";
+import {
+  submitIDRequest,
+  logoutUser,
+  buildUserQRPayload,
+  subscribeToMyIdRequest,
+  MyIdRequest,
+} from "@/lib/firebase";
 
 // Colour tokens
 const C = {
@@ -96,7 +103,17 @@ export default function Account() {
   const [idModalVisible, setIdModalVisible] = useState(false);
   const [idReason,       setIdReason]       = useState("");
   const [idSubmitting,   setIdSubmitting]   = useState(false);
-  const [idSubmitted,    setIdSubmitted]    = useState(false);
+  // Live status of the senior's latest request, straight from Firestore, so the
+  // progress survives app restarts and follows what OSCA / the barangay do.
+  const [idRequest,      setIdRequest]      = useState<MyIdRequest | null>(null);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setIdRequest(null);
+      return undefined;
+    }
+    return subscribeToMyIdRequest(user.uid, setIdRequest);
+  }, [user?.uid]);
 
   // Notification panel
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -181,14 +198,20 @@ export default function Account() {
         seniorName:    `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Senior",
         seniorId:      user.idNumber || "N/A",
         address:       user.address  || "",
+        barangay:      user.barangay,
+        district:      user.district,
         contactNumber: user.conNumber || "",
         reason:        idReason || "Replacement / First-time request",
       });
-      setIdSubmitted(true);
+      setIdReason("");
       setIdModalVisible(false);
-      Alert.alert("Request Submitted", "Your physical Senior Citizen ID request has been sent to the admin.");
-    } catch {
-      Alert.alert("Error", "Failed to submit. Please check your connection.");
+      Alert.alert("Request Submitted", "Your physical Senior Citizen ID request has been sent. You can follow its progress on this screen.");
+    } catch (e: any) {
+      const inProgress = /already have a physical id request/i.test(e?.message ?? "");
+      Alert.alert(
+        inProgress ? "Request In Progress" : "Error",
+        inProgress ? e.message : "Failed to submit. Please check your connection.",
+      );
     } finally {
       setIdSubmitting(false);
     }
@@ -358,15 +381,18 @@ export default function Account() {
             Your request will be reviewed by the admin.
           </Text>
 
-          {idSubmitted ? (
-            <View style={s.submittedBox}>
-              <Ionicons name="checkmark-circle" size={24} color={C.success} />
-              <Text style={[s.submittedText, { fontSize: 15 * fontScale }]}>Request already submitted</Text>
+          {idRequest && (
+            <View style={s.idTrackerBox}>
+              <IdRequestTracker request={idRequest} fontScale={fontScale} />
             </View>
-          ) : (
+          )}
+
+          {(!idRequest || isFinishedIdRequest(idRequest.status)) && (
             <TouchableOpacity style={s.idRequestBtn} onPress={() => setIdModalVisible(true)} activeOpacity={0.85}>
               <Ionicons name="send-outline" size={20} color="#fff" />
-              <Text style={[s.idRequestBtnText, { fontSize: 17 * fontScale }]}>Request Physical ID</Text>
+              <Text style={[s.idRequestBtnText, { fontSize: 17 * fontScale }]}>
+                {idRequest ? "Request Another ID" : "Request Physical ID"}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -690,6 +716,7 @@ const s = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 18,
   },
+  idTrackerBox: { marginTop: 4, marginBottom: 12 },
   idRequestBtn: {
     backgroundColor: C.primary,
     borderRadius:    14,
