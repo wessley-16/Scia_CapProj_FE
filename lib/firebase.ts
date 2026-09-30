@@ -14,6 +14,7 @@ import {
   getDocs,
   addDoc,
   setDoc,
+  updateDoc,
   query,
   where,
   orderBy,
@@ -23,9 +24,7 @@ import {
   FieldValue,
 } from "@react-native-firebase/firestore";
 import { getStorage } from "@react-native-firebase/storage";
-import * as Location from "expo-location";
 import { initAppCheck } from "./appCheck";
-import { PRESENCE_TASK } from "./presenceShared";
 
 export const auth = getAuth();
 const db = getFirestore();
@@ -71,76 +70,7 @@ export function subscribeToAuthState(
 }
 
 export async function logoutUser() {
-  const uid = auth.currentUser?.uid;
-  if (uid) {
-    // A signed-out phone can't ping, so stop the server treating that silence as
-    // an emergency (it would SMS the guardians an hour later), and stop tracking.
-    try {
-      await setDoc(
-        doc(db, COLLECTIONS.USERS, uid),
-        { safety_monitoring_enabled: false, push_token: null },
-        { merge: true },
-      );
-    } catch (e) {
-      console.warn("logout: could not pause safety monitoring:", e);
-    }
-    try {
-      if (await Location.hasStartedLocationUpdatesAsync(PRESENCE_TASK)) {
-        await Location.stopLocationUpdatesAsync(PRESENCE_TASK);
-      }
-    } catch (e) {
-      console.warn("logout: could not stop location updates:", e);
-    }
-  }
   await signOut(auth);
-}
-
-// ── SAFETY MONITORING / PRESENCE ──────────────────────────────────────────────
-// Field names are read by the inactivity monitor Cloud Function
-// (SCIA_Admin_Firebase/functions/inactivityMonitor.js) — keep them in sync.
-export interface Guardian {
-  name: string;
-  phone: string;
-  relationship?: string;
-}
-
-export interface PresenceLocation {
-  latitude: number;
-  longitude: number;
-  accuracy?: number;
-}
-
-/**
- * Heartbeat: stamps last_active_timestamp (server time) and, when known, the
- * last known location. `extra` rides in the SAME write so that switching
- * monitoring on can never expose a stale timestamp to the server.
- */
-export async function writePresence(
-  uid: string,
-  location?: PresenceLocation,
-  extra: Record<string, any> = {},
-) {
-  await setDoc(
-    doc(db, COLLECTIONS.USERS, uid),
-    stripUndefined({
-      last_active_timestamp: serverTimestamp(),
-      last_known_location: location
-        ? stripUndefined({ ...location, captured_at: Date.now() })
-        : undefined,
-      ...extra,
-    }),
-    { merge: true },
-  );
-}
-
-/** Small self-service updates to the signed-in senior's own profile. */
-export async function updateMyUserFields(uid: string, fields: Record<string, any>) {
-  await setDoc(doc(db, COLLECTIONS.USERS, uid), stripUndefined(fields), { merge: true });
-}
-
-/** The senior answered the "Are you safe?" push. */
-export async function writeSafeConfirmation(uid: string) {
-  await writePresence(uid, undefined, { safety_check_confirmed_at: serverTimestamp() });
 }
 
 // ── USER REGISTRATION ─────────────────────────────────────────────────────────
@@ -158,6 +88,13 @@ export interface UserRegistration {
   idNumber?: string;
   password: string;
   imageBase64?: string;
+  // Who to contact if the senior goes silent for too long (inactivity alert).
+  // Both optional at sign-up; the app should nudge the senior to add these
+  // later from Account if left blank, since the alert can't reach anyone
+  // without at least one.
+  guardianName?: string;
+  guardianPhone?: string;   // PH mobile number, e.g. 09171234567
+  guardianRelation?: string;
 }
 
 export async function registerUser(data: UserRegistration) {
@@ -186,6 +123,9 @@ export async function registerUser(data: UserRegistration) {
       conNumber: data.conNumber,
       gender: data.gender,
       dob: data.dob,
+      guardianName: data.guardianName,
+      guardianPhone: data.guardianPhone,
+      guardianRelation: data.guardianRelation,
       idNumber: effectiveIdNumber,
       hasTempId: effectiveIdNumber.startsWith("TEMP"),
       status,
@@ -758,9 +698,6 @@ export function subscribeToHealthCenters(
 }
 
 // ── PHYSICAL ID REQUEST ───────────────────────────────────────────────────────
-// Lifecycle (written by the admin dashboard, see src/lib/idRequestStatus.js there):
-//   pending → (approved) → processing → delivered → received → done
-//   and pending / processing / delivered → cancelled (or rejected on review)
 export interface IDRequest {
   seniorName: string;
   seniorId: string;
@@ -768,105 +705,20 @@ export interface IDRequest {
   contactNumber: string;
   reason?: string;
   imageBase64?: string;
-  barangay?: string;
-  district?: string;
-}
-
-export type IdRequestStatus =
-  | "pending"
-  | "approved"
-  | "processing"
-  | "delivered"
-  | "received"
-  | "done"
-  | "cancelled"
-  | "rejected";
-
-/** Statuses where the request is still going through and a new one must not be filed. */
-export const ACTIVE_ID_REQUEST_STATUSES = [
-  "pending",
-  "approved",
-  "processing",
-  "delivered",
-  "received",
-];
-
-export interface MyIdRequest {
-  id: string;
-  status: IdRequestStatus | string;
-  reason?: string;
-  cancelReason?: string;
-  barangay?: string;
-  createdAt?: any;
-  updatedAt?: any;
-  processedAt?: any;
-  deliveredAt?: any;
-  receivedAt?: any;
-  claimedAt?: any;
-  cancelledAt?: any;
 }
 
 export async function submitIDRequest(data: IDRequest) {
-  const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error("Not signed in");
-
-  // One request at a time — otherwise the senior ends up with duplicates and
-  // no way to tell which one the tracker is showing.
-  const mine = await getDocs(
-    query(collection(db, COLLECTIONS.ID_REQUESTS), where("uid", "==", uid)),
-  );
-  if (mine.docs.some((d) => ACTIVE_ID_REQUEST_STATUSES.includes(d.data().status))) {
-    throw new Error("You already have a physical ID request in progress.");
-  }
-
-  // `barangay` is what lets the barangay's sub-admin see the request and mark it
-  // received / claimed (firestore.rules + IDManagement.jsx both filter on it).
-  // Stored with the admin dashboard's spelling of the barangay name.
-  const barangay = adminBarangayName(data.barangay) ?? undefined;
-
+  const uid = auth.currentUser?.uid ?? "anonymous";
   const docRef = await addDoc(
     collection(db, COLLECTIONS.ID_REQUESTS),
     stripUndefined({
       ...data,
-      barangay,
       uid,
       status: "pending",
       createdAt: serverTimestamp(),
     }),
   );
   return docRef.id;
-}
-
-/** Live status of the senior's most recent physical-ID request (null if none). */
-export function subscribeToMyIdRequest(
-  uid: string | null | undefined,
-  callback: (latest: MyIdRequest | null) => void,
-) {
-  if (!uid) {
-    callback(null);
-    return () => {};
-  }
-  // No orderBy on purpose: where("uid") + orderBy("createdAt") needs a composite
-  // index. A senior only has a handful of these, so sort here. A just-created
-  // doc has no server timestamp yet, so it counts as the newest.
-  const time = (r: any) => (r.createdAt ? toMillis(r.createdAt) : Number.MAX_SAFE_INTEGER);
-  return onSnapshot(
-    query(collection(db, COLLECTIONS.ID_REQUESTS), where("uid", "==", uid)),
-    (snap) => {
-      const items = (snap?.docs ?? [])
-        .map((d) => {
-          // Leave the photo out: it is large and the screen never shows it.
-          const { imageBase64, ...rest } = d.data() as any;
-          return { id: d.id, ...rest } as MyIdRequest;
-        })
-        .sort((a, b) => time(b) - time(a));
-      callback(items[0] ?? null);
-    },
-    (error) => {
-      console.warn("subscribeToMyIdRequest error:", error);
-      callback(null);
-    },
-  );
 }
 
 // ── DIGITAL ID ────────────────────────────────────────────────────────────────
@@ -924,6 +776,32 @@ export function subscribeToDigitalId(
   );
 }
 
+
+// ── GUARDIAN CONTACT (who the inactivity alert texts) ────────────────────────
+// Collected at sign-up if the senior fills it in there, or added/edited later
+// from Account. The inactivity-monitoring Cloud Function reads this straight
+// off the user's own document — nothing else needs to call this to read it.
+export async function updateGuardianContact(input: {
+  guardianName: string;
+  guardianPhone: string;
+  guardianRelation?: string;
+}) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+
+  const name = input.guardianName.trim();
+  const phone = input.guardianPhone.trim();
+  if (!name) throw new Error("Please enter your guardian's name.");
+  if (!/^(09\d{9}|\+639\d{9})$/.test(phone)) {
+    throw new Error("Please enter a valid PH mobile number, e.g. 09171234567.");
+  }
+
+  await updateDoc(doc(db, COLLECTIONS.USERS, uid), {
+    guardianName: name,
+    guardianPhone: phone,
+    guardianRelation: input.guardianRelation?.trim() || "",
+  });
+}
 
 // ── ID VERIFICATION (photo of the physical OSCA ID) ──────────────────────────
 // The senior sends the OSCA ID number and a photo of the card. The admin's ID
