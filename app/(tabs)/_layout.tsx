@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { usePresence } from "@/hooks/usePresence";
 import { Ionicons } from "@expo/vector-icons";
 import Entypo from "@expo/vector-icons/Entypo";
 import { Tabs, useRouter } from "expo-router";
@@ -120,6 +121,7 @@ const PendingVerificationScreen = ({ onLogout }: { onLogout: () => void }) => {
 export default function Layout() {
   const router = useRouter();
   const { user, loading, isGuest, clearUser } = useAuth();
+  usePresence(); // Safety Monitoring heartbeat + "Are you safe?" prompt
 
   const onScanPress = () => {
     router.push("/voice" as any);

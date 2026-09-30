@@ -31,6 +31,15 @@
       "favicon": "./assets/images/Logo.png"
     },
     "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "SCIA uses your location, including in the background, so your guardians and barangay office can be alerted if you cannot be reached.",
+          "locationWhenInUsePermission": "SCIA uses your location to send accurate SOS alerts.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/auth",
       "@react-native-firebase/app-check",
@@ -63,7 +72,9 @@
         {
           "icon": "./assets/images/Logo.png",
           "color": "#2356E1",
-          "sounds": ["./assets/sounds/alarm.wav"],
+          "sounds": [
+            "./assets/sounds/alarm.wav"
+          ],
           "mode": "production"
         }
       ],

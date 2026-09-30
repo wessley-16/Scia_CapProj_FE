@@ -1,3 +1,4 @@
+import "@/lib/presenceTask"; // registers the background location task
 import { AuthProvider } from "@/context/AuthContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import { Slot } from "expo-router";

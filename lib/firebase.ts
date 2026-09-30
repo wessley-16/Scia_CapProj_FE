@@ -23,7 +23,9 @@ import {
   FieldValue,
 } from "@react-native-firebase/firestore";
 import { getStorage } from "@react-native-firebase/storage";
+import * as Location from "expo-location";
 import { initAppCheck } from "./appCheck";
+import { PRESENCE_TASK } from "./presenceShared";
 
 export const auth = getAuth();
 const db = getFirestore();
@@ -69,7 +71,76 @@ export function subscribeToAuthState(
 }
 
 export async function logoutUser() {
+  const uid = auth.currentUser?.uid;
+  if (uid) {
+    // A signed-out phone can't ping, so stop the server treating that silence as
+    // an emergency (it would SMS the guardians an hour later), and stop tracking.
+    try {
+      await setDoc(
+        doc(db, COLLECTIONS.USERS, uid),
+        { safety_monitoring_enabled: false, push_token: null },
+        { merge: true },
+      );
+    } catch (e) {
+      console.warn("logout: could not pause safety monitoring:", e);
+    }
+    try {
+      if (await Location.hasStartedLocationUpdatesAsync(PRESENCE_TASK)) {
+        await Location.stopLocationUpdatesAsync(PRESENCE_TASK);
+      }
+    } catch (e) {
+      console.warn("logout: could not stop location updates:", e);
+    }
+  }
   await signOut(auth);
+}
+
+// ── SAFETY MONITORING / PRESENCE ──────────────────────────────────────────────
+// Field names are read by the inactivity monitor Cloud Function
+// (SCIA_Admin_Firebase/functions/inactivityMonitor.js) — keep them in sync.
+export interface Guardian {
+  name: string;
+  phone: string;
+  relationship?: string;
+}
+
+export interface PresenceLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+}
+
+/**
+ * Heartbeat: stamps last_active_timestamp (server time) and, when known, the
+ * last known location. `extra` rides in the SAME write so that switching
+ * monitoring on can never expose a stale timestamp to the server.
+ */
+export async function writePresence(
+  uid: string,
+  location?: PresenceLocation,
+  extra: Record<string, any> = {},
+) {
+  await setDoc(
+    doc(db, COLLECTIONS.USERS, uid),
+    stripUndefined({
+      last_active_timestamp: serverTimestamp(),
+      last_known_location: location
+        ? stripUndefined({ ...location, captured_at: Date.now() })
+        : undefined,
+      ...extra,
+    }),
+    { merge: true },
+  );
+}
+
+/** Small self-service updates to the signed-in senior's own profile. */
+export async function updateMyUserFields(uid: string, fields: Record<string, any>) {
+  await setDoc(doc(db, COLLECTIONS.USERS, uid), stripUndefined(fields), { merge: true });
+}
+
+/** The senior answered the "Are you safe?" push. */
+export async function writeSafeConfirmation(uid: string) {
+  await writePresence(uid, undefined, { safety_check_confirmed_at: serverTimestamp() });
 }
 
 // ── USER REGISTRATION ─────────────────────────────────────────────────────────

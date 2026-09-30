@@ -25,6 +25,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import IdVerificationCard from "@/components/IdVerificationCard";
 import IdRequestTracker, { isFinishedIdRequest } from "@/components/IdRequestTracker";
+import SafetyMonitoringCard from "@/components/SafetyMonitoringCard";
 import {
   submitIDRequest,
   logoutUser,
@@ -396,6 +397,8 @@ export default function Account() {
             </TouchableOpacity>
           )}
         </View>
+
+        <SafetyMonitoringCard fontScale={fontScale} />
 
         {/* Quick actions */}
         <View style={s.sectionCard}>

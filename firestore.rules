@@ -91,7 +91,8 @@ service cloud.firestore {
             || (request.auth.uid == userId
                 && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
                      'isVerified', 'status', 'idNumber', 'hasTempId', 'role',
-                     'verifiedAt', 'previousIdNumber', 'tempIdReplacedAt'])));
+                     'verifiedAt', 'previousIdNumber', 'tempIdReplacedAt',
+                     'safety_alert'])));
 
       allow delete: if isSuperAdmin();
     }
@@ -274,6 +275,15 @@ service cloud.firestore {
         && (isOwner() || isSubOrSuperAdmin());
       allow update: if isSubOrSuperAdmin() && canSeeBarangay(resource.data.get('barangay', null));
       allow delete: if isSuperAdmin();
+    }
+
+    // ── /inactivity_alerts ───────────────────────────────────────────────
+    // Audit trail written only by the monitorInactivity Cloud Function
+    // (Admin SDK bypasses rules). Admins can read; nobody can write from a client.
+    match /inactivity_alerts/{docId} {
+      allow read: if isSubOrSuperAdmin()
+        && canSeeBarangay(resource.data.get('barangay', null));
+      allow write: if false;
     }
 
     // ── /ncsc_registrations ──────────────────────────────────────────────

@@ -29,6 +29,10 @@ export interface UserProfile {
   previousIdNumber?: string;
   barangay?: string;
   district?: string;
+  // Safety monitoring (see lib/presence.ts)
+  safety_monitoring_opt_in?: boolean;
+  safety_monitoring_enabled?: boolean;
+  guardians?: { name: string; phone: string; relationship?: string }[];
 }
 
 interface AuthContextType {
