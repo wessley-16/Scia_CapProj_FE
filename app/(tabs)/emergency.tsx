@@ -21,60 +21,10 @@ import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import { sendSOSAlert, subscribeToSOSAlert } from '../../lib/firebase';
 import { canonicalBarangay } from '../../constants/valenzuelaDistricts';
+import { barangayFromBoundaries } from '../../constants/barangayBoundaries';
 
 const HOLD_DURATION_MS = 5000;
 const COOLDOWN_MS = 5 * 60 * 1000;
-
-// Names must match constants/barangays.ts and the admin dashboard exactly,
-// so a scoped sub-admin can see the alert on the SOS Map.
-const valenzuelaBarangays = [
-  { name: 'Arkong Bato',         lat: 14.7175, lng: 120.9800 },
-  { name: 'Bagbaguin',           lat: 14.7365, lng: 120.9920 },
-  { name: 'Balangkas',           lat: 14.7015, lng: 120.9790 },
-  { name: 'Bignay',              lat: 14.7250, lng: 120.9980 },
-  { name: 'Bisig',               lat: 14.7160, lng: 120.9785 },
-  { name: 'Canumay East',        lat: 14.7095, lng: 120.9925 },
-  { name: 'Canumay West',        lat: 14.7065, lng: 120.9880 },
-  { name: 'Coloong',             lat: 14.7205, lng: 120.9780 },
-  { name: 'Dalandanan',          lat: 14.7035, lng: 120.9825 },
-  { name: 'General T. de Leon',  lat: 14.7120, lng: 120.9870 },
-  { name: 'Isla',                lat: 14.6945, lng: 120.9950 },
-  { name: 'Karuhatan',           lat: 14.7055, lng: 120.9890 },
-  { name: 'Lawang Bato',         lat: 14.7155, lng: 120.9975 },
-  { name: 'Lingunan',            lat: 14.7060, lng: 120.9830 },
-  { name: 'Mabolo',              lat: 14.6995, lng: 120.9905 },
-  { name: 'Malanday',            lat: 14.7190, lng: 120.9820 },
-  { name: 'Malinta',             lat: 14.7045, lng: 120.9785 },
-  { name: 'Mapulang Lupa',       lat: 14.7135, lng: 120.9965 },
-  { name: 'Marulas',             lat: 14.7145, lng: 120.9915 },
-  { name: 'Maysan',              lat: 14.7195, lng: 120.9950 },
-  { name: 'Palasan',             lat: 14.7005, lng: 120.9915 },
-  { name: 'Parada',              lat: 14.7085, lng: 120.9805 },
-  { name: 'Pariancillo Villa',   lat: 14.7030, lng: 120.9865 },
-  { name: 'Paso de Blas',        lat: 14.7290, lng: 120.9930 },
-  { name: 'Pasolo',              lat: 14.7110, lng: 120.9795 },
-  { name: 'Poblacion',           lat: 14.7080, lng: 120.9860 },
-  { name: 'Pulo',                lat: 14.7245, lng: 120.9835 },
-  { name: 'Punturin',            lat: 14.7270, lng: 120.9875 },
-  { name: 'Rincon',              lat: 14.7095, lng: 120.9795 },
-  { name: 'Tagalag',             lat: 14.7320, lng: 120.9880 },
-  { name: 'Ugong',               lat: 14.7205, lng: 120.9935 },
-  { name: 'Veinte Reales',       lat: 14.7075, lng: 120.9895 },
-  { name: 'Wawang Pulo',         lat: 14.7185, lng: 120.9845 },
-];
-
-// LAST-RESORT FALLBACK ONLY. Each entry is a single hardcoded point for a
-// whole barangay, so "nearest point" is just a coarse guess and is wrong
-// near any barangay border. Only used when the phone's reverse geocoder
-// didn't return a barangay we recognize.
-const getBarangayFromCoords = (lat: number, lng: number): string => {
-  let closest = { name: 'Unknown Barangay', dist: Number.MAX_VALUE };
-  for (const b of valenzuelaBarangays) {
-    const d = Math.hypot(lat - b.lat, lng - b.lng);
-    if (d < closest.dist) closest = { name: b.name, dist: d };
-  }
-  return closest.name;
-};
 
 // Google's free embed endpoint, no API key needed.
 const buildGoogleMapsEmbedUrl = (lat: number, lng: number) =>
@@ -126,29 +76,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
-// OpenStreetMap's reverse geocoder knows Philippine barangays (suburb /
-// quarter / neighbourhood) far better than the phone's built-in one, which
-// often returns no district at all. Used only when the phone's result doesn't
-// match a real Valenzuela barangay. Failure is silent: caller falls back.
-async function lookupBarangayOnline(lat: number, lng: number): Promise<string | null> {
-  try {
-    const res = await withTimeout(
-      fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&addressdetails=1&lat=${lat}&lon=${lng}`,
-        { headers: { 'Accept-Language': 'en' } },
-      ),
-      5000,
-    );
-    if (!res.ok) return null;
-    const a = (await res.json())?.address ?? {};
-    for (const candidate of [a.suburb, a.quarter, a.neighbourhood, a.village, a.city_district]) {
-      const match = canonicalBarangay(candidate);
-      if (match && valenzuelaBarangays.some((b) => canonicalBarangay(b.name) === match)) return match;
-    }
-  } catch {}
-  return null;
-}
-
 export default function EmergencyScreen() {
   const { fontScale, t } = useSettings();
   const { user } = useAuth();
@@ -157,7 +84,7 @@ export default function EmergencyScreen() {
   const [name, setName] = useState('');
   const [fullAddress, setFullAddress] = useState('Fetching...');
   const [barangay, setBarangay] = useState('');
-  const [barangaySource, setBarangaySource] = useState<'geocoder' | 'estimate'>('estimate');
+  const [barangaySource, setBarangaySource] = useState<'boundary' | 'geocoder' | 'outside'>('boundary');
   const [accuracy, setAccuracy] = useState<number | null>(null);
 
   const [isHolding, setIsHolding] = useState(false);
@@ -263,51 +190,34 @@ export default function EmergencyScreen() {
       setMapLoadFailed(false);
       setMapKey((k) => k + 1);
 
+      // Barangay: decided by the real boundary polygons (offline, instant,
+      // exact). No nearest-point guessing and no extra API needed.
+      const hit = barangayFromBoundaries(coords.latitude, coords.longitude);
+      if (hit) {
+        setBarangay(hit.name);
+        setBarangaySource('boundary');
+      } else {
+        setBarangay('');
+        setBarangaySource('outside');
+      }
+
+      // Street/city text only, for the address line. Needs network, so it must
+      // never block the SOS: on failure fall back to the raw coordinates.
       try {
         const geo = await Location.reverseGeocodeAsync(loc.coords);
         const place: any = geo[0];
-
         if (place) {
           const streetLine = [place.streetNumber, place.street].filter(Boolean).join(' ');
-          setFullAddress([streetLine, place.city].filter(Boolean).join(', ') || 'Address unavailable');
-
-          // The reverse geocoder's "district" is the phone's real,
-          // boundary-aware sublocality (i.e. the actual barangay for that
-          // street), unlike the single-point nearest-neighbor guess below.
-          // Try it first, canonicalized to the exact spelling the admin
-          // dashboard filters on. "subregion" is tried next since some
-          // Android devices report the barangay there instead. Only fall
-          // back to the coordinate guess if neither matches a real
-          // Valenzuela barangay, so a wrong-but-confident guess never
-          // overrides a correct geocoded one.
-          let found: string | null =
-              canonicalBarangay(place.district) ??
-              canonicalBarangay(place.subregion);
-          const isReal = (n: string | null) =>
-            !!n && valenzuelaBarangays.some((b) => canonicalBarangay(b.name) === n);
-          if (!isReal(found)) found = await lookupBarangayOnline(coords.latitude, coords.longitude);
-
-          if (found) {
-            setBarangay(found);
-            setBarangaySource('geocoder');
-          } else {
-            setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
-            setBarangaySource('estimate');
+          setFullAddress([streetLine, place.city].filter(Boolean).join(', ') || `${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
+          if (!hit && place.district) {
+            // Outside Valenzuela: keep what the phone says so the alert still names the area.
+            setBarangay(canonicalBarangay(place.district) ?? place.district);
           }
         } else {
           setFullAddress(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
-          setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
-          setBarangaySource('estimate');
         }
       } catch {
-        // Reverse geocoding needs network/provider access and can fail even
-        // when the GPS coordinates themselves are perfectly good (no
-        // signal, provider hiccup, etc). Never let that block the SOS: keep
-        // the accurate coordinates, show them as the address, and still use
-        // the coordinate-based barangay guess so a barangay is always sent.
         setFullAddress(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
-        setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
-        setBarangaySource('estimate');
       }
     } catch (error: any) {
       setLocationError(error?.message || 'Could not get your location.');
