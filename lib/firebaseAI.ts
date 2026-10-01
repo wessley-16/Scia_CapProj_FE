@@ -7,9 +7,8 @@
 // Backend: VertexAIBackend (the "Agent Platform Gemini API", formerly
 // Vertex AI). This project is now on the Blaze (pay-as-you-go) plan, so it
 // can use this backend — it was previously downgraded to GoogleAIBackend
-// (Gemini Developer API) because Vertex AI requires Blaze. Uses the same
-// backend + region as hooks/useLiveVoice.ts so the whole app talks to
-// Gemini through one path.
+// (Gemini Developer API) because Vertex AI requires Blaze. The text chatbot
+// and voice assistant share this setup; the Live voice hook has its own.
 //
 // Before this works you must, in the Google Cloud console for this
 // Firebase project (scia-b5440):
@@ -51,10 +50,12 @@ import { getApp } from "@react-native-firebase/app";
 import appCheck from "@react-native-firebase/app-check";
 import { getAuth } from "@react-native-firebase/auth";
 
-// Same region useLiveVoice.ts uses for the Live API. Also used by
-// lib/voiceAI.ts through aiInstance(), so the whole app (chat + voice)
-// talks to Gemini through this one region.
-const VERTEX_REGION = "asia-southeast1";
+// Gemini 3.x models are only available at the "global" location in Firebase AI
+// Logic (they return 404 "Publisher model ... was not found" from a single region
+// such as asia-southeast1). Used by the text chatbot and, through aiInstance(),
+// by lib/voiceAI.ts. The Live voice hook (hooks/useLiveVoice.ts) has its own
+// region on purpose: the Live 2.5 models are not available at "global".
+const VERTEX_REGION = "global";
 
 // ── Models ───────────────────────────────────────────────────────────────
 // Keep these in ONE place. When Google retires a model you change 2 lines,

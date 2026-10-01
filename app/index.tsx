@@ -47,6 +47,9 @@ const languageOptions = [
   { labelKey: "tagalog", value: "tl" },
 ];
 
+// After this many wrong passwords in a row, offer the Forgot Password flow.
+const FORGOT_PROMPT_AFTER = 3;
+
 export default function Index() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -56,6 +59,8 @@ export default function Index() {
   const [showLogin, setShowLogin] = useState(false);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  // Wrong-password tries on this screen; after a few we point to Forgot Password.
+  const [failedAttempts, setFailedAttempts] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -137,6 +142,14 @@ export default function Index() {
     return true;
   };
 
+  const goToForgotPassword = () => {
+    if (blockIfSignedIn()) return;
+    router.push({
+      pathname: "/(auth)/forgot-password",
+      params: { identifier: /^[A-Za-z0-9+]{4,20}$/.test(identifier.trim()) ? identifier.trim() : "" },
+    });
+  };
+
   const handleLogin = async () => {
     if (!identifier || !password) {
       Alert.alert(
@@ -148,10 +161,24 @@ export default function Index() {
     setIsLoading(true);
     try {
       await loginByIdentifier(identifier, password);
+      setFailedAttempts(0);
       await refreshUser();
       router.replace("/(tabs)/home");
     } catch (error: any) {
-      Alert.alert("Login Failed", error?.message || "Invalid credentials");
+      const attempts = failedAttempts + 1;
+      setFailedAttempts(attempts);
+      if (attempts >= FORGOT_PROMPT_AFTER) {
+        Alert.alert(
+          "Login Failed",
+          `${error?.message || "Invalid credentials"}\n\nForgot your password? You can reset it with a code sent to your registered mobile number.`,
+          [
+            { text: "Try Again", style: "cancel" },
+            { text: "Reset Password", onPress: goToForgotPassword },
+          ],
+        );
+      } else {
+        Alert.alert("Login Failed", error?.message || "Invalid credentials");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -293,6 +320,20 @@ export default function Index() {
                   onChangeText={setPassword}
                   secureTextEntry
                 />
+
+                {failedAttempts >= FORGOT_PROMPT_AFTER && (
+                  <View style={styles.attemptBox}>
+                    <Text style={[styles.attemptText, { fontSize: 15 * fontScale }]}>
+                      Having trouble logging in? Reset your password with a code sent to your
+                      registered mobile number.
+                    </Text>
+                  </View>
+                )}
+                <TouchableOpacity onPress={goToForgotPassword} style={styles.forgotWrap}>
+                  <Text style={[styles.forgotText, { fontSize: 15 * fontScale }]}>
+                    Forgot password?
+                  </Text>
+                </TouchableOpacity>
 
                 <View style={styles.hintBox}>
                   <Text style={[styles.hintText, { fontSize: 15 * fontScale }]}>
@@ -506,6 +547,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: "#111",
   },
+  forgotWrap: { alignSelf: "flex-end", paddingVertical: 6, marginBottom: 4 },
+  forgotText: { color: "#1D4ED8", fontWeight: "700", textDecorationLine: "underline" },
+  attemptBox: {
+    backgroundColor: "#FEF3C7",
+    borderWidth: 1,
+    borderColor: "#F59E0B",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 6,
+  },
+  attemptText: { color: "#7A3B00", lineHeight: 21 },
   hintBox: { marginTop: 4, marginBottom: 6, gap: 4 },
   hintText: { color: "#374151", lineHeight: 22, fontWeight: "700" },
   hintItem: { color: "#4B5563", lineHeight: 20, paddingLeft: 4 },

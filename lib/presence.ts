@@ -65,7 +65,9 @@ export async function ensureSafetyChannel() {
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 500, 250, 500],
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    sound: "default",
+    // No `sound` key on purpose: leaving it out gives the system default sound.
+    // Passing "default" is read as a custom file name and fails on SDK 57
+    // ("Custom sound 'default' not found in native app").
   });
 }
 

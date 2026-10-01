@@ -1,5 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
 import { Guardian, updateMyUserFields } from "@/lib/firebase";
+import { RULES, RuleKind, sanitize, validate } from "@/lib/validators";
 import { disableSafetyMonitoring, enableSafetyMonitoring } from "@/lib/presence";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
@@ -19,8 +20,6 @@ import {
 } from "react-native";
 
 const MAX_GUARDIANS = 3;
-// 09XXXXXXXXX, +639XXXXXXXXX or 639XXXXXXXXX
-const isPhMobile = (v: string) => /^(09|\+?639)\d{9}$/.test(v.replace(/[\s-]/g, ""));
 
 export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: number }) {
   const { user, refreshUser } = useAuth();
@@ -29,6 +28,15 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [relationship, setRelationship] = useState("");
+  // Red message under the form: why a typed character was removed, or why Save was refused.
+  const [formError, setFormError] = useState("");
+
+  // Strips characters the field does not allow and says why (e.g. digits in a name).
+  const typed = (kind: RuleKind, setter: (v: string) => void) => (raw: string) => {
+    const { value, rejected } = sanitize(kind, raw);
+    setter(value);
+    setFormError(rejected ? RULES[kind].hint : "");
+  };
 
   const uid = user?.uid;
   const on = !!user?.safety_monitoring_opt_in;
@@ -97,13 +105,18 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
 
   const addGuardian = async () => {
     if (!name.trim() || !phone.trim()) {
-      Alert.alert("Missing information", "Please enter the guardian's name and mobile number.");
+      setFormError("Please enter the guardian's name and mobile number.");
       return;
     }
-    if (!isPhMobile(phone)) {
-      Alert.alert("Check the number", "Enter a Philippine mobile number like 09171234567.");
+    const err =
+      validate("name", name) ||
+      validate("phone", phone) ||
+      validate("relation", relationship, { required: false });
+    if (err) {
+      setFormError(err);
       return;
     }
+    setFormError("");
     setBusy(true);
     try {
       await saveGuardians([
@@ -111,7 +124,7 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
         { name: name.trim(), phone: phone.replace(/[\s-]/g, ""), relationship: relationship.trim() || undefined },
       ]);
       setEditing(false);
-      setName(""); setPhone(""); setRelationship("");
+      setName(""); setPhone(""); setRelationship(""); setFormError("");
     } catch {
       Alert.alert("Error", "Could not save. Please check your connection.");
     } finally {
@@ -177,20 +190,23 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={s.overlay}>
           <View style={s.modal}>
             <Text style={[s.title, { fontSize: 20 * fontScale, marginBottom: 12 }]}>Add guardian</Text>
-            <TextInput style={s.input} placeholder="Full name" value={name} onChangeText={setName} />
+            <TextInput style={[s.input, !!formError && s.inputError]} placeholder="Full name" value={name} onChangeText={typed("name", setName)} maxLength={RULES.name.max} />
             <TextInput
               style={s.input}
               placeholder="Mobile number (09XXXXXXXXX)"
               keyboardType="phone-pad"
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={typed("phone", setPhone)}
+              maxLength={RULES.phone.max}
             />
             <TextInput
               style={s.input}
               placeholder="Relationship (optional)"
               value={relationship}
-              onChangeText={setRelationship}
+              onChangeText={typed("relation", setRelationship)}
+              maxLength={RULES.relation.max}
             />
+            {!!formError && <Text style={s.errorText}>{formError}</Text>}
             <View style={s.btnRow}>
               <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => setEditing(false)}>
                 <Text style={s.btnGhostText}>Cancel</Text>
@@ -213,6 +229,8 @@ const s = StyleSheet.create({
   body: { color: "#4B5563", lineHeight: 20, marginTop: 8 },
   sub: { fontWeight: "700", color: "#111827", marginTop: 14, marginBottom: 6 },
   hint: { color: "#6B7280" },
+  inputError: { borderColor: "#DC2626", backgroundColor: "#FEF2F2" },
+  errorText: { color: "#DC2626", fontSize: 13, fontWeight: "600", marginBottom: 8 },
   guardianRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#F3F6FF", borderRadius: 12, padding: 12, marginTop: 8 },
   gName: { fontWeight: "700", color: "#111827" },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },

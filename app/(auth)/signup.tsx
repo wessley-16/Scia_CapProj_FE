@@ -10,6 +10,17 @@ import { DISTRICT_1_BARANGAYS, DISTRICT_2_BARANGAYS } from "@/constants/barangay
 import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { pickIdImage as pickIdPhoto, PickedIdImage } from "@/lib/idImage";
+import {
+  DISTRICTS,
+  RULES,
+  RuleKind,
+  latestSeniorBirthDate,
+  sanitize,
+  validate,
+  validateGender,
+  validateOption,
+  validatePassword,
+} from "@/lib/validators";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -56,6 +67,11 @@ export default function Signup() {
   const [dobDate, setDobDate] = useState(new Date(1960, 0, 1));
   const [idNumber, setIdNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianPhone, setGuardianPhone] = useState("");
+  const [guardianRelation, setGuardianRelation] = useState("");
+  // Field-level errors shown under each input (and a red border).
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showDobPicker, setShowDobPicker] = useState(false);
 
@@ -72,6 +88,59 @@ export default function Signup() {
   const fullAddress = street && barangay
     ? `${street}, Brgy. ${barangay}, Valenzuela City`
     : "";
+
+  // Typing filter: characters the field does not allow are dropped and the
+  // field shows why; a valid keystroke clears the message.
+  const onText = (
+    field: string,
+    kind: RuleKind,
+    raw: string,
+    set: (v: string) => void,
+  ) => {
+    const { value, rejected } = sanitize(kind, raw);
+    set(value);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (rejected) next[field] = RULES[kind].hint;
+      else delete next[field];
+      return next;
+    });
+  };
+
+  const inputStyle = (field: string, extra?: object) => [
+    styles.input,
+    extra,
+    errors[field] ? styles.inputError : null,
+  ];
+
+  const fieldError = (field: string) =>
+    errors[field] ? <Text style={styles.errorText}>{errors[field]}</Text> : null;
+
+  // Full check on submit. Returns the first message so it can be shown in an alert.
+  const validateAll = (): string => {
+    const e: Record<string, string> = {};
+    const add = (field: string, msg: string) => {
+      if (msg) e[field] = msg;
+    };
+    add("firstName", validate("name", firstName));
+    add("midName", validate("name", midName));
+    add("lastName", validate("name", lastName));
+    add("conNumber", validate("phone", conNumber));
+    add("street", validate("address", street));
+    add("guardianName", validate("name", guardianName));
+    add("guardianPhone", validate("phone", guardianPhone));
+    add("guardianRelation", validate("relation", guardianRelation, { required: false }));
+    add("idNumber", validate("idNumber", idNumber, { required: hasSciaId === true }));
+    add("district", validateOption(district, DISTRICTS, "district"));
+    add("barangay", validateOption(barangay, barangayOptions, "barangay"));
+    add("gender", validateGender(gender));
+    add("password", validatePassword(password));
+    setErrors(e);
+    return Object.values(e)[0] ?? "";
+  };
+
+  const isPhMobile = (v: string) =>
+    /^(09\d{9}|\+639\d{9})$/.test(v.replace(/[\s-]/g, ""));
 
   const pickIdImage = async () => {
     try {
@@ -114,6 +183,25 @@ export default function Signup() {
       Alert.alert("Missing Fields", "Please fill in all required fields.");
       return;
     }
+    const firstProblem = validateAll();
+    if (firstProblem) {
+      Alert.alert("Please Check Your Entries", firstProblem);
+      return;
+    }
+    if (!guardianName.trim() || !guardianPhone.trim()) {
+      Alert.alert(
+        "Guardian Required",
+        "Please add a guardian or relative name and contact number. This is who gets alerted if you are unreachable.",
+      );
+      return;
+    }
+    if (!isPhMobile(guardianPhone.trim())) {
+      Alert.alert(
+        "Check the Number",
+        "Please enter a valid PH mobile number for the guardian, e.g. 09171234567.",
+      );
+      return;
+    }
     if (hasSciaId === null) {
       Alert.alert(
         "Registration Status",
@@ -150,6 +238,9 @@ export default function Signup() {
         dob,
         idNumber: idNumber || "",
         password,
+        guardianName: guardianName.trim(),
+        guardianPhone: guardianPhone.trim(),
+        guardianRelation: guardianRelation.trim(),
         imageBase64: hasSciaId === true ? idImage?.base64 : undefined,
       });
       if (hasSciaId === false && ncscStatus) {
@@ -289,32 +380,69 @@ export default function Signup() {
           <TextInput
             placeholder="First Name *"
             placeholderTextColor="#6B7280"
-            style={styles.input}
+            style={inputStyle("firstName")}
             value={firstName}
-            onChangeText={setFirstName}
+            onChangeText={(v) => onText("firstName", "name", v, setFirstName)}
           />
+          {fieldError("firstName")}
           <TextInput
             placeholder="Middle Name *"
             placeholderTextColor="#6B7280"
-            style={styles.input}
+            style={inputStyle("midName")}
             value={midName}
-            onChangeText={setMidName}
+            onChangeText={(v) => onText("midName", "name", v, setMidName)}
           />
+          {fieldError("midName")}
           <TextInput
             placeholder="Last Name *"
             placeholderTextColor="#6B7280"
-            style={styles.input}
+            style={inputStyle("lastName")}
             value={lastName}
-            onChangeText={setLastName}
+            onChangeText={(v) => onText("lastName", "name", v, setLastName)}
           />
+          {fieldError("lastName")}
           <TextInput
             placeholder="Contact Number *"
             placeholderTextColor="#6B7280"
-            style={styles.input}
+            style={inputStyle("conNumber")}
             value={conNumber}
-            onChangeText={setConNumber}
+            onChangeText={(v) => onText("conNumber", "phone", v, setConNumber)}
             keyboardType="phone-pad"
           />
+          {fieldError("conNumber")}
+        </View>
+
+        <Text style={styles.sectionLabel}>Guardian / Relative Contact</Text>
+        <Text style={styles.sectionHint}>
+          Who to alert if you don't check in. Required for the safety-monitoring
+          feature.
+        </Text>
+        <View style={styles.inputGroup}>
+          <TextInput
+            placeholder="Guardian/Relative Name *"
+            placeholderTextColor="#6B7280"
+            style={inputStyle("guardianName")}
+            value={guardianName}
+            onChangeText={(v) => onText("guardianName", "name", v, setGuardianName)}
+          />
+          {fieldError("guardianName")}
+          <TextInput
+            placeholder="Guardian Contact Number *"
+            placeholderTextColor="#6B7280"
+            style={inputStyle("guardianPhone")}
+            value={guardianPhone}
+            onChangeText={(v) => onText("guardianPhone", "phone", v, setGuardianPhone)}
+            keyboardType="phone-pad"
+          />
+          {fieldError("guardianPhone")}
+          <TextInput
+            placeholder="Relationship (e.g. Daughter, Son, Neighbor)"
+            placeholderTextColor="#6B7280"
+            style={inputStyle("guardianRelation")}
+            value={guardianRelation}
+            onChangeText={(v) => onText("guardianRelation", "relation", v, setGuardianRelation)}
+          />
+          {fieldError("guardianRelation")}
         </View>
 
         <Text style={styles.sectionLabel}>District *</Text>
@@ -354,10 +482,11 @@ export default function Signup() {
         <TextInput
           placeholder="e.g. 123 Rizal St."
           placeholderTextColor="#6B7280"
-          style={styles.input}
+          style={inputStyle("street")}
           value={street}
-          onChangeText={setStreet}
+          onChangeText={(v) => onText("street", "address", v, setStreet)}
         />
+        {fieldError("street")}
 
         <Text style={styles.sectionLabel}>Date of Birth *</Text>
         <TouchableOpacity
@@ -376,7 +505,7 @@ export default function Signup() {
             value={dobDate}
             mode="date"
             display={Platform.OS === "ios" ? "spinner" : "default"}
-            maximumDate={new Date()}
+            maximumDate={latestSeniorBirthDate()}
             minimumDate={new Date(1920, 0, 1)}
             onChange={(event, selectedDate) => {
               if (Platform.OS === "android") setShowDobPicker(false);
@@ -429,9 +558,11 @@ export default function Signup() {
                   : "Senior Citizen ID Number"
               }
               placeholderTextColor="#6B7280"
-              style={[styles.input, { paddingRight: 90 }]}
+              style={inputStyle("idNumber", { paddingRight: 90 })}
               value={idNumber}
-              onChangeText={setIdNumber}
+              onChangeText={(v) => onText("idNumber", "idNumber", v, setIdNumber)}
+              autoCapitalize="characters"
+              autoCorrect={false}
             />
             <View style={styles.optionalBadge}>
               <Text style={styles.optionalBadgeText}>
@@ -439,14 +570,24 @@ export default function Signup() {
               </Text>
             </View>
           </View>
+          {fieldError("idNumber")}
           <TextInput
             placeholder="Password *"
             placeholderTextColor="#6B7280"
             secureTextEntry
-            style={styles.input}
+            style={inputStyle("password")}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(v) => {
+              setPassword(v.slice(0, 64));
+              setErrors((prev) => {
+                const next = { ...prev };
+                delete next.password;
+                return next;
+              });
+            }}
+            autoCapitalize="none"
           />
+          {fieldError("password")}
         </View>
 
         {hasSciaId === true && (
@@ -537,7 +678,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     marginTop: 22,
   },
+  sectionHint: { fontSize: 14, color: "#4B5563", marginBottom: 10, lineHeight: 20 },
   inputGroup: { gap: 12 },
+  inputError: { borderColor: "#DC2626", backgroundColor: "#FEF2F2" },
+  errorText: { color: "#B91C1C", fontSize: 14, lineHeight: 20, marginTop: -4 },
   input: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1.5,

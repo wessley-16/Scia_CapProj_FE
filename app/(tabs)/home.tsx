@@ -9,7 +9,7 @@ import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — events, join/check-in, and everything else now go through
 // Firestore directly (previously joining hit a hardcoded local dev backend
 // at http://10.142.254.160:3000 that no longer exists)
-import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds, subscribeToAuthState } from "@/lib/firebase";
+import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds, subscribeToAuthState, subscribeToMyNotifications, markNotificationRead, AppNotification } from "@/lib/firebase";
 import EventCarousel from "@/components/home/EventCarousel";
 import EventJoinFormModal from "@/components/home/EventJoinFormModal";
 import { useAuth } from "@/context/AuthContext";
@@ -292,6 +292,107 @@ export default function Home() {
     setNotifications(stored ? JSON.parse(stored) : []);
   };
 
+  /* ---------------- NOTIFICATION STATUS (read / closed) + LINKS ---------------- */
+  // Notifications come from two places: the local list above and Cloud Functions
+  // (ID request updates, in Firestore). "Read" and "closed" are remembered on this
+  // device; server ones are also marked read in Firestore.
+  const NOTIF_STATE_KEY = "notif_state_v1";
+  const [serverNotifs, setServerNotifs] = useState<AppNotification[]>([]);
+  const [notifState, setNotifState] = useState<{ read: Record<string, number>; closed: Record<string, number> }>({
+    read: {},
+    closed: {},
+  });
+
+  useEffect(() => {
+    AsyncStorage.getItem(NOTIF_STATE_KEY)
+      .then((raw) => {
+        if (raw) setNotifState(JSON.parse(raw));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!user?.uid || isGuest) {
+      setServerNotifs([]);
+      return;
+    }
+    const unsub = subscribeToMyNotifications(user.uid, setServerNotifs);
+    return () => unsub();
+  }, [user?.uid, isGuest]);
+
+  const updateNotifState = (fn: (prev: typeof notifState) => typeof notifState) => {
+    setNotifState((prev) => {
+      const next = fn(prev);
+      AsyncStorage.setItem(NOTIF_STATE_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  };
+
+  type PanelNotif = {
+    id: string;
+    type: string;
+    title: string;
+    body: string;
+    ts: number;
+    link: string | null;
+    server: boolean;
+    readRemote: boolean;
+  };
+
+  // Where a notification takes the senior. An explicit `link` wins; otherwise by type.
+  const linkFor = (type: string, link?: string): string | null => {
+    if (link && link.startsWith("/")) return link;
+    if (type === "id_request_status") return "/(tabs)/account";
+    if (type === "SOS") return "/(tabs)/emergency";
+    return null;
+  };
+
+  const panelNotifs: PanelNotif[] = useMemo(() => {
+    const local = notifications.map((n: any) => ({
+      id: `local:${n.id}`,
+      type: n.type || "notification",
+      title: n.type === "SOS" ? "Emergency Alert" : "Notification",
+      body: n.message || "",
+      ts: new Date(n.timestamp).getTime() || 0,
+      link: linkFor(n.type, n.link),
+      server: false,
+      readRemote: false,
+    }));
+    const remote = serverNotifs.map((n) => ({
+      id: `server:${n.id}`,
+      type: n.type,
+      title: n.title || "Notification",
+      body: n.body || "",
+      ts: n.createdAt?.toMillis?.() ?? 0,
+      link: linkFor(n.type, n.link),
+      server: true,
+      readRemote: n.read === true,
+    }));
+    return [...local, ...remote]
+      .filter((n) => !notifState.closed[n.id])
+      .sort((a, b) => b.ts - a.ts);
+  }, [notifications, serverNotifs, notifState.closed]);
+
+  const isNotifRead = (n: PanelNotif) => n.readRemote || !!notifState.read[n.id];
+  const unreadCount = panelNotifs.filter((n) => !isNotifRead(n)).length;
+
+  const markNotifRead = (n: PanelNotif) => {
+    updateNotifState((p) => ({ ...p, read: { ...p.read, [n.id]: Date.now() } }));
+    if (n.server) markNotificationRead(n.id.replace("server:", "")).catch(() => {});
+  };
+  const markAllNotifsRead = () => panelNotifs.filter((n) => !isNotifRead(n)).forEach(markNotifRead);
+  const closeNotif = (n: PanelNotif) =>
+    updateNotifState((p) => ({
+      read: { ...p.read, [n.id]: p.read[n.id] ?? Date.now() },
+      closed: { ...p.closed, [n.id]: Date.now() },
+    }));
+  const openNotif = (n: PanelNotif) => {
+    markNotifRead(n);
+    if (!n.link) return;
+    toggleNotification(); // slide the panel away, then go to the page
+    router.push(n.link as any);
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadNextMedicine();
@@ -394,12 +495,17 @@ export default function Home() {
             </View>
           </View>
 
-          <TouchableOpacity onPress={toggleNotification}>
+          <TouchableOpacity onPress={toggleNotification} accessibilityLabel="Notifications">
             <Ionicons
               name={showNotif ? "close" : "notifications"}
               size={26}
               color="#2356E1"
             />
+            {!showNotif && unreadCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -709,34 +815,64 @@ export default function Home() {
               )}
 
               {/* SYSTEM NOTIFICATIONS */}
-              <Text style={{ color: "#6B7280", marginTop: 15, marginBottom: 5 }}>
-                System Alerts
-              </Text>
+              <View style={styles.notifHeaderRow}>
+                <Text style={{ color: "#6B7280" }}>System Alerts</Text>
+                {unreadCount > 0 && (
+                  <TouchableOpacity onPress={markAllNotifsRead}>
+                    <Text style={styles.notifActionText}>Mark all as read</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-              {notifications.length === 0 ? (
+              {panelNotifs.length === 0 ? (
                 <Text>No alerts yet</Text>
               ) : (
-                notifications.map((notif) => (
-                  <View
-                    key={notif.id}
-                    style={{
-                      backgroundColor: notif.type === "SOS" ? "#FEE2E2" : "#E0F2FE",
-                      padding: 12,
-                      borderRadius: 12,
-                      marginBottom: 10,
-                    }}
-                  >
-                    <Text style={{ fontWeight: "bold" }}>
-                      {notif.type === "SOS" ? "Emergency Alert" : "Notification"}
-                    </Text>
+                panelNotifs.map((n) => {
+                  const read = isNotifRead(n);
+                  return (
+                    <View
+                      key={n.id}
+                      style={[
+                        styles.notifCard,
+                        { backgroundColor: n.type === "SOS" ? "#FEE2E2" : "#E0F2FE" },
+                        read && styles.notifCardRead,
+                      ]}
+                    >
+                      <View style={styles.notifTitleRow}>
+                        {!read && <View style={styles.notifDot} />}
+                        <Text style={{ fontWeight: read ? "600" : "800", flex: 1 }}>{n.title}</Text>
+                        <TouchableOpacity
+                          onPress={() => closeNotif(n)}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          accessibilityLabel="Close notification"
+                        >
+                          <Ionicons name="close" size={20} color="#4B5563" />
+                        </TouchableOpacity>
+                      </View>
 
-                    <Text>{notif.message}</Text>
+                      {!!n.body && <Text>{n.body}</Text>}
 
-                    <Text style={{ fontSize: 14, color: "gray" }}>
-                      {new Date(notif.timestamp).toLocaleString()}
-                    </Text>
-                  </View>
-                ))
+                      {n.ts > 0 && (
+                        <Text style={{ fontSize: 14, color: "gray" }}>
+                          {new Date(n.ts).toLocaleString()}
+                        </Text>
+                      )}
+
+                      <View style={styles.notifActions}>
+                        {!!n.link && (
+                          <TouchableOpacity onPress={() => openNotif(n)}>
+                            <Text style={styles.notifActionText}>Open</Text>
+                          </TouchableOpacity>
+                        )}
+                        {!read && (
+                          <TouchableOpacity onPress={() => markNotifRead(n)}>
+                            <Text style={styles.notifActionText}>Mark as read</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
               )}
             </View>
           </Animated.View>
@@ -994,6 +1130,32 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
+  notifBadge: {
+    position: "absolute",
+    top: -6,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: "#DC2626",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notifBadgeText: { color: "white", fontSize: 11, fontWeight: "800" },
+  notifHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  notifCard: { padding: 12, borderRadius: 12, marginBottom: 10, gap: 4 },
+  notifCardRead: { opacity: 0.65 },
+  notifTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  notifDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#2356E1" },
+  notifActions: { flexDirection: "row", gap: 18, marginTop: 6 },
+  notifActionText: { color: "#1D4ED8", fontWeight: "700", textDecorationLine: "underline" },
   notifBtn: {
     position: "absolute",
     top: 20,

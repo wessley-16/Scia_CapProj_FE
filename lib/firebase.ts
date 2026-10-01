@@ -24,7 +24,9 @@ import {
   FieldValue,
 } from "@react-native-firebase/firestore";
 import { getStorage } from "@react-native-firebase/storage";
+import * as Location from "expo-location";
 import { initAppCheck } from "./appCheck";
+import { PRESENCE_TASK } from "./presenceShared";
 
 export const auth = getAuth();
 const db = getFirestore();
@@ -70,7 +72,76 @@ export function subscribeToAuthState(
 }
 
 export async function logoutUser() {
+  const uid = auth.currentUser?.uid;
+  if (uid) {
+    // A signed-out phone can't ping, so stop the server treating that silence as
+    // an emergency (it would SMS the guardians an hour later), and stop tracking.
+    try {
+      await setDoc(
+        doc(db, COLLECTIONS.USERS, uid),
+        { safety_monitoring_enabled: false, push_token: null },
+        { merge: true },
+      );
+    } catch (e) {
+      console.warn("logout: could not pause safety monitoring:", e);
+    }
+    try {
+      if (await Location.hasStartedLocationUpdatesAsync(PRESENCE_TASK)) {
+        await Location.stopLocationUpdatesAsync(PRESENCE_TASK);
+      }
+    } catch (e) {
+      console.warn("logout: could not stop location updates:", e);
+    }
+  }
   await signOut(auth);
+}
+
+// ── SAFETY MONITORING / PRESENCE ──────────────────────────────────────────────
+// Field names are read by the inactivity monitor Cloud Function
+// (SCIA_Admin_Firebase/functions/inactivityMonitor.js) — keep them in sync.
+export interface Guardian {
+  name: string;
+  phone: string;
+  relationship?: string;
+}
+
+export interface PresenceLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+}
+
+/**
+ * Heartbeat: stamps last_active_timestamp (server time) and, when known, the
+ * last known location. `extra` rides in the SAME write so that switching
+ * monitoring on can never expose a stale timestamp to the server.
+ */
+export async function writePresence(
+  uid: string,
+  location?: PresenceLocation,
+  extra: Record<string, any> = {},
+) {
+  await setDoc(
+    doc(db, COLLECTIONS.USERS, uid),
+    stripUndefined({
+      last_active_timestamp: serverTimestamp(),
+      last_known_location: location
+        ? stripUndefined({ ...location, captured_at: Date.now() })
+        : undefined,
+      ...extra,
+    }),
+    { merge: true },
+  );
+}
+
+/** Small self-service updates to the signed-in senior's own profile. */
+export async function updateMyUserFields(uid: string, fields: Record<string, any>) {
+  await setDoc(doc(db, COLLECTIONS.USERS, uid), stripUndefined(fields), { merge: true });
+}
+
+/** The senior answered the "Are you safe?" push. */
+export async function writeSafeConfirmation(uid: string) {
+  await writePresence(uid, undefined, { safety_check_confirmed_at: serverTimestamp() });
 }
 
 // ── USER REGISTRATION ─────────────────────────────────────────────────────────
@@ -89,9 +160,8 @@ export interface UserRegistration {
   password: string;
   imageBase64?: string;
   // Who to contact if the senior goes silent for too long (inactivity alert).
-  // Both optional at sign-up; the app should nudge the senior to add these
-  // later from Account if left blank, since the alert can't reach anyone
-  // without at least one.
+  // The sign-up screen requires name + phone; they are stored as the first
+  // entry of users/{uid}.guardians.
   guardianName?: string;
   guardianPhone?: string;   // PH mobile number, e.g. 09171234567
   guardianRelation?: string;
@@ -123,9 +193,18 @@ export async function registerUser(data: UserRegistration) {
       conNumber: data.conNumber,
       gender: data.gender,
       dob: data.dob,
-      guardianName: data.guardianName,
-      guardianPhone: data.guardianPhone,
-      guardianRelation: data.guardianRelation,
+      // Same shape as Account > Safety Monitoring and the inactivity alert:
+      // users/{uid}.guardians = [{ name, phone, relationship }]
+      guardians:
+        data.guardianName && data.guardianPhone
+          ? [
+              stripUndefined({
+                name: data.guardianName.trim(),
+                phone: data.guardianPhone.replace(/[\s-]/g, ""),
+                relationship: data.guardianRelation?.trim() || undefined,
+              }),
+            ]
+          : undefined,
       idNumber: effectiveIdNumber,
       hasTempId: effectiveIdNumber.startsWith("TEMP"),
       status,
@@ -698,6 +777,9 @@ export function subscribeToHealthCenters(
 }
 
 // ── PHYSICAL ID REQUEST ───────────────────────────────────────────────────────
+// Lifecycle (written by the admin dashboard, see src/lib/idRequestStatus.js there):
+//   pending → (approved) → processing → delivered → received → done
+//   and pending / processing / delivered → cancelled (or rejected on review)
 export interface IDRequest {
   seniorName: string;
   seniorId: string;
@@ -705,20 +787,105 @@ export interface IDRequest {
   contactNumber: string;
   reason?: string;
   imageBase64?: string;
+  barangay?: string;
+  district?: string;
+}
+
+export type IdRequestStatus =
+  | "pending"
+  | "approved"
+  | "processing"
+  | "delivered"
+  | "received"
+  | "done"
+  | "cancelled"
+  | "rejected";
+
+/** Statuses where the request is still going through and a new one must not be filed. */
+export const ACTIVE_ID_REQUEST_STATUSES = [
+  "pending",
+  "approved",
+  "processing",
+  "delivered",
+  "received",
+];
+
+export interface MyIdRequest {
+  id: string;
+  status: IdRequestStatus | string;
+  reason?: string;
+  cancelReason?: string;
+  barangay?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  processedAt?: any;
+  deliveredAt?: any;
+  receivedAt?: any;
+  claimedAt?: any;
+  cancelledAt?: any;
 }
 
 export async function submitIDRequest(data: IDRequest) {
-  const uid = auth.currentUser?.uid ?? "anonymous";
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+
+  // One request at a time — otherwise the senior ends up with duplicates and
+  // no way to tell which one the tracker is showing.
+  const mine = await getDocs(
+    query(collection(db, COLLECTIONS.ID_REQUESTS), where("uid", "==", uid)),
+  );
+  if (mine.docs.some((d) => ACTIVE_ID_REQUEST_STATUSES.includes(d.data().status))) {
+    throw new Error("You already have a physical ID request in progress.");
+  }
+
+  // `barangay` is what lets the barangay's sub-admin see the request and mark it
+  // received / claimed (firestore.rules + IDManagement.jsx both filter on it).
+  // Stored with the admin dashboard's spelling of the barangay name.
+  const barangay = adminBarangayName(data.barangay) ?? undefined;
+
   const docRef = await addDoc(
     collection(db, COLLECTIONS.ID_REQUESTS),
     stripUndefined({
       ...data,
+      barangay,
       uid,
       status: "pending",
       createdAt: serverTimestamp(),
     }),
   );
   return docRef.id;
+}
+
+/** Live status of the senior's most recent physical-ID request (null if none). */
+export function subscribeToMyIdRequest(
+  uid: string | null | undefined,
+  callback: (latest: MyIdRequest | null) => void,
+) {
+  if (!uid) {
+    callback(null);
+    return () => {};
+  }
+  // No orderBy on purpose: where("uid") + orderBy("createdAt") needs a composite
+  // index. A senior only has a handful of these, so sort here. A just-created
+  // doc has no server timestamp yet, so it counts as the newest.
+  const time = (r: any) => (r.createdAt ? toMillis(r.createdAt) : Number.MAX_SAFE_INTEGER);
+  return onSnapshot(
+    query(collection(db, COLLECTIONS.ID_REQUESTS), where("uid", "==", uid)),
+    (snap) => {
+      const items = (snap?.docs ?? [])
+        .map((d) => {
+          // Leave the photo out: it is large and the screen never shows it.
+          const { imageBase64, ...rest } = d.data() as any;
+          return { id: d.id, ...rest } as MyIdRequest;
+        })
+        .sort((a, b) => time(b) - time(a));
+      callback(items[0] ?? null);
+    },
+    (error) => {
+      console.warn("subscribeToMyIdRequest error:", error);
+      callback(null);
+    },
+  );
 }
 
 // ── DIGITAL ID ────────────────────────────────────────────────────────────────
@@ -965,4 +1132,87 @@ export async function saveNcscStatus(
     },
     { merge: true },
   );
+}
+
+// ── PASSWORD RECOVERY (Forgot Password + SMS one-time code) ───────────────────
+// The two callable functions live in the admin project's functions/accountControls.js
+// (asia-southeast1). The app has no Functions SDK module, so they are called
+// over HTTPS using the standard callable protocol: POST { data } -> { result }
+// or { error: { message, status } }. Neither needs the user to be signed in.
+const FUNCTIONS_BASE = "https://asia-southeast1-scia-b5440.cloudfunctions.net";
+
+async function callPublicFunction<T = any>(name: string, data: Record<string, unknown>): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(`${FUNCTIONS_BASE}/${name}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data }),
+    });
+  } catch {
+    throw new Error("No internet connection. Please check your connection and try again.");
+  }
+  let body: any = null;
+  try {
+    body = await res.json();
+  } catch {
+    /* non-JSON response, handled below */
+  }
+  if (!res.ok || body?.error) {
+    throw new Error(body?.error?.message || "Something went wrong. Please try again.");
+  }
+  return body?.result as T;
+}
+
+/** Step 1: text a 6-digit code to the mobile number registered on the account. */
+export function requestPasswordResetOtp(identifier: string) {
+  return callPublicFunction<{ ok: boolean; message: string }>("requestPasswordResetOtp", {
+    identifier: identifier.trim(),
+  });
+}
+
+/** Step 2: submit the code together with the new password. */
+export function resetPasswordWithOtp(identifier: string, otp: string, newPassword: string) {
+  return callPublicFunction<{ ok: boolean }>("resetPasswordWithOtp", {
+    identifier: identifier.trim(),
+    otp: otp.trim(),
+    newPassword,
+  });
+}
+
+// ── NOTIFICATIONS (server-written, e.g. ID request status) ────────────────────
+export interface AppNotification {
+  id: string;
+  uid: string;
+  type: string;
+  title?: string;
+  body?: string;
+  read?: boolean;
+  link?: string;
+  createdAt?: any;
+}
+
+/** Live list of this senior's notifications. Sorted newest first on the client
+ *  so no composite index is needed. */
+export function subscribeToMyNotifications(
+  uid: string,
+  callback: (items: AppNotification[]) => void,
+) {
+  const q = query(collection(db, "notifications"), where("uid", "==", uid));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const items = snap.docs.map((d: any) => ({ id: d.id, ...d.data() })) as AppNotification[];
+      items.sort(
+        (a, b) => (b.createdAt?.toMillis?.() ?? 0) - (a.createdAt?.toMillis?.() ?? 0),
+      );
+      callback(items);
+    },
+    (error) => console.warn("subscribeToMyNotifications listener error:", error),
+  );
+}
+
+/** Marks a server notification as read (the only field rules let a senior change). */
+export async function markNotificationRead(id: string) {
+  await updateDoc(doc(db, "notifications", id), { read: true });
 }

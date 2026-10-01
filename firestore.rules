@@ -136,6 +136,17 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ── /notifications ──────────────────────────────────────────────────
+    // Written by Cloud Functions (ID request updates). A senior reads their own
+    // and may only flip `read`; everything else stays server-side.
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false;
+    }
+
     // ── /emergencies ─────────────────────────────────────────────────────
     match /emergencies/{docId} {
       allow create: if request.auth != null;
