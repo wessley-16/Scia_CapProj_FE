@@ -618,8 +618,15 @@ export interface EmergencyAlert {
   name: string;
   latitude: number;
   longitude: number;
+  /** Where the phone is RIGHT NOW (reverse-geocoded from the GPS fix). */
   address: string;
   barangay: string;
+  /** "geocoder" = barangay came from the reverse geocoder, "estimate" = nearest-point guess. */
+  barangaySource?: "geocoder" | "estimate";
+  accuracy?: number | null;
+  /** Where the senior LIVES, from their account (set at signup). */
+  homeAddress?: string;
+  homeBarangay?: string;
 }
 
 export async function sendSOSAlert(data: EmergencyAlert) {

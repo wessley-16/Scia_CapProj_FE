@@ -126,6 +126,29 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+// OpenStreetMap's reverse geocoder knows Philippine barangays (suburb /
+// quarter / neighbourhood) far better than the phone's built-in one, which
+// often returns no district at all. Used only when the phone's result doesn't
+// match a real Valenzuela barangay. Failure is silent: caller falls back.
+async function lookupBarangayOnline(lat: number, lng: number): Promise<string | null> {
+  try {
+    const res = await withTimeout(
+      fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&addressdetails=1&lat=${lat}&lon=${lng}`,
+        { headers: { 'Accept-Language': 'en' } },
+      ),
+      5000,
+    );
+    if (!res.ok) return null;
+    const a = (await res.json())?.address ?? {};
+    for (const candidate of [a.suburb, a.quarter, a.neighbourhood, a.village, a.city_district]) {
+      const match = canonicalBarangay(candidate);
+      if (match && valenzuelaBarangays.some((b) => canonicalBarangay(b.name) === match)) return match;
+    }
+  } catch {}
+  return null;
+}
+
 export default function EmergencyScreen() {
   const { fontScale, t } = useSettings();
   const { user } = useAuth();
@@ -134,6 +157,8 @@ export default function EmergencyScreen() {
   const [name, setName] = useState('');
   const [fullAddress, setFullAddress] = useState('Fetching...');
   const [barangay, setBarangay] = useState('');
+  const [barangaySource, setBarangaySource] = useState<'geocoder' | 'estimate'>('estimate');
+  const [accuracy, setAccuracy] = useState<number | null>(null);
 
   const [isHolding, setIsHolding] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(5);
@@ -234,6 +259,7 @@ export default function EmergencyScreen() {
 
       const coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
       setLocation(coords);
+      setAccuracy(loc.coords.accuracy ?? null);
       setMapLoadFailed(false);
       setMapKey((k) => k + 1);
 
@@ -254,14 +280,24 @@ export default function EmergencyScreen() {
           // back to the coordinate guess if neither matches a real
           // Valenzuela barangay, so a wrong-but-confident guess never
           // overrides a correct geocoded one.
-          const geocodedBarangay =
+          let found: string | null =
               canonicalBarangay(place.district) ??
               canonicalBarangay(place.subregion);
+          const isReal = (n: string | null) =>
+            !!n && valenzuelaBarangays.some((b) => canonicalBarangay(b.name) === n);
+          if (!isReal(found)) found = await lookupBarangayOnline(coords.latitude, coords.longitude);
 
-          setBarangay(geocodedBarangay ?? getBarangayFromCoords(coords.latitude, coords.longitude));
+          if (found) {
+            setBarangay(found);
+            setBarangaySource('geocoder');
+          } else {
+            setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
+            setBarangaySource('estimate');
+          }
         } else {
           setFullAddress(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
           setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
+          setBarangaySource('estimate');
         }
       } catch {
         // Reverse geocoding needs network/provider access and can fail even
@@ -271,6 +307,7 @@ export default function EmergencyScreen() {
         // the coordinate-based barangay guess so a barangay is always sent.
         setFullAddress(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
         setBarangay(getBarangayFromCoords(coords.latitude, coords.longitude));
+        setBarangaySource('estimate');
       }
     } catch (error: any) {
       setLocationError(error?.message || 'Could not get your location.');
@@ -337,7 +374,9 @@ export default function EmergencyScreen() {
     try {
       const docId = await sendSOSAlert({
         name, latitude: location.latitude, longitude: location.longitude,
-        address: fullAddress, barangay,
+        address: fullAddress, barangay, barangaySource, accuracy,
+        homeAddress: user?.address || '',
+        homeBarangay: user?.barangay || '',
       });
       setActiveSosId(docId);
       setDispatchStatus(null);
@@ -505,16 +544,18 @@ export default function EmergencyScreen() {
           <View style={styles.infoRow}>
             <Ionicons name="home-outline" size={20} color="#C0181F" style={styles.infoIcon} />
             <View style={styles.infoField}>
-              <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Address</Text>
-              <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>{fullAddress}</Text>
+              <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Registered address (home)</Text>
+              <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>{user?.address || 'Not set'}</Text>
             </View>
           </View>
 
           <View style={styles.infoRow}>
             <Ionicons name="business-outline" size={20} color="#C0181F" style={styles.infoIcon} />
             <View style={styles.infoField}>
-              <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Barangay</Text>
-              <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>{barangay}</Text>
+              <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Current location (where you are now)</Text>
+              <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>
+                {barangay ? `Brgy. ${barangay}, ` : ''}{fullAddress}
+              </Text>
             </View>
           </View>
 
