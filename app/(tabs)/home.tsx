@@ -10,7 +10,7 @@ import { useSettings } from "@/context/SettingsContext";
 // Firestore directly (previously joining hit a hardcoded local dev backend
 // at http://10.142.254.160:3000 that no longer exists)
 import { subscribeToEvents, Event as FirebaseEvent, logoutUser, joinEvent, fetchJoinedEventIds, subscribeToAuthState } from "@/lib/firebase";
-import EventCarousel from "@/components/home/Eventcarousel";
+import EventCarousel from "@/components/home/EventCarousel";
 import EventJoinFormModal from "@/components/home/EventJoinFormModal";
 import { useAuth } from "@/context/AuthContext";
 import { Medicine } from "@/interfaces/interfaces";
