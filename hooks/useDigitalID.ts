@@ -7,16 +7,24 @@ import { doc, getFirestore, onSnapshot } from "@react-native-firebase/firestore"
 export interface DigitalId {
   fullName: string;
   idNumber: string;
+  // Fields printed on the physical OSCA ID, so the card can mirror it
+  controlNumber?: string;
+  dob?: string;
+  sex?: string;
+  address?: string;
+  barangay?: string;
+  releasedAt?: any; // Firestore Timestamp — the "Date Issued"
   role?: string; // e.g. "Member", "Senior Citizen", "Patient"
   organization?: string; // e.g. "SCIA"
   photoUrl?: string;
+  photoURL?: string; // the admin portal writes this spelling
   // Written by the admin's approveIdVerification: the verified ID photo the
   // senior uploaded (Storage URL, or base64 when it was sent from the app).
   idImageUrl?: string;
   idImageBase64?: string;
   isVerified?: boolean;
   validUntil?: any; // Firestore Timestamp or ISO string
-  status?: "active" | "suspended" | "expired";
+  status?: "active" | "suspended" | "expired" | "invalidated";
   themeColor?: string; // card background, e.g. "#1E3A8A"
   accentColor?: string; // badge / stripe, e.g. "#FACC15"
 }
@@ -55,4 +63,31 @@ export function useDigitalId(uidOverride?: string) {
   }, [uidOverride]);
 
   return { data, loading, error };
+}
+
+// Outcome of the senior's "Claim" tap (digital_id_requests/{uid}), written by
+// the onDigitalIdRequested Cloud Function.
+export interface DigitalIdRequest {
+  status: "requested" | "issued" | "denied";
+  code?: string;
+  message?: string;
+}
+
+export function useDigitalIdRequest(uidOverride?: string) {
+  const [request, setRequest] = useState<DigitalIdRequest | null>(null);
+
+  useEffect(() => {
+    const uid = uidOverride ?? getAuth().currentUser?.uid;
+    if (!uid) {
+      setRequest(null);
+      return;
+    }
+    return onSnapshot(
+      doc(getFirestore(), "digital_id_requests", uid),
+      (snap) => setRequest(snap.exists() ? (snap.data() as DigitalIdRequest) : null),
+      () => setRequest(null),
+    );
+  }, [uidOverride]);
+
+  return request;
 }

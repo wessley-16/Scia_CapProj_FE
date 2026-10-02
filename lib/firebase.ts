@@ -60,6 +60,7 @@ export const COLLECTIONS = {
   HEALTH_CENTERS: "health_centers",
   USER_LOOKUP: "user_lookup",
   DIGITAL_IDS: "digital_ids",
+  DIGITAL_ID_REQUESTS: "digital_id_requests",
   NCSC_REGISTRATIONS: "ncsc_registrations",
   ID_VERIFICATIONS: "id_verifications",
 };
@@ -695,30 +696,51 @@ export async function submitAppointment(data: AppointmentRequest) {
   return docRef.id;
 }
 
+/**
+ * Live list of the signed-in senior's own appointments (newest first).
+ *
+ * No orderBy() on purpose: `where("uid") + orderBy("createdAt")` needs a
+ * composite index, and firestore.indexes.json has none. Without the index the
+ * listener fails with "failed-precondition", the old code only console.warn'd
+ * it, and the Appointment tab silently showed nothing — even though the
+ * booking was saved. A senior only has a handful of these, so sort here. A
+ * just-created doc has no server timestamp yet, so it counts as the newest.
+ *
+ * `onError` lets the screen show a message instead of an empty list.
+ */
 export function subscribeToUserAppointments(
   callback: (appointments: any[]) => void,
+  onError?: (error: unknown) => void,
 ) {
   let unsubscribeSnapshot: (() => void) | null = null;
+
+  const time = (a: any) =>
+    a.createdAt ? toMillis(a.createdAt) : Number.MAX_SAFE_INTEGER;
 
   const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
     if (unsubscribeSnapshot) {
       unsubscribeSnapshot();
       unsubscribeSnapshot = null;
     }
-    if (!user) return;
+    if (!user) {
+      callback([]); // signed out: never leave a previous account's bookings on screen
+      return;
+    }
 
     unsubscribeSnapshot = onSnapshot(
       query(
         collection(db, COLLECTIONS.APPOINTMENTS),
         where("uid", "==", user.uid),
-        orderBy("createdAt", "desc"),
       ),
       (snapshot) => {
         if (!snapshot) return;
-        callback((snapshot.docs ?? []).map((d) => ({ id: d.id, ...d.data() })));
+        const list = (snapshot.docs ?? []).map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a: any, b: any) => time(b) - time(a));
+        callback(list);
       },
       (error) => {
         console.warn("subscribeToUserAppointments listener error:", error);
+        onError?.(error);
       },
     );
   });
@@ -727,6 +749,25 @@ export function subscribeToUserAppointments(
     unsubscribeAuth();
     if (unsubscribeSnapshot) unsubscribeSnapshot();
   };
+}
+
+// ── DIGITAL ID ────────────────────────────────────────────────────────────────
+/**
+ * The senior's "Claim" tap. Raises digital_id_requests/{uid}; the
+ * onDigitalIdRequested Cloud Function (admin repo) checks the account is
+ * verified, creates digital_ids/{uid} (which useDigitalId() is already
+ * listening to) and writes the outcome back onto the request so the card can
+ * show why it was refused. Seniors cannot write digital_ids themselves.
+ */
+export async function requestDigitalId() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+  // A full overwrite on purpose: clears the previous denial message too.
+  await setDoc(doc(db, COLLECTIONS.DIGITAL_ID_REQUESTS, uid), {
+    uid,
+    status: "requested",
+    requestedAt: serverTimestamp(),
+  });
 }
 
 // ── HEALTH CENTERS ────────────────────────────────────────────────────────────

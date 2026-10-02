@@ -26,6 +26,11 @@ import { useSettings } from "@/context/SettingsContext";
 import { canonicalBarangay } from "@/constants/valenzuelaDistricts";
 import { Medicine } from "@/interfaces/interfaces";
 import { submitAppointment, subscribeToUserAppointments } from "@/lib/firebase";
+import AppointmentStatusTracker, {
+  APPOINTMENT_STATUS_LABEL,
+  normalizeAppointmentStatus,
+  type AppointmentStatus,
+} from "@/components/AppointmentStatusTracker";
 
 // Configure notifications
 Notifications.setNotificationHandler({
@@ -38,15 +43,13 @@ Notifications.setNotificationHandler({
   }),
 });
 
-type AppointmentStatus = "pending" | "confirmed" | "cancelled";
-
 type AppointmentType = {
   id?: string;
   date: string;
   time: string;
   type: string;
   notes?: string;
-  status: AppointmentStatus;
+  status?: AppointmentStatus | string;
 };
 
 type ActiveTab = "medicine" | "appointment";
@@ -87,6 +90,8 @@ export default function Healthcare() {
   const [appointments, setAppointments] = useState<AppointmentType[]>([]);
   const [apptError, setApptError] = useState("");
   const [submittingAppt, setSubmittingAppt] = useState(false);
+  const [apptsLoading, setApptsLoading] = useState(true);
+  const [apptsLoadError, setApptsLoadError] = useState(false);
 
   // Load Data
   useFocusEffect(
@@ -103,9 +108,17 @@ export default function Healthcare() {
   // real record and (b) actively deleted any appointment once its date
   // passed, so there was never a real history to show.
   useEffect(() => {
-    const unsubscribe = subscribeToUserAppointments((data) => {
-      setAppointments(data as AppointmentType[]);
-    });
+    const unsubscribe = subscribeToUserAppointments(
+      (data) => {
+        setAppointments(data as AppointmentType[]);
+        setApptsLoading(false);
+        setApptsLoadError(false);
+      },
+      () => {
+        setApptsLoading(false);
+        setApptsLoadError(true);
+      },
+    );
     return unsubscribe;
   }, []);
 
@@ -614,28 +627,41 @@ export default function Healthcare() {
             </Text>
           </TouchableOpacity>
 
-          {appointments.length > 0 && (
-            <>
-              <Text style={[styles.sectionLabel, { fontSize: 16 * fontScale }]}>Your Appointments</Text>
-              {appointments.map((appt, idx) => (
+          <Text style={[styles.sectionLabel, { fontSize: 16 * fontScale }]}>Your Appointments</Text>
+
+          {apptsLoading ? (
+            <Text style={[styles.apptSub, { fontSize: 14 * fontScale }]}>Loading your appointments…</Text>
+          ) : apptsLoadError ? (
+            <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: "#B91C1C" }]}>
+              We could not load your appointments. Please check your connection and reopen this tab.
+            </Text>
+          ) : appointments.length === 0 ? (
+            <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: "#6B7280" }]}>
+              You have no appointments yet. Book one above and you can follow its status here.
+            </Text>
+          ) : (
+            appointments.map((appt, idx) => {
+              const status = normalizeAppointmentStatus(appt.status);
+              return (
                 <View
                   key={appt.id || idx}
                   style={[
                     styles.apptCard,
-                    appt.status === "confirmed" && styles.apptConfirmed,
-                    appt.status === "cancelled" && styles.apptCancelled,
+                    status === "confirmed" && styles.apptConfirmed,
+                    status === "completed" && styles.apptConfirmed,
+                    status === "cancelled" && styles.apptCancelled,
                   ]}
                 >
                   <View style={styles.apptRow}>
                     <Text style={[styles.apptType, { fontSize: 17 * fontScale }]}>{appt.type}</Text>
-                    <View style={[styles.badge,
-                      appt.status === "confirmed" && styles.badgeConfirmed,
-                      appt.status === "cancelled" && styles.badgeCancelled,
-                    ]}>
-                      <Text style={styles.badgeText}>
-                        {appt.status === "pending" ? "Pending" :
-                         appt.status === "confirmed" ? "Confirmed" : "Cancelled"}
-                      </Text>
+                    <View
+                      style={[
+                        styles.badge,
+                        (status === "confirmed" || status === "completed") && styles.badgeConfirmed,
+                        status === "cancelled" && styles.badgeCancelled,
+                      ]}
+                    >
+                      <Text style={styles.badgeText}>{APPOINTMENT_STATUS_LABEL[status]}</Text>
                     </View>
                   </View>
                   <Text style={[styles.apptSub, { fontSize: 14 * fontScale }]}>
@@ -647,14 +673,16 @@ export default function Healthcare() {
                     </Text>
                   ) : null}
 
-                  {appt.status === "pending" && (
+                  <AppointmentStatusTracker status={status} fontScale={fontScale} />
+
+                  {status === "pending" && (
                     <Text style={styles.apptCancelHint}>
                       To cancel or reschedule, please contact the 3S Center.
                     </Text>
                   )}
                 </View>
-              ))}
-            </>
+              );
+            })
           )}
         </ScrollView>
       )}

@@ -1,0 +1,143 @@
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
+
+/**
+ * Appointment lifecycle, as written by the Barangay dashboard
+ * (SCIA_Admin_Firebase -> src/pages/HealthCenters.jsx):
+ *
+ *   pending  ->  confirmed  ->  completed
+ *       \-------------\--------> cancelled   (declined / cancelled by the 3S Center)
+ *
+ * Keep in sync with APPOINTMENT_STATUSES in HealthCenters.jsx.
+ */
+export type AppointmentStatus = "pending" | "confirmed" | "completed" | "cancelled";
+
+/** Maps any spelling the data might carry onto the four real statuses. */
+export function normalizeAppointmentStatus(raw: unknown): AppointmentStatus {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (s === "confirmed" || s === "approved") return "confirmed";
+  if (s === "completed" || s === "done") return "completed";
+  if (s === "cancelled" || s === "canceled" || s === "declined" || s === "rejected") {
+    return "cancelled";
+  }
+  return "pending";
+}
+
+export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+const STEPS: { key: Exclude<AppointmentStatus, "cancelled">; label: string }[] = [
+  { key: "pending", label: "Submitted" },
+  { key: "confirmed", label: "Confirmed" },
+  { key: "completed", label: "Completed" },
+];
+
+const STEP_INDEX: Record<Exclude<AppointmentStatus, "cancelled">, number> = {
+  pending: 0,
+  confirmed: 1,
+  completed: 2,
+};
+
+const BLUE = "#2356E1";
+const GREEN = "#10B981";
+const RED = "#EF4444";
+const GRAY = "#D1D5DB";
+
+type Props = {
+  status: unknown;
+  fontScale?: number;
+};
+
+export default function AppointmentStatusTracker({ status, fontScale = 1 }: Props) {
+  const current = normalizeAppointmentStatus(status);
+
+  if (current === "cancelled") {
+    return (
+      <View style={styles.cancelledRow}>
+        <Ionicons name="close-circle" size={20} color={RED} />
+        <Text style={[styles.cancelledText, { fontSize: 13 * fontScale }]}>
+          This appointment was cancelled or declined by the 3S Center. You can book a new
+          one anytime.
+        </Text>
+      </View>
+    );
+  }
+
+  const reached = STEP_INDEX[current];
+
+  return (
+    <View style={styles.wrap}>
+      <View style={styles.track}>
+        {STEPS.map((step, i) => {
+          const done = i <= reached;
+          const isCurrent = i === reached;
+          const color = done ? (current === "completed" ? GREEN : BLUE) : GRAY;
+          return (
+            <React.Fragment key={step.key}>
+              <View style={styles.stepCol}>
+                <View
+                  style={[
+                    styles.dot,
+                    { backgroundColor: done ? color : "white", borderColor: color },
+                    isCurrent && styles.dotCurrent,
+                  ]}
+                >
+                  {done && <Ionicons name="checkmark" size={12} color="white" />}
+                </View>
+                <Text
+                  style={[
+                    styles.stepLabel,
+                    { fontSize: 11 * fontScale },
+                    done && { color: "#1F2937", fontWeight: "700" },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {step.label}
+                </Text>
+              </View>
+              {i < STEPS.length - 1 && (
+                <View
+                  style={[
+                    styles.line,
+                    { backgroundColor: i < reached ? (current === "completed" ? GREEN : BLUE) : GRAY },
+                  ]}
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </View>
+
+      <Text style={[styles.hint, { fontSize: 12 * fontScale }]}>
+        {current === "pending" && "Waiting for the 3S Center to confirm your booking."}
+        {current === "confirmed" && "Your booking is confirmed. Please arrive on time."}
+        {current === "completed" && "This appointment has been completed."}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { marginTop: 10 },
+  track: { flexDirection: "row", alignItems: "flex-start" },
+  stepCol: { alignItems: "center", width: 64 },
+  dot: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dotCurrent: { transform: [{ scale: 1.15 }] },
+  line: { flex: 1, height: 3, marginTop: 10, marginHorizontal: -6, borderRadius: 2 },
+  stepLabel: { marginTop: 4, color: "#9CA3AF", textAlign: "center" },
+  hint: { marginTop: 8, color: "#6B7280", fontStyle: "italic" },
+  cancelledRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 10 },
+  cancelledText: { flex: 1, color: "#991B1B" },
+});
