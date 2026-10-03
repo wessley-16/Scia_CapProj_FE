@@ -1145,7 +1145,14 @@ export type NcscSeniorStatus = "started" | "cancelled" | "completed_claimed";
 
 export async function saveNcscStatus(
   status: NcscSeniorStatus,
-  extra: { barangay?: string; fullName?: string } = {},
+  extra: {
+    barangay?: string;
+    fullName?: string;
+    // Set when the senior answered "Yes, I'm already registered": the admin
+    // sees the OSCA ID number on the NCSC Registrations page to verify by hand.
+    alreadyRegistered?: boolean;
+    idNumber?: string;
+  } = {},
 ) {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Not signed in");
@@ -1156,6 +1163,9 @@ export async function saveNcscStatus(
     barangay: extra.barangay ?? null,
     fullName: extra.fullName ?? null,
     source: "mobile_app",
+    ...(extra.alreadyRegistered
+      ? { alreadyRegistered: true, idNumber: extra.idNumber ?? null }
+      : {}),
   });
 
   const existing = await getDoc(ref);

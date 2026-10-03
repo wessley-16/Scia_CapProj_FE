@@ -8,6 +8,15 @@ import appCheck from "@react-native-firebase/app-check";
 // calls fail with "401 Firebase App Check token is invalid".
 const APP_CHECK_DEBUG_TOKEN = "C0071C18-3761-4F4B-8BF0-1D0C84B13742";
 
+// true  -> "debug" provider (uses the debug token above). Used by:
+//           - dev builds (npx expo start / development client), and
+//           - test APKs built with the EAS "preview" profile, which sets
+//             EXPO_PUBLIC_APPCHECK_DEBUG=1 in eas.json.
+// false -> real providers (Play Integrity on Android, App Attest on iOS).
+//           Used by the "production" build you publish to the Play Store.
+const USE_DEBUG_PROVIDER =
+  __DEV__ || process.env.EXPO_PUBLIC_APPCHECK_DEBUG === "1";
+
 export function initAppCheck() {
   if (__DEV__ && !APP_CHECK_DEBUG_TOKEN) {
     console.warn(
@@ -21,11 +30,11 @@ export function initAppCheck() {
     const provider = appCheck().newReactNativeFirebaseAppCheckProvider();
     provider.configure({
       android: {
-        provider: __DEV__ ? "debug" : "playIntegrity",
+        provider: USE_DEBUG_PROVIDER ? "debug" : "playIntegrity",
         debugToken: APP_CHECK_DEBUG_TOKEN,
       },
       apple: {
-        provider: __DEV__ ? "debug" : "appAttest",
+        provider: USE_DEBUG_PROVIDER ? "debug" : "appAttest",
         debugToken: APP_CHECK_DEBUG_TOKEN,
       },
     });

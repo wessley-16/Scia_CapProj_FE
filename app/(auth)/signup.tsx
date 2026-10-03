@@ -253,6 +253,20 @@ export default function Signup() {
           console.warn("saveNcscStatus failed:", e);
         }
       }
+      // "Yes, I'm registered": record it so OSCA sees it under NCSC
+      // Registrations and can verify the ID number by hand.
+      if (hasSciaId === true) {
+        try {
+          await saveNcscStatus("completed_claimed", {
+            barangay,
+            fullName: `${firstName} ${midName} ${lastName}`.replace(/\s+/g, " ").trim(),
+            alreadyRegistered: true,
+            idNumber: idNumber.trim(),
+          });
+        } catch (e) {
+          console.warn("saveNcscStatus (already registered) failed:", e);
+        }
+      }
       await refreshUser();
       router.replace("/(tabs)/home");
     } catch (error: any) {
