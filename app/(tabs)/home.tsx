@@ -1,6 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { BlurView } from "expo-blur";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -63,34 +62,6 @@ export default function Home() {
   const goToAppointment = () => router.push("/(tabs)/healthcare");
   const goToEmergency = () => router.push("/(tabs)/emergency");
   const goToDocs = () => router.push("/(tabs)/govdocs");
-
-  /* ---------------- PROGRAM ---------------- */
-  const [isProgramOpen, setIsProgramOpen] = useState(false);
-  const animatedHeight = useState(new Animated.Value(0))[0];
-  const animatedOpacity = useState(new Animated.Value(0))[0];
-  const rotateAnim = useState(new Animated.Value(0))[0];
-
-  const toggleProgram = () => {
-    Animated.parallel([
-      Animated.timing(animatedHeight, {
-        toValue: isProgramOpen ? 0 : 150,
-        duration: 250,
-        useNativeDriver: false,
-      }),
-      Animated.timing(animatedOpacity, {
-        toValue: isProgramOpen ? 0 : 1,
-        duration: 250,
-        useNativeDriver: false,
-      }),
-      Animated.timing(rotateAnim, {
-        toValue: isProgramOpen ? 0 : 1,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    setIsProgramOpen(!isProgramOpen);
-  };
 
   /* ---------------- FETCH EVENTS ---------------- */
   const fetchEvents = async () => {
@@ -458,6 +429,7 @@ export default function Home() {
       <ImageBackground
         source={background}
         style={styles.backgroundImage}
+        imageStyle={styles.backgroundImageFaded}
         resizeMode="cover"
       >
       <ScrollView
@@ -486,19 +458,24 @@ export default function Home() {
             <View style={styles.idRow}>
               <Ionicons
                 name="shield-checkmark"
-                size={14}
-                color="#FBBF24"
+                size={18}
+                color="#B45309"
               />
-              <Text style={[styles.idText, { fontSize: 13 * fontScale }]}>
+              <Text style={[styles.idText, { fontSize: 16 * fontScale }]}>
                 {idNumber}
               </Text>
             </View>
           </View>
 
-          <TouchableOpacity onPress={toggleNotification} accessibilityLabel="Notifications">
+          <TouchableOpacity
+            onPress={toggleNotification}
+            accessibilityLabel="Notifications"
+            style={styles.bellButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Ionicons
               name={showNotif ? "close" : "notifications"}
-              size={26}
+              size={32}
               color="#2356E1"
             />
             {!showNotif && unreadCount > 0 && (
@@ -516,61 +493,36 @@ export default function Home() {
           <DigitalIDCard uid={user?.uid} />
         </View>
 
-        {/* PROGRAMS */}
-        <BlurView intensity={40} tint="dark" style={styles.programContainer}>
-          {/* HEADER (clickable) */}
-          <TouchableOpacity onPress={toggleProgram} style={styles.programHeader}>
-            <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>{t("programUpdates")}</Text>
+        {/* ANNOUNCEMENTS — always visible (no dropdown) so seniors see the
+            important details straight away */}
+        <View style={styles.programContainer}>
+          <View style={styles.programHeader}>
+            <MaterialCommunityIcons name="bullhorn-outline" size={32} color="#12307A" />
+            <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>
+              {t("programUpdates")}
+            </Text>
+          </View>
 
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    rotate: rotateAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["0deg", "180deg"],
-                    }),
-                  },
-                ],
-              }}
-            >
-              <Ionicons name="chevron-down" size={20} color="#fff" />
-            </Animated.View>
-          </TouchableOpacity>
-
-          {/* COLLAPSIBLE CONTENT */}
-          <Animated.View
-            style={{
-              height: animatedHeight,
-              opacity: animatedOpacity,
-              overflow: "hidden",
-            }}
-          >
-
-            <View>
-              <EventCarousel
-                events={events}
-                joinedEventIds={joinedEvents.map((e) => e.id)}
-                fontScale={fontScale}
-                onJoinPress={handleJoinPress}
-              />
-            </View>
-
-          </Animated.View>
-        </BlurView>
+          <EventCarousel
+            events={events}
+            joinedEventIds={joinedEvents.map((e) => e.id)}
+            fontScale={fontScale}
+            onJoinPress={handleJoinPress}
+          />
+        </View>
 
         <View style={styles.assistantContainer}>
           {/* CHAT ASSISTANT */}
           <TouchableOpacity style={styles.assistant} onPress={goToChat}>
             <MaterialCommunityIcons
               name="robot-outline"
-              size={36}
+              size={46}
               color="#2563EB"
             />
 
             <View>
-              <Text style={[styles.assistantTitle, { fontSize: 16 * fontScale }]}>{t("chatAssistant")}</Text>
-              <Text style={[styles.assistantSub, { fontSize: 12 * fontScale }]}>
+              <Text style={[styles.assistantTitle, { fontSize: 19 * fontScale }]}>{t("chatAssistant")}</Text>
+              <Text style={[styles.assistantSub, { fontSize: 15 * fontScale }]}>
                 {t("howCanIHelp")}
               </Text>
             </View>
@@ -580,13 +532,13 @@ export default function Home() {
           <TouchableOpacity style={styles.assistant} onPress={goToVoice}>
             <MaterialCommunityIcons
               name="microphone-outline"
-              size={36}
+              size={46}
               color="#2563EB"
             />
 
             <View>
-              <Text style={[styles.assistantTitle, { fontSize: 16 * fontScale }]}>{t("voiceAssistant")}</Text>
-              <Text style={[styles.assistantSub, { fontSize: 12 * fontScale }]}>
+              <Text style={[styles.assistantTitle, { fontSize: 19 * fontScale }]}>{t("voiceAssistant")}</Text>
+              <Text style={[styles.assistantSub, { fontSize: 15 * fontScale }]}>
                 {t("speakAndGetHelp")}
               </Text>
             </View>
@@ -747,17 +699,6 @@ export default function Home() {
         }}
       />
 
-      {/* FLOATING CHAT */}
-      <TouchableOpacity
-        style={[
-          styles.chat,
-          { bottom: tabBarHeight + 20 },
-        ]}
-        onPress={goToChat}
-      >
-        <Ionicons name="chatbubble" size={26} color="#fff" />
-      </TouchableOpacity>
-
       {showNotif && (
         <>
           {/* DARK OVERLAY */}
@@ -914,7 +855,10 @@ function ActionButton({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: "#F4F6F9" },
 
-  backgroundImage: { flex: 1 },
+  // Calm light-blue wash; the 3S Center illustration stays only as a faint
+  // watermark so all text sits on a plain, high-contrast surface.
+  backgroundImage: { flex: 1, backgroundColor: "#EAF1FF" },
+  backgroundImageFaded: { opacity: 0.12 },
 
   container: { padding: 0},
 
@@ -955,8 +899,18 @@ const styles = StyleSheet.create({
   },
 
   idText: {
-    fontSize: 13,
+    fontSize: 16,
     marginLeft: 4,
+    color: "#111827",
+    fontWeight: "600",
+  },
+
+  bellButton: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 6,
   },
 
   digitalIdContainer: {
@@ -973,9 +927,8 @@ const styles = StyleSheet.create({
 
   programContainer: {
     flexDirection: "column",
-    padding: 16,
-    marginHorizontal: 0,
-    marginTop: 100,
+    marginHorizontal: 10,
+    marginTop: 20,
   },
 
   moduleContainer: {
@@ -1062,21 +1015,26 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 18,
+    padding: 16,
+    minHeight: 150,
+    justifyContent: "center",
+    borderRadius: 20,
     elevation: 3,
   },
 
   assistantTitle: {
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: "bold",
+    color: "#111827",
     textAlign: "center",
+    marginTop: 6,
   },
 
   assistantSub: {
-    fontSize: 12,
-    color: "#6B7280",
+    fontSize: 15,
+    color: "#374151",
     textAlign: "center",
+    marginTop: 2,
   },
 
   button: {
@@ -1165,19 +1123,17 @@ const styles = StyleSheet.create({
 
   programHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
 
   programTitle: {
+    flex: 1,
     fontSize: 24,
-    fontWeight: "bold",
-    color: "#ffffff",
-    marginBottom: 6,
-    // subtle glow for readability
-    textShadowColor: "rgba(0,0,0,0.4)",
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 3,
+    fontWeight: "800",
+    color: "#12307A",
   },
 
   programLabel: {
