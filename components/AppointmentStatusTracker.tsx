@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useSettings } from "@/context/SettingsContext";
 
 /**
  * Appointment lifecycle, as written by the Barangay dashboard
@@ -54,6 +55,7 @@ type Props = {
 };
 
 export default function AppointmentStatusTracker({ status, fontScale = 1 }: Props) {
+  const { t } = useSettings();
   const current = normalizeAppointmentStatus(status);
 
   if (current === "cancelled") {
@@ -61,8 +63,7 @@ export default function AppointmentStatusTracker({ status, fontScale = 1 }: Prop
       <View style={styles.cancelledRow}>
         <Ionicons name="close-circle" size={20} color={RED} />
         <Text style={[styles.cancelledText, { fontSize: 13 * fontScale }]}>
-          This appointment was cancelled or declined by the 3S Center. You can book a new
-          one anytime.
+          {t("apptCancelledMsg")}
         </Text>
       </View>
     );
@@ -97,7 +98,7 @@ export default function AppointmentStatusTracker({ status, fontScale = 1 }: Prop
                   ]}
                   numberOfLines={1}
                 >
-                  {step.label}
+                  {t("apptStep_" + step.key)}
                 </Text>
               </View>
               {i < STEPS.length - 1 && (
@@ -114,9 +115,9 @@ export default function AppointmentStatusTracker({ status, fontScale = 1 }: Prop
       </View>
 
       <Text style={[styles.hint, { fontSize: 12 * fontScale }]}>
-        {current === "pending" && "Waiting for the 3S Center to confirm your booking."}
-        {current === "confirmed" && "Your booking is confirmed. Please arrive on time."}
-        {current === "completed" && "This appointment has been completed."}
+        {current === "pending" && t("apptHintPending")}
+        {current === "confirmed" && t("apptHintConfirmed")}
+        {current === "completed" && t("apptHintCompleted")}
       </Text>
     </View>
   );

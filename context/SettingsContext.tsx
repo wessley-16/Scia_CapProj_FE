@@ -1,12 +1,16 @@
+import { en, tl } from '@/constants/translations';
+import { setCurrentLanguage } from '@/lib/i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+
+type TVars = Record<string, string | number>;
 
 interface SettingsContextType {
   fontScale: number;
   language: string;
   setFontScale: (scale: number) => void;
   setLanguage: (lang: string) => void;
-  t: (key: string) => string;
+  t: (key: string, vars?: TVars) => string;
 }
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
@@ -23,18 +27,28 @@ interface SettingsProviderProps {
   children: ReactNode;
 }
 
+const DICTS: Record<string, Record<string, string>> = { en, tl };
+
+// New storage key: older installs saved 'en' under 'language' before Tagalog
+// became the default, so everyone starts in Tagalog once and can still switch
+// to English in Settings (that choice is then remembered).
+const LANGUAGE_KEY = 'language_v2';
+
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
   const [fontScale, setFontScaleState] = useState<number>(1);
-  // Defaults to Tagalog since most SCIA users are Filipino seniors.
+  // Tagalog by default: most SCIA users are Filipino seniors.
   const [language, setLanguageState] = useState<string>('tl');
 
   useEffect(() => {
     const loadSettings = async () => {
       try {
         const storedFontScale = await AsyncStorage.getItem('fontScale');
-        const storedLanguage = await AsyncStorage.getItem('language');
+        const storedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
         if (storedFontScale) setFontScaleState(parseFloat(storedFontScale));
-        if (storedLanguage) setLanguageState(storedLanguage);
+        if (storedLanguage === 'en' || storedLanguage === 'tl') {
+          setLanguageState(storedLanguage);
+          setCurrentLanguage(storedLanguage);
+        }
       } catch (error) {
         console.error('Failed to load settings:', error);
       }
@@ -53,319 +67,26 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
 
   const setLanguage = async (lang: string) => {
     setLanguageState(lang);
+    setCurrentLanguage(lang);
     try {
-      await AsyncStorage.setItem('language', lang);
+      await AsyncStorage.setItem(LANGUAGE_KEY, lang);
     } catch (error) {
       console.error('Failed to save language:', error);
     }
   };
 
-  const t = (key: string): string => {
-    const translations: Record<string, Record<string, string>> = {
-      en: {
-        fontSize: 'Font Size',
-        language: 'Language',
-        small: 'Small',
-        medium: 'Medium',
-        large: 'Large',
-        english: 'English',
-        tagalog: 'Tagalog',
-        preview: 'Good day! I am SCIA, a senior citizen friendly assistant.',
-        accountSettings: 'Account Settings',
-        adjustFontSize: 'Adjust font size',
-        changeLanguage: 'Change language',
-        exampleTextPreview: 'Example text preview:',
-        saveChanges: 'Save Changes',
-        profilePage: 'Profile Page',
-        changePicture: 'Change Picture',
-        removePicture: 'Remove Picture',
-        notifications: 'Notifications',
-        nameLabel: 'Name:',
-        seniorCitizenId: 'Senior Citizen ID:',
-        addressLabel: 'Address:',
-        contactNumber: 'Contact Number:',
-        dobLabel: 'Date of Birth:',
-        genderLabel: 'Gender:',
-        qrCodeTitle: 'Senior Citizen ID QR Code',
-        greeting: 'Magandang Araw Po,',
-        programUpdates: 'LGU Program Updates',
-        whatLabel: 'What :',
-        whenLabel: 'When :',
-        whereLabel: 'Where :',
-        joinLabel: 'Join',
-        chatAssistant: 'Chat Assistant',
-        howCanIHelp: 'How can I help you today?',
-        voiceAssistant: 'Voice Assistant',
-        liveSessionActive: 'Live session active',
-        liveRecording: 'Recording your voice...',
-        connectingStatus: 'Connecting to Gemini Live...',
-        connectedStatus: 'Connected',
-        respondingStatus: 'Gemini is responding...',
-        connectionErrorStatus: 'Connection error',
-        notConnectedStatus: 'Not connected',
-        disconnect: 'Disconnect',
-        connect: 'Connect',
-        inputTranscriptLabel: 'Input transcript',
-        modelTranscriptLabel: 'Model transcript',
-        connectAndSpeak: 'Connect and start speaking or send realtime text.',
-        geminiResponses: 'Gemini responses will appear here.',
-        sendRealtimeTextPlaceholder: 'Send realtime text to Live API...',
-        speakAndGetHelp: 'Speak and get help instantly',
-        reminder: 'Reminder',
-        takeLabel: 'Take :',
-        timeLabel: 'Time :',
-        noteLabel: 'Note :',
-        noReminders: 'No medicine reminders today',
-        sosEmergency: 'SOS EMERGENCY',
-        callForHelp: 'Call for help',
-        healthcare: 'Healthcare',
-        appointmentAndMeds: 'Appointments & Medications',
-        setAppointment: 'SET APPOINTMENT',
-        bookYourVisit: 'Book your visit',
-        medicinePillBox: 'MEDICINE PILL BOX',
-        manageMedications: 'Manage medications',
-        governmentWebsites: 'GOVERNMENT WEBSITES',
-        visitOfficialSites: 'Visit official sites',
-        scheduleAppointment: 'Schedule Appointment',
-        selectedDate: 'Selected Date:',
-        bookAppointment: 'Book Appointment',
-        newAppointment: 'New Appointment',
-        hospitalClinic: 'Hospital / Clinic',
-        typePlaceholder: 'Type (Check-up, Consultation, Lab Test)',
-        hhPlaceholder: 'HH',
-        mmPlaceholder: 'MM',
-        medicineNamePlaceholder: 'e.g., Blood Pressure Medicine',
-        descriptionPlaceholder: 'e.g., Take after meals',
-        dosagePlaceholder: 'e.g., 1, 500',
-        intervalPlaceholder: 'e.g., 8',
-        dosageLabel: 'Dosage:',
-        noDescriptionProvided: 'No description provided',
-        saveAppointment: 'Save Appointment',
-        cancel: 'Cancel',
-        done: 'Done',
-        other: 'Other',
-        emergencyType: 'Emergency Type',
-        fall: 'Fall',
-        heartAttack: 'Heart Attack',
-        stroke: 'Stroke',
-        typeEmergency: 'Type emergency...',
-        infoName: 'Name:',
-        infoAddress: 'Address:',
-        infoBarangay: 'Barangay:',
-        infoEmergency: 'Emergency:',
-        noMedicines: 'No medicines added yet',
-        addFirstMedicine: 'Add your first medicine to get started',
-        addMedicine: 'Add Medicine',
-        medicineName: 'Medicine Name',
-        descriptionPurpose: 'Description / Purpose (Optional)',
-        dosage: 'Dosage',
-        unit: 'Unit',
-        intervalHours: 'Interval (hours)',
-        saveSchedule: 'Save & Schedule',
-        close: 'Close',
-        descriptionLabel: 'Description:',
-        scheduleLabel: 'Schedule:',
-        nextDose: 'Next Dose:',
-        markTakenNow: 'Mark as Taken Now',
-        // Login / welcome screen
-        logIn: 'Log In',
-        submit: 'Submit',
-        signUp: 'Sign-up',
-        guest: 'Guest',
-        idOrNamePlaceholder: 'ID Number, Full Name, or Phone Number',
-        passwordPlaceholder: 'Password',
-        loginHintTitle: 'You can log in using your:',
-        loginHintId: '• 6-digit OSCA ID number',
-        loginHintPhone: '• Phone number (e.g. 09955015206)',
-        loginHintFullName: '• Full name (e.g. Juan Santos Cruz)',
-        loginHintFirstLast: '• First + Last name (e.g. Juan Cruz)',
-        welcomeBack: 'Welcome back!',
-        continueAs: 'Continue as',
-        continueButton: 'Continue',
-        notYouLogOut: 'Not you? Log out',
-        logOutConfirmTitle: 'Log Out',
-        logOutConfirmMessage: 'Log out from this account?',
-        // Already-signed-in guard
-        alreadySignedInTitle: 'Already Signed In',
-        alreadySignedInPrefix: "You're already signed in as",
-        pleaseLogOutFirst: 'Please log out first to continue.',
-        // Exit-app dialog
-        exitAppTitle: 'Exit SCIA?',
-        exitAppMessageLoggedIn: 'Do you want to log out before exiting?',
-        exitAppMessageGuest: 'Are you sure you want to exit?',
-        exitWithoutLogout: 'Exit Without Logging Out',
-        logOutAndExit: 'Log Out & Exit',
-        exitApp: 'Exit',
-        // Settings-from-login button
-        languageAndFont: 'Language & Font',
-        // Map fallback
-        mapLoadFailed: 'Map could not load. Check your internet connection.',
-        retry: 'Retry',
-        openInMaps: 'Open in Maps',
-        // Digital ID
-        digitalId: 'Digital ID',
-        digitalIdDescription: 'Your verified Senior Citizen digital ID, released by the admin.',
-        digitalIdVerifiedBadge: 'Verified',
-        digitalIdControlNo: 'Control No:',
-        digitalIdReleasedOn: 'Released:',
-        digitalIdPendingTitle: 'Digital ID Not Yet Available',
-        digitalIdPendingMessage: 'Your digital ID will appear here once the admin confirms your physical Senior Citizen ID and releases it.',
-        digitalIdRevokedTitle: 'Digital ID Unavailable',
-        digitalIdRevokedMessage: 'This digital ID has been put on hold by the admin. Please contact your barangay OSCA office.',
-      },
-      tl: {
-        fontSize: 'Laki ng Font',
-        language: 'Wika',
-        small: 'Maliit',
-        medium: 'Katamtaman',
-        large: 'Malaki',
-        english: 'English',
-        tagalog: 'Tagalog',
-        preview: 'Kumusta po! Ako si SCIA, ang inyong senior citizen friendly assistant.',
-        accountSettings: 'Account Settings',
-        adjustFontSize: 'Ayusin ang laki ng font',
-        changeLanguage: 'Piliin ang wika',
-        exampleTextPreview: 'Halimbawang teksto ng preview:',
-        saveChanges: 'I-save ang mga binago',
-        profilePage: 'Profile Page',
-        changePicture: 'Palitan ang Picture',
-        removePicture: 'Tanggalin ang Picture',
-        notifications: 'Mga Abiso',
-        nameLabel: 'Pangalan:',
-        seniorCitizenId: 'Senior Citizen ID:',
-        addressLabel: 'Address:',
-        contactNumber: 'Contact Number:',
-        dobLabel: 'Araw ng Kapanganakan:',
-        genderLabel: 'Kasarian:',
-        qrCodeTitle: 'Senior Citizen ID QR Code',
-        greeting: 'Magandang Araw Po,',
-        programUpdates: 'Update sa Programa ng LGU',
-        whatLabel: 'Ano :',
-        whenLabel: 'Kailan :',
-        whereLabel: 'Saan :',
-        joinLabel: 'Sumali',
-        chatAssistant: 'Chat Assistant',
-        howCanIHelp: 'Paano kita matutulungan ngayon?',
-        voiceAssistant: 'Voice Assistant',
-        liveSessionActive: 'Live session active',
-        liveRecording: 'Ire-record ang boses mo...',
-        connectingStatus: 'Nagko-connect sa Gemini Live...',
-        connectedStatus: 'Connected',
-        respondingStatus: 'Gemini ay nagreresponde...',
-        connectionErrorStatus: 'Connection error',
-        notConnectedStatus: 'Hindi connected',
-        disconnect: 'Disconnect',
-        connect: 'Connect',
-        inputTranscriptLabel: 'Input transcript',
-        modelTranscriptLabel: 'Model transcript',
-        connectAndSpeak: 'Mag-connect at magsalita o mag-send ng realtime text.',
-        geminiResponses: 'Dito lalabas ang Gemini responses.',
-        speakAndGetHelp: 'Magsalita at kumuha ng tulong agad',
-        reminder: 'Paalala',
-        takeLabel: 'Uminom :',
-        timeLabel: 'Oras :',
-        noteLabel: 'Tala :',
-        noReminders: 'Walang medicine reminder ngayon',
-        sosEmergency: 'SOS Emergency',
-        callForHelp: 'Tumawag ng tulong',
-        healthcare: 'Healthcare',
-        appointmentAndMeds: 'Mga Appointment at Gamot',
-        setAppointment: 'Set Appointment',
-        bookYourVisit: 'Mag-book ng appointment',
-        medicinePillBox: 'Medicine Pill Box',
-        manageMedications: 'Isaayos ang mga gamot',
-        governmentWebsites: 'Government Websites',
-        visitOfficialSites: 'Bisitahin ang official sites',
-        scheduleAppointment: 'Schedule Appointment',
-        selectedDate: 'Napiling Petsa:',
-        bookAppointment: 'Mag-book ng Appointment',
-        newAppointment: 'Bagong Appointment',
-        hospitalClinic: 'Hospital / Clinic',
-        typePlaceholder: 'I-type (Check-up, Konsultasyon, Lab Test)',
-        hhPlaceholder: 'HH',
-        mmPlaceholder: 'MM',
-        medicineNamePlaceholder: 'e.g., Blood Pressure Medicine',
-        descriptionPlaceholder: 'e.g., Inumin pagkatapos kumain',
-        dosagePlaceholder: 'e.g., 1, 500',
-        intervalPlaceholder: 'e.g., 8',
-        dosageLabel: 'Dosage:',
-        noDescriptionProvided: 'Walang description na binigay',
-        saveAppointment: 'I-save ang Appointment',
-        cancel: 'Cancel',
-        done: 'Done',
-        other: 'Other',
-        emergencyType: 'Uri ng Emergency',
-        fall: 'Fall',
-        heartAttack: 'Heart Attack',
-        stroke: 'Stroke',
-        typeEmergency: 'Isulat ang emergency...',
-        infoName: 'Pangalan:',
-        infoAddress: 'Address:',
-        infoBarangay: 'Barangay:',
-        infoEmergency: 'Emergency:',
-        noMedicines: 'Walang gamot na idinagdag pa',
-        addFirstMedicine: 'Mag-add ng unang gamot para magsimula',
-        addMedicine: 'Mag-add ng gamot',
-        medicineName: 'Pangalan ng gamot',
-        descriptionPurpose: 'Description / Layun (Opsyonal)',
-        dosage: 'Dosage',
-        unit: 'Unit',
-        intervalHours: 'Interval (hours)',
-        saveSchedule: 'Save & Schedule',
-        close: 'Close',
-        descriptionLabel: 'Description:',
-        scheduleLabel: 'Schedule:',
-        nextDose: 'Next Dose:',
-        markTakenNow: 'Markahan na nainom na',
-        // Login / welcome screen
-        logIn: 'Mag-log In',
-        submit: 'I-submit',
-        signUp: 'Mag-sign Up',
-        guest: 'Bisita',
-        idOrNamePlaceholder: 'ID Number, Buong Pangalan, o Numero ng Telepono',
-        passwordPlaceholder: 'Password',
-        loginHintTitle: 'Maaari kang mag-log in gamit ang:',
-        loginHintId: '• 6-digit na numero ng OSCA ID',
-        loginHintPhone: '• Numero ng telepono (hal. 09955015206)',
-        loginHintFullName: '• Buong pangalan (hal. Juan Santos Cruz)',
-        loginHintFirstLast: '• Pangalan + Apelyido (hal. Juan Cruz)',
-        welcomeBack: 'Maligayang pagbabalik!',
-        continueAs: 'Magpatuloy bilang',
-        continueButton: 'Magpatuloy',
-        notYouLogOut: 'Hindi ikaw? Mag-log out',
-        logOutConfirmTitle: 'Mag-log Out',
-        logOutConfirmMessage: 'Mag-log out mula sa account na ito?',
-        // Already-signed-in guard
-        alreadySignedInTitle: 'May Naka-sign In Na',
-        alreadySignedInPrefix: 'Naka-sign in ka na bilang',
-        pleaseLogOutFirst: 'Mangyaring mag-log out muna para magpatuloy.',
-        // Exit-app dialog
-        exitAppTitle: 'Lumabas sa SCIA?',
-        exitAppMessageLoggedIn: 'Gusto mo bang mag-log out bago lumabas?',
-        exitAppMessageGuest: 'Sigurado ka bang gusto mong lumabas?',
-        exitWithoutLogout: 'Lumabas Nang Hindi Nag-log Out',
-        logOutAndExit: 'Mag-log Out at Lumabas',
-        exitApp: 'Lumabas',
-        // Settings-from-login button
-        languageAndFont: 'Wika at Font',
-        // Map fallback
-        mapLoadFailed: 'Hindi ma-load ang mapa. I-check ang iyong internet connection.',
-        retry: 'Subukan Muli',
-        openInMaps: 'Buksan sa Maps',
-        // Digital ID
-        digitalId: 'Digital ID',
-        digitalIdDescription: 'Ang iyong verified Senior Citizen digital ID, na inilabas ng admin.',
-        digitalIdVerifiedBadge: 'Verified',
-        digitalIdControlNo: 'Control No:',
-        digitalIdReleasedOn: 'Inilabas:',
-        digitalIdPendingTitle: 'Wala Pang Digital ID',
-        digitalIdPendingMessage: 'Lalabas dito ang iyong digital ID kapag kinumpirma ng admin ang iyong physical Senior Citizen ID at inilabas na ito.',
-        digitalIdRevokedTitle: 'Hindi Available ang Digital ID',
-        digitalIdRevokedMessage: 'Isinuspinde ng admin ang digital ID na ito. Mangyaring makipag-ugnayan sa inyong barangay OSCA office.',
-      },
-    };
-    const langMap = translations[language] || translations.en;
-    return langMap[key] || key;
+  // t("key") or t("key", { name: "Juan" }) for strings with {name} placeholders.
+  // Falls back to English, then to the key itself, so a missing Tagalog string
+  // never shows up blank.
+  const t = (key: string, vars?: TVars): string => {
+    const dict = DICTS[language] || tl;
+    let text = dict[key] ?? en[key] ?? key;
+    if (vars) {
+      for (const k of Object.keys(vars)) {
+        text = text.split('{' + k + '}').join(String(vars[k]));
+      }
+    }
+    return text;
   };
 
   const value: SettingsContextType = {

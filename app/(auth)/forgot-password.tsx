@@ -30,7 +30,17 @@ type Step = "request" | "verify";
 
 export default function ForgotPassword() {
   const router = useRouter();
-  const { fontScale } = useSettings() as { fontScale?: number };
+  const { fontScale, t } = useSettings() as { fontScale?: number; t: (k: string, v?: Record<string, string | number>) => string };
+  // The server sends English error text; show the Tagalog version of the known ones.
+  const serverMsg = (e: any, fallbackKey: string) => {
+    const m: string = e?.message ?? "";
+    if (/wait a minute/i.test(m)) return t("fpSrvWait");
+    if (/too many code requests/i.test(m)) return t("fpSrvTooMany");
+    if (/could not send the code/i.test(m)) return t("fpSrvUnavailable");
+    if (/not valid or has expired/i.test(m)) return t("fpSrvBadCode");
+    if (/too many wrong codes/i.test(m)) return t("fpSrvTooManyWrong");
+    return t(fallbackKey);
+  };
   const scale = fontScale ?? 1;
   const params = useLocalSearchParams<{ identifier?: string }>();
 
@@ -61,11 +71,11 @@ export default function ForgotPassword() {
 
   const sendCode = async () => {
     if (!identifier) {
-      setError("identifier", "Enter your ID number or registered mobile number.");
+      setError("identifier", t("fpEnterId"));
       return;
     }
     if (!isValidIdentifier(identifier)) {
-      setError("identifier", "Enter a valid ID number or a mobile number like 09171234567.");
+      setError("identifier", t("fpBadId"));
       return;
     }
     setLoading(true);
@@ -76,7 +86,7 @@ export default function ForgotPassword() {
       setOtp("");
       setErrors({});
     } catch (e: any) {
-      setError("identifier", e?.message || "Could not send the code. Please try again.");
+      setError("identifier", serverMsg(e, "fpSendFail"));
     } finally {
       setLoading(false);
     }
@@ -84,14 +94,14 @@ export default function ForgotPassword() {
 
   const resetPassword = async () => {
     const next: Record<string, string> = {};
-    if (otp.length !== 6) next.otp = "Enter the 6-digit code from the text message.";
+    if (otp.length !== 6) next.otp = t("fpBadOtp");
     if (newPassword.length < MIN_PASSWORD) {
-      next.newPassword = `Password must be at least ${MIN_PASSWORD} characters.`;
+      next.newPassword = t("vPwShort", { n: MIN_PASSWORD });
     } else if (newPassword.length > MAX_PASSWORD) {
-      next.newPassword = "Password is too long.";
+      next.newPassword = t("vPwLong");
     }
     if (!next.newPassword && confirmPassword !== newPassword) {
-      next.confirmPassword = "The passwords do not match.";
+      next.confirmPassword = t("fpNoMatch");
     }
     if (Object.keys(next).length) {
       setErrors(next);
@@ -101,12 +111,12 @@ export default function ForgotPassword() {
     try {
       await resetPasswordWithOtp(identifier, otp, newPassword);
       Alert.alert(
-        "Password Changed",
-        "Your password has been reset. Please log in with your new password.",
-        [{ text: "OK", onPress: () => router.replace("/") }],
+        t("fpChangedTitle"),
+        t("fpChangedBody"),
+        [{ text: t("ok"), onPress: () => router.replace("/") }],
       );
     } catch (e: any) {
-      setError("otp", e?.message || "Could not reset the password. Please try again.");
+      setError("otp", serverMsg(e, "fpResetFail"));
     } finally {
       setLoading(false);
     }
@@ -129,19 +139,19 @@ export default function ForgotPassword() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Text style={[styles.title, { fontSize: 28 * scale }]}>Forgot Password</Text>
+          <Text style={[styles.title, { fontSize: 28 * scale }]}>{t("fpTitle")}</Text>
           <Text style={[styles.subtitle, { fontSize: 16 * scale }]}>
             {step === "request"
-              ? "Enter your ID number or registered mobile number. We will text a 6-digit code to the mobile number on your account."
-              : "Enter the 6-digit code we texted you, then choose a new password."}
+              ? t("fpIntroRequest")
+              : t("fpIntroVerify")}
           </Text>
 
           {step === "request" ? (
             <>
-              <Text style={styles.label}>ID Number or Mobile Number</Text>
+              <Text style={styles.label}>{t("fpIdLabel")}</Text>
               <TextInput
                 style={fieldStyle("identifier")}
-                placeholder="e.g. 123456 or 09171234567"
+                placeholder={t("fpIdPh")}
                 placeholderTextColor="#6B7280"
                 value={identifier}
                 onChangeText={(v) => {
@@ -163,13 +173,13 @@ export default function ForgotPassword() {
                 {loading ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text style={[styles.primaryText, { fontSize: 17 * scale }]}>Send Code</Text>
+                  <Text style={[styles.primaryText, { fontSize: 17 * scale }]}>{t("fpSendCode")}</Text>
                 )}
               </TouchableOpacity>
             </>
           ) : (
             <>
-              <Text style={styles.label}>6-digit Code</Text>
+              <Text style={styles.label}>{t("fpCodeLabel")}</Text>
               <TextInput
                 style={[...fieldStyle("otp"), styles.otpInput]}
                 placeholder="000000"
@@ -186,10 +196,10 @@ export default function ForgotPassword() {
               />
               {!!errors.otp && <Text style={styles.errorText}>{errors.otp}</Text>}
 
-              <Text style={styles.label}>New Password</Text>
+              <Text style={styles.label}>{t("fpNewPassword")}</Text>
               <TextInput
                 style={fieldStyle("newPassword")}
-                placeholder={`At least ${MIN_PASSWORD} characters`}
+                placeholder={t("fpPasswordPh", { n: MIN_PASSWORD })}
                 placeholderTextColor="#6B7280"
                 value={newPassword}
                 onChangeText={(v) => {
@@ -201,10 +211,10 @@ export default function ForgotPassword() {
               />
               {!!errors.newPassword && <Text style={styles.errorText}>{errors.newPassword}</Text>}
 
-              <Text style={styles.label}>Confirm New Password</Text>
+              <Text style={styles.label}>{t("fpConfirmPassword")}</Text>
               <TextInput
                 style={fieldStyle("confirmPassword")}
-                placeholder="Type the new password again"
+                placeholder={t("fpConfirmPh")}
                 placeholderTextColor="#6B7280"
                 value={confirmPassword}
                 onChangeText={(v) => {
@@ -227,13 +237,13 @@ export default function ForgotPassword() {
                 {loading ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  <Text style={[styles.primaryText, { fontSize: 17 * scale }]}>Reset Password</Text>
+                  <Text style={[styles.primaryText, { fontSize: 17 * scale }]}>{t("fpReset")}</Text>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity onPress={sendCode} disabled={loading || cooldown > 0}>
                 <Text style={[styles.linkText, cooldown > 0 && styles.linkDisabled]}>
-                  {cooldown > 0 ? `Resend code in ${cooldown}s` : "Send a new code"}
+                  {cooldown > 0 ? t("fpResendIn", { s: cooldown }) : t("fpSendNew")}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -242,18 +252,17 @@ export default function ForgotPassword() {
                   setErrors({});
                 }}
               >
-                <Text style={styles.linkText}>Use a different ID or number</Text>
+                <Text style={styles.linkText}>{t("fpDifferentId")}</Text>
               </TouchableOpacity>
             </>
           )}
 
           <Text style={styles.helpText}>
-            No code or no registered mobile number? Visit your barangay or the OSCA office and ask
-            them to reset your password.
+            {t("fpHelp")}
           </Text>
 
           <TouchableOpacity onPress={() => router.replace("/")} style={styles.backWrap}>
-            <Text style={styles.linkText}>Back to Login</Text>
+            <Text style={styles.linkText}>{t("fpBackToLogin")}</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>

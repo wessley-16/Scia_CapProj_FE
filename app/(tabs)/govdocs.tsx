@@ -2,19 +2,21 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useSettings } from "@/context/SettingsContext";
 
-const openLink = (url: string) => {
+const openLink = (url: string, t: (key: string) => string) => {
   Alert.alert(
-    "Open Website",
-    "You will be redirected to an external website.",
+    t("govOpenTitle"),
+    t("govOpenBody"),
     [
-      { text: "Cancel", style: "cancel" },
-      { text: "Continue", onPress: () => Linking.openURL(url) }
+      { text: t("cancel"), style: "cancel" },
+      { text: t("continueBtn"), onPress: () => Linking.openURL(url) }
     ]
   );
 };
 
 export default function govdocs() {
+  const { t } = useSettings();
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -22,12 +24,12 @@ export default function govdocs() {
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
-          <Text style={styles.headerTitle}>Online Government Websites</Text>
+          <Text style={styles.headerTitle}>{t("govTitle")}</Text>
 
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
-            onPress={() => openLink("https://www.ncsc.gov.ph")}
+            onPress={() => openLink("https://www.ncsc.gov.ph", t)}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -38,7 +40,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>National Commission of Senior Citizens</Text>
+              <Text style={styles.linkText}>{t("govNcsc")}</Text>
             </View>
             
           </TouchableOpacity>
@@ -46,7 +48,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
-            onPress={() => openLink("https://www.dswd.gov.ph")}
+            onPress={() => openLink("https://www.dswd.gov.ph", t)}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -57,7 +59,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>Department of Social Welfare and Development (DSWD)</Text>
+              <Text style={styles.linkText}>{t("govDswd")}</Text>
             </View>
             
           </TouchableOpacity>
@@ -65,7 +67,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
-            onPress={() => openLink("https://valenzuela.gov.ph/office-of-senior-citizens-affairs/")}
+            onPress={() => openLink("https://valenzuela.gov.ph/office-of-senior-citizens-affairs/", t)}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -76,7 +78,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>Valenzuela Office for Senior Citizens Affair (OSCA)</Text>
+              <Text style={styles.linkText}>{t("govOsca")}</Text>
             </View>
             
           </TouchableOpacity>
@@ -84,7 +86,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
-            onPress={() => openLink("https://www.philhealth.gov.ph")}
+            onPress={() => openLink("https://www.philhealth.gov.ph", t)}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -95,7 +97,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>Philippine Health Insurance Corporation (PhilHealth)</Text>
+              <Text style={styles.linkText}>{t("govPhilhealth")}</Text>
             </View>
             
           </TouchableOpacity>
@@ -103,7 +105,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
-            onPress={() => openLink("https://doh.gov.ph")}
+            onPress={() => openLink("https://doh.gov.ph", t)}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -114,7 +116,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>Department of Health (DOH)</Text>
+              <Text style={styles.linkText}>{t("govDoh")}</Text>
             </View>
             
           </TouchableOpacity>
@@ -122,7 +124,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
-            onPress={() => openLink("https://www.sss.gov.ph")}
+            onPress={() => openLink("https://www.sss.gov.ph", t)}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -133,7 +135,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>Social Security System (SSS)</Text>
+              <Text style={styles.linkText}>{t("govSss")}</Text>
             </View>
             
           </TouchableOpacity>
@@ -141,7 +143,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
-            onPress={() => openLink("https://www.gsis.gov.ph")}
+            onPress={() => openLink("https://www.gsis.gov.ph", t)}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -152,7 +154,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>Government Service Insurance System (GSIS)</Text>
+              <Text style={styles.linkText}>{t("govGsis")}</Text>
             </View>
             
           </TouchableOpacity>
@@ -160,7 +162,7 @@ export default function govdocs() {
           <TouchableOpacity 
             style={styles.websiteLink} 
             activeOpacity={0.8}
-            onPress={() => openLink("https://psa.gov.ph")}
+            onPress={() => openLink("https://psa.gov.ph", t)}
           >
             <View style={styles.iconWrapper}>
               <MaterialCommunityIcons
@@ -171,7 +173,7 @@ export default function govdocs() {
             </View>
 
             <View style={styles.textWrapper}>
-              <Text style={styles.linkText}>Philippine Statistics Authority (PSA)</Text>
+              <Text style={styles.linkText}>{t("govPsa")}</Text>
             </View>
             
           </TouchableOpacity>

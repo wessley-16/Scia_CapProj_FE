@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { MyIdRequest } from "@/lib/firebase";
+import { useSettings } from "@/context/SettingsContext";
 
 const C = {
   primary: "#1A56C4",
@@ -72,6 +73,7 @@ export default function IdRequestTracker({
   request: MyIdRequest;
   fontScale?: number;
 }) {
+  const { t } = useSettings();
   const status = request.status;
 
   if (status === "cancelled" || status === "rejected") {
@@ -80,12 +82,12 @@ export default function IdRequestTracker({
         <Ionicons name="close-circle" size={24} color={C.danger} />
         <View style={s.bannerText}>
           <Text style={[s.bannerTitle, { color: C.danger, fontSize: 16 * fontScale }]}>
-            {status === "rejected" ? "Request not approved" : "Request cancelled"}
+            {status === "rejected" ? t("idrRejected") : t("idrCancelled")}
           </Text>
           <Text style={[s.bannerBody, { fontSize: 14 * fontScale }]}>
             {request.cancelReason
-              ? `Reason: ${request.cancelReason}`
-              : "Please contact OSCA for details, or send a new request."}
+              ? t("idrReason", { reason: request.cancelReason })
+              : t("idrContact")}
           </Text>
         </View>
       </View>
@@ -102,7 +104,7 @@ export default function IdRequestTracker({
         const stamp = complete || active ? formatStamp(request[step.stamp]) : "";
         const isLast = i === STEPS.length - 1;
         const hint =
-          active && status === "approved" ? "Approved by OSCA. Waiting to be processed." : step.hint;
+          active && status === "approved" ? t("idrApproved") : t("idrHint_" + step.key);
 
         return (
           <View key={step.key} style={s.row}>
@@ -132,7 +134,7 @@ export default function IdRequestTracker({
                   active && { color: C.primary },
                 ]}
               >
-                {step.label}
+                {t("idrStep_" + step.key)}
               </Text>
               {(active || (complete && !!stamp)) && (
                 <Text style={[s.hint, { fontSize: 14 * fontScale }]}>

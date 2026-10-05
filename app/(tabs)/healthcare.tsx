@@ -165,11 +165,11 @@ export default function Healthcare() {
       notificationsGranted.current = finalStatus === "granted";
       if (!notificationsGranted.current) {
         Alert.alert(
-          "Notifications Disabled",
-          "Medicine reminders won't ring unless notifications are allowed for this app.",
+          t("hcNotifDisabledTitle"),
+          t("hcNotifDisabledBody1"),
           [
-            { text: "Not Now", style: "cancel" },
-            { text: "Open Settings", onPress: () => Linking.openSettings() },
+            { text: t("hcNotNow"), style: "cancel" },
+            { text: t("emOpenSettings"), onPress: () => Linking.openSettings() },
           ],
         );
       }
@@ -247,16 +247,16 @@ export default function Healthcare() {
   ) => {
     if (!notificationsGranted.current) {
       Alert.alert(
-        "Notifications Disabled",
-        "Please enable notifications in your device settings so this reminder can ring.",
+        t("hcNotifDisabledTitle"),
+        t("hcNotifDisabledBody2"),
       );
       return undefined;
     }
     try {
       const id = await Notifications.scheduleNotificationAsync({
         content: {
-          title: "⏰ Medicine Reminder",
-          body: `Time to take ${name}!`,
+          title: t("hcNotifTitle"),
+          body: t("hcNotifBody", { name }),
           // iOS reads sound off the notification itself; Android reads it
           // off the channel (registered above) and just needs channelId
           // pointing at the dedicated one.
@@ -274,8 +274,8 @@ export default function Healthcare() {
     } catch (e) {
       console.log("Notif schedule error:", e);
       Alert.alert(
-        "Reminder Not Set",
-        "The alarm for this medicine could not be scheduled. Please try again.",
+        t("hcReminderNotSetTitle"),
+        t("hcReminderNotSetBody"),
       );
       return undefined;
     }
@@ -283,26 +283,26 @@ export default function Healthcare() {
 
   const addMedicine = async () => {
     if (!medicineName || !dosage || !interval || !medStartHour || !medStartMinute) {
-      Alert.alert("Missing Fields", "Please fill in all fields, including the alarm start time.");
+      Alert.alert(t("hcMissingTitle"), t("hcMissingBody"));
       return;
     }
     const intervalNum = parseInt(interval);
     if (isNaN(intervalNum) || intervalNum < 1) {
-      Alert.alert("Invalid Interval", "Alarm interval must be at least 1 hour.");
+      Alert.alert(t("hcBadIntervalTitle"), t("hcBadIntervalBody"));
       return;
     }
     const hour12 = parseInt(medStartHour);
     const startMinute = parseInt(medStartMinute);
     if (isNaN(hour12) || hour12 < 1 || hour12 > 12 || isNaN(startMinute) || startMinute < 0 || startMinute > 59) {
-      Alert.alert("Invalid Time", "Start time must be a valid hour (1-12) and minute (0-59).");
+      Alert.alert(t("hcBadTimeTitle"), t("hcBadTimeBody"));
       return;
     }
 
     const startHour24 = to24Hour(hour12, medStartAmPm);
     const dailyTimes = computeDailyTimes(startHour24, startMinute, intervalNum);
     const notificationIds: string[] = [];
-    for (const t of dailyTimes) {
-      const id = await scheduleDailyNotification(medicineName, t.hour, t.minute);
+    for (const slot of dailyTimes) {
+      const id = await scheduleDailyNotification(medicineName, slot.hour, slot.minute);
       if (id) notificationIds.push(id);
     }
 
@@ -344,7 +344,7 @@ export default function Healthcare() {
     const updatedMed = { ...selectedMedicine, lastTakenTime: Date.now() };
     await saveMedicines(medicines.map((m) => (m.id === updatedMed.id ? updatedMed : m)));
     setSelectedMedicine(updatedMed);
-    Alert.alert("Done", "Medicine marked as taken!");
+    Alert.alert(t("done"), t("hcTakenBody"));
   };
 
   const resetMedicineForm = () => {
@@ -359,16 +359,16 @@ export default function Healthcare() {
   };
 
   const formatDosage = (d: string, u: string) =>
-    `${d} ${u === "capsule" ? (d === "1" ? "capsule" : "capsules") : u}`;
+    `${d} ${u === "capsule" ? (d === "1" ? t("hcCapsule") : t("hcCapsules")) : u}`;
 
   const getNextDoseTime = (med: Medicine) => {
     // Preferred path: medicines created with the fixed daily alarm times.
     if (med.notificationTimes && med.notificationTimes.length > 0) {
       const now = new Date();
       let best: Date | null = null;
-      for (const t of med.notificationTimes) {
+      for (const slot of med.notificationTimes) {
         const candidate = new Date(now);
-        candidate.setHours(t.hour, t.minute, 0, 0);
+        candidate.setHours(slot.hour, slot.minute, 0, 0);
         if (candidate.getTime() <= now.getTime()) candidate.setDate(candidate.getDate() + 1);
         if (!best || candidate.getTime() < best.getTime()) best = candidate;
       }
@@ -378,31 +378,31 @@ export default function Healthcare() {
         const m = best.getMinutes().toString().padStart(2, "0");
         const hr = Math.floor(diff / (1000 * 60 * 60));
         const mn = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        return `${h}:${m} (in ${hr}h ${mn}m)`;
+        return t("hcInHM", { time: `${h}:${m}`, h: hr, m: mn });
       }
     }
     // Fallback for medicines saved before fixed-time alarms existed.
     const nextTime = med.lastTakenTime + med.interval * 60 * 60 * 1000;
     const diff = nextTime - Date.now();
-    if (diff <= 0) return "Now (Overdue)";
+    if (diff <= 0) return t("hcNowOverdue");
     const date = new Date(nextTime);
     const h = date.getHours().toString().padStart(2, "0");
     const m = date.getMinutes().toString().padStart(2, "0");
     const hr = Math.floor(diff / (1000 * 60 * 60));
     const mn = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${h}:${m} (in ${hr}h ${mn}m)`;
+    return t("hcInHM", { time: `${h}:${m}`, h: hr, m: mn });
   };
 
   // Appointment Functions
   const submitAppointmentHandler = async () => {
     if (!selectedDate || !apptHour || !apptMinute || !apptType) {
-      setApptError("Please fill in date, time and appointment type.");
+      setApptError(t("hcApptFillAll"));
       return;
     }
     const h = parseInt(apptHour);
     const m = parseInt(apptMinute);
     if (isNaN(h) || isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) {
-      setApptError("Time must be valid (hour 1-12, minute 0-59).");
+      setApptError(t("hcApptBadTime"));
       return;
     }
     const formattedTime = `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")} ${apptAmPm}`;
@@ -430,13 +430,13 @@ export default function Healthcare() {
       setApptType("General Check-up");
       setApptNotes("");
       Alert.alert(
-        "Appointment Submitted",
+        t("hcApptSubmittedTitle"),
         myBarangay
-          ? `Your appointment request has been sent to the 3S Center of Brgy. ${myBarangay}. Please wait for confirmation.`
-          : "Your appointment request has been sent to the 3S Center. Please wait for confirmation."
+          ? t("hcApptSubmittedBody1", { barangay: myBarangay })
+          : t("hcApptSubmittedBody2")
       );
     } catch (e) {
-      setApptError("Failed to submit. Please check your connection.");
+      setApptError(t("hcApptSubmitFail"));
       console.log("Appointment submission error:", e);
     } finally {
       setSubmittingAppt(false);
@@ -459,6 +459,22 @@ export default function Healthcare() {
     return marked;
   };
 
+  // Stored/sent to the admin panel in English; only the label shown here is translated.
+  const APPT_TYPE_KEY: Record<string, string> = {
+    "General Check-up": "general",
+    "Blood Pressure Monitoring": "bp",
+    "Diabetes Consultation": "diabetes",
+    "Physical Therapy": "physio",
+    "Social Services": "social",
+    "Nutrition Counseling": "nutrition",
+    "Mental Health Support": "mental",
+    "Eye Check-up": "eye",
+    "Dental Consultation": "dental",
+    "Vaccination": "vaccine",
+  };
+  const apptTypeLabel = (v: string) =>
+    APPT_TYPE_KEY[v] ? t("apptType_" + APPT_TYPE_KEY[v]) : v;
+
   const appointmentTypes = [
     "General Check-up",
     "Blood Pressure Monitoring",
@@ -480,7 +496,7 @@ export default function Healthcare() {
         <View style={styles.headerTitleRow}>
           <MaterialCommunityIcons name="hospital-box-outline" size={26} color="#1F2937" />
           <Text style={[styles.headerTitle, { fontSize: 24 * fontScale }]}>
-            Healthcare
+            {t("hcTitle")}
           </Text>
         </View>
         {/* Tab Switcher */}
@@ -495,7 +511,7 @@ export default function Healthcare() {
               color={activeTab === "medicine" ? "white" : "#2356E1"}
             />
             <Text style={[styles.tabBtnText, activeTab === "medicine" && styles.tabBtnTextActive, { fontSize: 15 * fontScale }]}>
-              Medicine
+              {t("hcTabMedicine")}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -508,7 +524,7 @@ export default function Healthcare() {
               color={activeTab === "appointment" ? "white" : "#2356E1"}
             />
             <Text style={[styles.tabBtnText, activeTab === "appointment" && styles.tabBtnTextActive, { fontSize: 15 * fontScale }]}>
-              Appointment
+              {t("hcTabAppointment")}
             </Text>
           </TouchableOpacity>
         </View>
@@ -527,16 +543,16 @@ export default function Healthcare() {
           >
             <MaterialCommunityIcons name="plus" size={22} color="white" />
             <Text style={[styles.primaryBtnText, { fontSize: 17 * fontScale }]}>
-              Add Medicine & Set Alarm
+              {t("hcAddMedicineBtn")}
             </Text>
           </TouchableOpacity>
 
           {medicines.length === 0 ? (
             <View style={styles.emptyState}>
               <MaterialCommunityIcons name="pill" size={60} color="#D1D5DB" />
-              <Text style={[styles.emptyText, { fontSize: 18 * fontScale }]}>No medicines added yet</Text>
+              <Text style={[styles.emptyText, { fontSize: 18 * fontScale }]}>{t("hcNoMedicines")}</Text>
               <Text style={[styles.emptySubText, { fontSize: 15 * fontScale }]}>
-                Add your first medicine to get reminders
+                {t("hcNoMedicinesSub")}
               </Text>
             </View>
           ) : (
@@ -550,18 +566,18 @@ export default function Healthcare() {
                   <Text style={[styles.cardTitle, { fontSize: 19 * fontScale }]}>{med.name}</Text>
                   <Text style={[styles.cardSub, { fontSize: 15 * fontScale }]}>{formatDosage(med.dosage, med.dosageUnit)}</Text>
                   <Text style={[styles.cardNext, { fontSize: 14 * fontScale }]}>
-                    Next: {getNextDoseTime(med)}
+                    {t("hcNext", { time: getNextDoseTime(med) })}
                   </Text>
                   <Text style={[styles.cardSub, { fontSize: 11 * fontScale, color: "#9CA3AF" }]}>
-                    Every {med.interval}h
+                    {t("hcEveryShort", { n: med.interval })}
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={() =>
-                    Alert.alert("Delete Medicine", "Are you sure?", [
-                      { text: "Cancel", style: "cancel" },
+                    Alert.alert(t("hcDeleteTitle"), t("hcDeleteConfirm"), [
+                      { text: t("cancel"), style: "cancel" },
                       {
-                        text: "Delete",
+                        text: t("hcDelete"),
                         style: "destructive",
                         onPress: () => deleteMedicine(med.id, med.notificationIds),
                       },
@@ -587,8 +603,8 @@ export default function Healthcare() {
             <Ionicons name="information-circle-outline" size={18} color="#1E40AF" />
             <Text style={[styles.infoText, { fontSize: 14 * fontScale }]}>
               {myBarangay
-                ? `Appointments go to the 3S Senior Center of Brgy. ${myBarangay} (the barangay you signed up with). Its sub-admin will confirm your booking.`
-                : "Appointments are sent to the 3S Senior Center in Valenzuela. Sub-admin will confirm your booking."}
+                ? t("hcApptInfo1", { barangay: myBarangay })
+                : t("hcApptInfo2")}
             </Text>
           </View>
 
@@ -610,7 +626,7 @@ export default function Healthcare() {
 
           {selectedDate ? (
             <View style={styles.selectedDateBox}>
-              <Text style={[{ fontSize: 16 * fontScale, color: "#374151" }]}>Selected Date:</Text>
+              <Text style={[{ fontSize: 16 * fontScale, color: "#374151" }]}>{t("hcSelectedDate")}</Text>
               <Text style={[{ fontSize: 17 * fontScale, fontWeight: "bold", color: "#1E3A8A" }]}>
                 {selectedDate}
               </Text>
@@ -623,21 +639,21 @@ export default function Healthcare() {
           >
             <Ionicons name="calendar" size={20} color="white" />
             <Text style={[styles.primaryBtnText, { fontSize: 17 * fontScale }]}>
-              Book Appointment at 3S Center
+              {t("hcBookAtCenter")}
             </Text>
           </TouchableOpacity>
 
-          <Text style={[styles.sectionLabel, { fontSize: 16 * fontScale }]}>Your Appointments</Text>
+          <Text style={[styles.sectionLabel, { fontSize: 16 * fontScale }]}>{t("hcYourAppts")}</Text>
 
           {apptsLoading ? (
-            <Text style={[styles.apptSub, { fontSize: 14 * fontScale }]}>Loading your appointments…</Text>
+            <Text style={[styles.apptSub, { fontSize: 14 * fontScale }]}>{t("hcApptsLoading")}</Text>
           ) : apptsLoadError ? (
             <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: "#B91C1C" }]}>
-              We could not load your appointments. Please check your connection and reopen this tab.
+              {t("hcApptsLoadError")}
             </Text>
           ) : appointments.length === 0 ? (
             <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: "#6B7280" }]}>
-              You have no appointments yet. Book one above and you can follow its status here.
+              {t("hcApptsNone")}
             </Text>
           ) : (
             appointments.map((appt, idx) => {
@@ -653,7 +669,7 @@ export default function Healthcare() {
                   ]}
                 >
                   <View style={styles.apptRow}>
-                    <Text style={[styles.apptType, { fontSize: 17 * fontScale }]}>{appt.type}</Text>
+                    <Text style={[styles.apptType, { fontSize: 17 * fontScale }]}>{apptTypeLabel(appt.type)}</Text>
                     <View
                       style={[
                         styles.badge,
@@ -661,11 +677,11 @@ export default function Healthcare() {
                         status === "cancelled" && styles.badgeCancelled,
                       ]}
                     >
-                      <Text style={styles.badgeText}>{APPOINTMENT_STATUS_LABEL[status]}</Text>
+                      <Text style={styles.badgeText}>{t("apptStatus_" + status)}</Text>
                     </View>
                   </View>
                   <Text style={[styles.apptSub, { fontSize: 14 * fontScale }]}>
-                    {appt.date} at {appt.time}
+                    {t("hcApptAt", { date: appt.date, time: appt.time })}
                   </Text>
                   {appt.notes ? (
                     <Text style={[styles.apptSub, { fontSize: 12 * fontScale, color: "#9CA3AF" }]}>
@@ -677,7 +693,7 @@ export default function Healthcare() {
 
                   {status === "pending" && (
                     <Text style={styles.apptCancelHint}>
-                      To cancel or reschedule, please contact the 3S Center.
+                      {t("hcApptCancelHint")}
                     </Text>
                   )}
                 </View>
@@ -702,29 +718,29 @@ export default function Healthcare() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>Add Medicine & Set Alarm</Text>
+              <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>{t("hcAddMedTitle")}</Text>
 
-              <Text style={styles.label}>Medicine Name</Text>
+              <Text style={styles.label}>{t("hcMedName")}</Text>
               <TextInput
-                placeholder="e.g. Metformin"
+                placeholder={t("hcMedNamePh")}
                 placeholderTextColor="#6B7280"
                 value={medicineName}
                 onChangeText={setMedicineName}
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Description / Purpose</Text>
+              <Text style={styles.label}>{t("hcMedPurpose")}</Text>
               <TextInput
-                placeholder="e.g. For blood sugar"
+                placeholder={t("hcMedPurposePh")}
                 placeholderTextColor="#6B7280"
                 value={description}
                 onChangeText={setDescription}
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Dosage Amount</Text>
+              <Text style={styles.label}>{t("hcDosageAmount")}</Text>
               <TextInput
-                placeholder="e.g. 500"
+                placeholder={t("hcDosageAmountPh")}
                 placeholderTextColor="#6B7280"
                 value={dosage}
                 onChangeText={setDosage}
@@ -732,22 +748,22 @@ export default function Healthcare() {
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Unit</Text>
+              <Text style={styles.label}>{t("hcUnit")}</Text>
               <View style={styles.pickerBox}>
                 <Picker
                   selectedValue={dosageUnit}
                   onValueChange={(v) => setDosageUnit(v)}
                   style={{ height: 50 }}
                 >
-                  <Picker.Item label="mg (milligrams)" value="mg" />
-                  <Picker.Item label="ml (milliliters)" value="ml" />
-                  <Picker.Item label="Capsule" value="capsule" />
+                  <Picker.Item label={t("hcUnitMg")} value="mg" />
+                  <Picker.Item label={t("hcUnitMl")} value="ml" />
+                  <Picker.Item label={t("hcUnitCapsule")} value="capsule" />
                 </Picker>
               </View>
 
-              <Text style={styles.label}>Alarm Interval (hours)</Text>
+              <Text style={styles.label}>{t("hcInterval")}</Text>
               <TextInput
-                placeholder="e.g. 8 (every 8 hours)"
+                placeholder={t("hcIntervalPh")}
                 placeholderTextColor="#6B7280"
                 value={interval}
                 onChangeText={setInterval}
@@ -755,7 +771,7 @@ export default function Healthcare() {
                 style={styles.input}
               />
 
-              <Text style={styles.label}>First Alarm Time</Text>
+              <Text style={styles.label}>{t("hcFirstAlarm")}</Text>
               <View style={styles.timeRow}>
                 <TextInput
                   placeholder="HH"
@@ -793,13 +809,13 @@ export default function Healthcare() {
               </Text>
 
               <TouchableOpacity style={styles.saveBtn} onPress={addMedicine}>
-                <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>Save & Set Alarm</Text>
+                <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>{t("hcSaveAlarm")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.cancelLink}
                 onPress={() => { setMedicineModalVisible(false); resetMedicineForm(); }}
               >
-                <Text style={styles.cancelLinkText}>Cancel</Text>
+                <Text style={styles.cancelLinkText}>{t("cancel")}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -814,19 +830,19 @@ export default function Healthcare() {
               <>
                 <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>{selectedMedicine.name}</Text>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Description</Text>
-                  <Text style={styles.detailVal}>{selectedMedicine.description || "Not set"}</Text>
+                  <Text style={styles.detailLabel}>{t("hcDetailDescription")}</Text>
+                  <Text style={styles.detailVal}>{selectedMedicine.description || t("hcNotSet")}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Dosage</Text>
+                  <Text style={styles.detailLabel}>{t("hcDetailDosage")}</Text>
                   <Text style={styles.detailVal}>{formatDosage(selectedMedicine.dosage, selectedMedicine.dosageUnit)}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Alarm</Text>
-                  <Text style={styles.detailVal}>Every {selectedMedicine.interval} hours</Text>
+                  <Text style={styles.detailLabel}>{t("hcDetailAlarm")}</Text>
+                  <Text style={styles.detailVal}>{t("hcEveryLong", { n: selectedMedicine.interval })}</Text>
                 </View>
                 <View style={[styles.detailRow, styles.nextDoseHighlight]}>
-                  <Text style={[styles.detailLabel, { color: "#2563EB" }]}>Next Dose</Text>
+                  <Text style={[styles.detailLabel, { color: "#2563EB" }]}>{t("hcDetailNextDose")}</Text>
                   <Text style={[styles.detailVal, { color: "#1E40AF", fontWeight: "bold" }]}>
                     {getNextDoseTime(selectedMedicine)}
                   </Text>
@@ -835,13 +851,13 @@ export default function Healthcare() {
                   style={[styles.saveBtn, { backgroundColor: "#10B981", marginTop: 20 }]}
                   onPress={takeMedicineNow}
                 >
-                  <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>Mark as Taken Now</Text>
+                  <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>{t("hcMarkTaken")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.cancelLink}
                   onPress={() => setDetailsModalVisible(false)}
                 >
-                  <Text style={styles.cancelLinkText}>Close</Text>
+                  <Text style={styles.cancelLinkText}>{t("close")}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -855,26 +871,26 @@ export default function Healthcare() {
           <View style={styles.modalBox}>
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[styles.modalTitle, { fontSize: 22 * fontScale }]}>
-                Book Appointment
+                {t("hcBookTitle")}
               </Text>
               <Text style={[styles.apptCenter, { fontSize: 15 * fontScale }]}>
-                3S Senior Citizens Center, Valenzuela City
+                {t("hcCenterName")}
               </Text>
 
               {selectedDate ? (
                 <View style={styles.selectedDateBox}>
-                  <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>Date selected:</Text>
+                  <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>{t("hcDateSelected")}</Text>
                   <Text style={{ fontWeight: "bold", color: "#1E3A8A", fontSize: 16 * fontScale }}>
                     {selectedDate}
                   </Text>
                 </View>
               ) : (
                 <Text style={{ color: "#DC2626", marginBottom: 8, fontSize: 14 * fontScale }}>
-                  Please go back and select a date from the calendar first.
+                  {t("hcSelectDateFirst")}
                 </Text>
               )}
 
-              <Text style={styles.label}>Appointment Type</Text>
+              <Text style={styles.label}>{t("hcApptType")}</Text>
               <View style={styles.pickerBox}>
                 <Picker
                   selectedValue={apptType}
@@ -882,12 +898,12 @@ export default function Healthcare() {
                   style={{ height: 50 }}
                 >
                   {appointmentTypes.map((tName) => (
-                    <Picker.Item key={tName} label={tName} value={tName} />
+                    <Picker.Item key={tName} label={apptTypeLabel(tName)} value={tName} />
                   ))}
                 </Picker>
               </View>
 
-              <Text style={styles.label}>Time</Text>
+              <Text style={styles.label}>{t("hcTime")}</Text>
               <View style={styles.timeRow}>
                 <TextInput
                   placeholder="HH"
@@ -921,9 +937,9 @@ export default function Healthcare() {
                 </View>
               </View>
 
-              <Text style={styles.label}>Notes (optional)</Text>
+              <Text style={styles.label}>{t("hcNotes")}</Text>
               <TextInput
-                placeholder="Any special concerns?"
+                placeholder={t("hcNotesPh")}
                 placeholderTextColor="#6B7280"
                 value={apptNotes}
                 onChangeText={setApptNotes}
@@ -946,7 +962,7 @@ export default function Healthcare() {
                   <ActivityIndicator color="white" />
                 ) : (
                   <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>
-                    Submit to 3S Center
+                    {t("hcSubmit")}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -954,7 +970,7 @@ export default function Healthcare() {
                 style={styles.cancelLink}
                 onPress={() => setAppointModalVisible(false)}
               >
-                <Text style={styles.cancelLinkText}>Cancel</Text>
+                <Text style={styles.cancelLinkText}>{t("cancel")}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

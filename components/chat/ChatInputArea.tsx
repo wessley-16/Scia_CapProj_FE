@@ -1,3 +1,4 @@
+import { useSettings } from "@/context/SettingsContext";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -30,6 +31,7 @@ export default function ChatInputArea({
   onInputFocus,
   fontScale,
 }: ChatInputAreaProps) {
+  const { t } = useSettings();
   const [text, setText] = useState("");
 
   const handleSend = () => {
@@ -67,7 +69,7 @@ export default function ChatInputArea({
         <View style={styles.inputWrapper}>
           <TextInput
             style={[styles.input, { fontSize: 16 * fontScale }]}
-            placeholder="Type your health concern..."
+            placeholder={t("chatInputPh")}
             placeholderTextColor="#6B7280"
             value={text}
             onChangeText={setText}

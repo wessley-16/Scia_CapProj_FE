@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import { useSettings } from "@/context/SettingsContext";
 import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,13 +25,14 @@ const CameraScreen = () => {
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [isReviewing, setIsReviewing] = useState(false);
   const router = useRouter();
+  const { t } = useSettings();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView | null>(null);
 
   // --- Action 1: Snap Picture from Live Camera ---
   const handleTakePicture = async () => {
     if (imageUris.length >= 5) {
-      Alert.alert("Limit Reached", "You can only analyze up to 5 images.");
+      Alert.alert(t("camLimit"), t("camLimit5"));
       return;
     }
 
@@ -80,11 +82,11 @@ const CameraScreen = () => {
         "medicines",
         JSON.stringify([...existingMeds, ...newMeds]),
       );
-      Alert.alert("Success!", "Medications added to your Pill Box.");
+      Alert.alert(t("camSuccess"), t("camSaved"));
       router.back();
     } catch (err) {
       console.error("Error saving meds:", err);
-      Alert.alert("Error", "Could not save to Pill Box.");
+      Alert.alert(t("errorTitle"), t("camSaveFail"));
     }
   };
 
@@ -102,7 +104,7 @@ const CameraScreen = () => {
     if (!result.canceled) {
       const uris = result.assets.map((asset) => asset.uri);
       if (imageUris.length + uris.length > 5) {
-        Alert.alert("Limit Reached", "Total images cannot exceed 5.");
+        Alert.alert(t("camLimit"), t("camLimitTotal"));
         return;
       }
       setImageUris((prev) => [...prev, ...uris]);
@@ -123,10 +125,10 @@ const CameraScreen = () => {
     return (
       <View style={styles.permissionContainer}>
         <Text style={{ textAlign: "center", marginBottom: 20 }}>
-          We need your permission to show the camera
+          {t("camNeedPermission")}
         </Text>
         <TouchableOpacity style={styles.saveButton} onPress={requestPermission}>
-          <Text style={styles.saveButtonText}>Grant Permission</Text>
+          <Text style={styles.saveButtonText}>{t("camGrant")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -158,7 +160,7 @@ const CameraScreen = () => {
           {isLoading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#2356E1" />
-              <Text style={styles.loadingText}>Analyzing medication...</Text>
+              <Text style={styles.loadingText}>{t("camAnalyzing")}</Text>
             </View>
           )}
 
@@ -166,7 +168,7 @@ const CameraScreen = () => {
 
           {reminders && reminders.length > 0 && (
             <View style={styles.resultsContainer}>
-              <Text style={styles.resultsHeader}>Medications Found:</Text>
+              <Text style={styles.resultsHeader}>{t("camFound")}</Text>
               {reminders.map((med: MedicationReminder, index: number) => (
                 <View key={index} style={styles.medCard}>
                   <Text style={styles.medTitle}>{med.medicationName}</Text>
@@ -184,7 +186,7 @@ const CameraScreen = () => {
               style={[styles.saveButton, { backgroundColor: "#10B981" }]}
               onPress={saveToPillBox}
             >
-              <Text style={styles.saveButtonText}>Add All to Pill Box</Text>
+              <Text style={styles.saveButtonText}>{t("camAddAll")}</Text>
             </TouchableOpacity>
           )}
 
@@ -193,7 +195,7 @@ const CameraScreen = () => {
             onPress={handleReset}
             disabled={isLoading}
           >
-            <Text style={styles.saveButtonText}>Scan Another</Text>
+            <Text style={styles.saveButtonText}>{t("camScanAnother")}</Text>
           </TouchableOpacity>
         </View>
       </View>

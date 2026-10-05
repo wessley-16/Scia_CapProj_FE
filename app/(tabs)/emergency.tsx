@@ -82,7 +82,7 @@ export default function EmergencyScreen() {
 
   const [location, setLocation] = useState<any>(null);
   const [name, setName] = useState('');
-  const [fullAddress, setFullAddress] = useState('Fetching...');
+  const [fullAddress, setFullAddress] = useState(t('emFetching'));
   const [barangay, setBarangay] = useState('');
   const [barangaySource, setBarangaySource] = useState<'boundary' | 'geocoder' | 'outside'>('boundary');
   const [accuracy, setAccuracy] = useState<number | null>(null);
@@ -143,13 +143,13 @@ export default function EmergencyScreen() {
         ({ status } = await Location.requestForegroundPermissionsAsync());
       }
       if (status !== 'granted') {
-        setLocationError('Location permission denied.');
+        setLocationError(t('emLocDeniedErr'));
         Alert.alert(
-          'Location Access Needed',
-          'SCIA needs location access to send accurate SOS alerts. Please enable it in your device settings.',
+          t('emLocAccessTitle'),
+          t('emLocAccessBody'),
           [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            { text: t('cancel'), style: 'cancel' },
+            { text: t('emOpenSettings'), onPress: () => Linking.openSettings() },
           ],
         );
         return;
@@ -160,10 +160,10 @@ export default function EmergencyScreen() {
       // letting getCurrentPositionAsync hang or throw a confusing error.
       const servicesEnabled = await Location.hasServicesEnabledAsync();
       if (!servicesEnabled) {
-        setLocationError('Location services are turned off.');
+        setLocationError(t('emLocOffErr'));
         Alert.alert(
-          'Location Services Off',
-          'Please turn on Location/GPS in your device settings so an accurate location can be sent with your SOS.',
+          t('emLocOffTitle'),
+          t('emLocOffBody'),
         );
         return;
       }
@@ -220,10 +220,10 @@ export default function EmergencyScreen() {
         setFullAddress(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`);
       }
     } catch (error: any) {
-      setLocationError(error?.message || 'Could not get your location.');
+      setLocationError(t('emLocErrFallback'));
       Alert.alert(
-        'Location Error',
-        'Could not get your current location. Please check that GPS is on and try again.',
+        t('emLocErrTitle'),
+        t('emLocErrBody'),
       );
     } finally {
       setIsFetchingLocation(false);
@@ -269,16 +269,14 @@ export default function EmergencyScreen() {
   const triggerSOS = async () => {
     if (!location) {
       Alert.alert(
-        locationError ? 'Location unavailable' : 'Please wait',
-        locationError
-          ? 'We could not get your location. Tap the locate button to try again before sending an SOS.'
-          : 'Still fetching your location. Please wait a moment.',
+        locationError ? t('emLocUnavailable') : t('emPleaseWait'),
+        locationError ? t('emNoLocBody') : t('emStillFetching'),
       );
       return;
     }
     const now = Date.now();
     if (lastSOS && now - lastSOS < COOLDOWN_MS) {
-      Alert.alert('Cooldown Active', 'Please wait 5 minutes before sending another SOS.');
+      Alert.alert(t('emCooldownTitle'), t('emCooldownBody'));
       return;
     }
     try {
@@ -293,21 +291,23 @@ export default function EmergencyScreen() {
       setLastSOS(now);
       setCooldownActive(true);
       setTimeout(() => setCooldownActive(false), COOLDOWN_MS);
-      Alert.alert('SOS Sent', 'Your location has been shared with responders. You will be notified when a responder is dispatched.');
+      Alert.alert(t('emSosSentTitle'), t('emSosSentBody'));
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to send SOS. Please try again.');
+      Alert.alert(t('errorTitle'), t('emSosFailed'));
     }
   };
 
   const rotate = progress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const isDispatched = dispatchStatus && dispatchStatus !== 'pending';
+  // "Press and hold for {seconds} ..." with the seconds part rendered in bold.
+  const [holdBefore, holdAfter] = t('emHoldLabel', { seconds: '|' }).split('|');
 
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Top bar, centered title, no settings button */}
       <View style={styles.topBar}>
         <Ionicons name="alert-circle" size={22} color="#fff" style={styles.topBarIcon} />
-        <Text style={[styles.topBarTitle, { fontSize: 22 * fontScale }]}>EMERGENCY</Text>
+        <Text style={[styles.topBarTitle, { fontSize: 22 * fontScale }]}>{t('emTitle')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -315,7 +315,7 @@ export default function EmergencyScreen() {
         {/* SOS button */}
         <View style={styles.sosArea}>
           <Text style={[styles.sosLabel, { fontSize: 17 * fontScale }]}>
-            Press and hold for <Text style={styles.sosLabelBold}>5 seconds</Text> to send an alert
+            {holdBefore}<Text style={styles.sosLabelBold}>{t('emFiveSeconds')}</Text>{holdAfter}
           </Text>
           <View style={styles.sosOuter}>
             <View style={styles.sosDashedRing} />
@@ -325,15 +325,15 @@ export default function EmergencyScreen() {
               onPressOut={stopHold}
               disabled={cooldownActive}
               style={[styles.sosButton, { opacity: cooldownActive ? 0.75 : 1 }]}
-              accessibilityLabel="SOS button"
-              accessibilityHint="Hold for 5 seconds to send an emergency alert"
+              accessibilityLabel={t('emA11yButton')}
+              accessibilityHint={t('emA11yHint')}
             >
               <Ionicons name="alert-circle-outline" size={38} color="#fff" style={{ marginBottom: 4 }} />
               <Text style={[styles.sosText, { fontSize: 24 * fontScale }]}>
-                {cooldownActive ? 'SENT' : isHolding ? String(secondsLeft) : 'HOLD'}
+                {cooldownActive ? t('emSent') : isHolding ? String(secondsLeft) : t('emHold')}
               </Text>
               <Text style={[styles.sosSubText, { fontSize: 16 * fontScale }]}>
-                {cooldownActive ? 'Alert sent' : '5 seconds'}
+                {cooldownActive ? t('emAlertSent') : t('emFiveSeconds')}
               </Text>
             </Pressable>
           </View>
@@ -345,10 +345,10 @@ export default function EmergencyScreen() {
             <Ionicons name="checkmark-circle" size={24} color="#065F46" style={styles.bannerIcon} />
             <View style={styles.bannerTextWrap}>
               <Text style={[styles.bannerTitle, styles.bannerTitleDispatched, { fontSize: 17 * fontScale }]}>
-                Responder dispatched
+                {t('emDispatchedTitle')}
               </Text>
               <Text style={[styles.bannerBody, styles.bannerBodyDispatched, { fontSize: 16 * fontScale }]}>
-                A responder has been sent to your location. Stay calm and stay where you are.
+                {t('emDispatchedBody')}
               </Text>
             </View>
           </View>
@@ -359,10 +359,10 @@ export default function EmergencyScreen() {
             <Ionicons name="time-outline" size={24} color="#D97706" style={styles.bannerIcon} />
             <View style={styles.bannerTextWrap}>
               <Text style={[styles.bannerTitle, styles.bannerTitleWaiting, { fontSize: 17 * fontScale }]}>
-                Alert sent. Waiting for responder.
+                {t('emWaitingTitle')}
               </Text>
               <Text style={[styles.bannerBody, styles.bannerBodyWaiting, { fontSize: 16 * fontScale }]}>
-                Your location has been shared. A responder will be assigned shortly.
+                {t('emWaitingBody')}
               </Text>
             </View>
           </View>
@@ -464,7 +464,7 @@ export default function EmergencyScreen() {
             <View style={styles.infoField}>
               <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Current location (where you are now)</Text>
               <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>
-                {barangay ? `Brgy. ${barangay}, ` : ''}{fullAddress}
+                {barangay ? t('emBrgy', { name: barangay }) : ''}{fullAddress}
               </Text>
             </View>
           </View>
@@ -473,7 +473,7 @@ export default function EmergencyScreen() {
             <View style={[styles.infoRow, styles.infoRowLast]}>
               <Ionicons name="radio-outline" size={20} color="#C0181F" style={styles.infoIcon} />
               <View style={styles.infoField}>
-                <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Status</Text>
+                <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>{t('emStatus')}</Text>
                 <View style={[
                   styles.statusPill,
                   isDispatched ? styles.statusPillDispatched : styles.statusPillPending,
@@ -485,7 +485,7 @@ export default function EmergencyScreen() {
                   ]}>
                     {isDispatched
                       ? dispatchStatus!.charAt(0).toUpperCase() + dispatchStatus!.slice(1)
-                      : 'Pending'}
+                      : t('emPending')}
                   </Text>
                 </View>
               </View>
@@ -497,7 +497,7 @@ export default function EmergencyScreen() {
         <View style={styles.instructionCard}>
           <Ionicons name="information-circle-outline" size={20} color="#EA580C" style={{ marginRight: 10, marginTop: 1 }} />
           <Text style={[styles.instructionText, { fontSize: 16 * fontScale }]}>
-            Hold the red button for 5 seconds to send an emergency alert. Your pinned location will be shared with responders immediately.
+            {t('emInstruction')}
           </Text>
         </View>
 

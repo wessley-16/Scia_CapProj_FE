@@ -41,10 +41,10 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("setLogoutTitle"), t("setLogoutBody"), [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Logout",
+        text: t("setLogoutTitle"),
         style: "destructive",
         onPress: async () => {
           try {
@@ -139,7 +139,7 @@ export default function SettingsScreen() {
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={[styles.logoutText, { fontSize: 17 * fontScale }]}>
-            {t("logout") || "Logout"}
+            {t("logout")}
           </Text>
         </TouchableOpacity>
       </ScrollView>

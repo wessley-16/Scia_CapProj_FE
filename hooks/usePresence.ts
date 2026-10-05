@@ -4,6 +4,7 @@ import { confirmSafe, ensureMonitoringRunning, recordPresence } from "@/lib/pres
 import { PING_INTERVAL_MS } from "@/lib/presenceShared";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
+import { tr } from "@/lib/i18n";
 import { useEffect } from "react";
 import { Alert, AppState } from "react-native";
 
@@ -53,15 +54,15 @@ export function usePresence() {
       if (response.notification.request.content.data?.type !== "safety_check") return;
       handled.add(id);
       Alert.alert(
-        "Are you safe?",
-        "Please confirm so we don't alert your guardians and your barangay office.",
+        tr("safeTitle"),
+        tr("safeBody"),
         [
-          { text: "I need help", style: "destructive", onPress: () => router.push("/(tabs)/emergency") },
+          { text: tr("safeNeedHelp"), style: "destructive", onPress: () => router.push("/(tabs)/emergency") },
           {
-            text: "I'm safe",
+            text: tr("safeImSafe"),
             onPress: () => {
               confirmSafe(uid).catch(() =>
-                Alert.alert("Could not confirm", "Please check your connection and open the app again."),
+                Alert.alert(tr("safeConfirmFailTitle"), tr("safeConfirmFailBody")),
               );
             },
           },

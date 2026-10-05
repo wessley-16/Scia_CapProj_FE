@@ -1,3 +1,4 @@
+import { useSettings } from "@/context/SettingsContext";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
@@ -11,6 +12,7 @@ export default function ChatHeader({
   onHistoryPress: () => void;
 }) {
   const router = useRouter();
+  const { t } = useSettings();
 
   return (
     <View style={styles.container}>
@@ -18,7 +20,7 @@ export default function ChatHeader({
         onPress={() => router.back()}
         style={styles.iconButton}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityLabel="Go back"
+        accessibilityLabel={t("chatGoBack")}
       >
         <Ionicons name="arrow-back" size={26} color="#2b5ce6" />
       </TouchableOpacity>
@@ -29,14 +31,14 @@ export default function ChatHeader({
           size={26}
           color="#2b5ce6"
         />
-        <Text style={[styles.title, { fontSize: 18 * fontScale }]}>HealthAI Assistant</Text>
+        <Text style={[styles.title, { fontSize: 18 * fontScale }]}>{t("chatHeader")}</Text>
       </View>
 
       <TouchableOpacity
         style={styles.iconButton}
         onPress={onHistoryPress}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityLabel="Chat history"
+        accessibilityLabel={t("a11yChatHistory")}
       >
         <Ionicons name="time-outline" size={26} color="#4B5563" />
       </TouchableOpacity>

@@ -21,11 +21,11 @@ const background = require("../../assets/images/Foreground.png");
 export default function Home() {
   const router = useRouter();
   const { user, isGuest, clearUser } = useAuth();
-  const name = user ? (`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Sa inyo") : "Sa inyo";
-  const idNumber = user?.idNumber ?? "No ID";
+  const { fontScale, t } = useSettings();
+  const name = user ? (`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || t("homeNoName")) : t("homeNoName");
+  const idNumber = user?.idNumber ?? t("homeNoId");
   const insets = useSafeAreaInsets();
   const tabBarHeight = insets.bottom + 60; // 60 ≈ typical tab bar height, adjust if yours differs
-  const { fontScale, t } = useSettings();
   const [refreshing, setRefreshing] = useState(false);
 
   const loadProfileImage = useCallback(async () => {
@@ -93,8 +93,8 @@ export default function Home() {
   const handleJoinPress = (event: FirebaseEvent) => {
     if (!user || isGuest) {
       Alert.alert(
-        "Log In Required",
-        "Please log in with your account to join events — this is what links your QR code to event check-in.",
+        t("homeLoginRequiredTitle"),
+        t("homeLoginRequiredBody"),
       );
       return;
     }
@@ -120,10 +120,10 @@ export default function Home() {
       );
       setJoinedEvents((prev) => [...prev, event]);
       setJoinFormEvent(null);
-      Alert.alert("You're In!", `You've joined "${event.title ?? event.Title ?? "the event"}".`);
+      Alert.alert(t("homeJoinedTitle"), t("homeJoinedBody", { title: event.title ?? event.Title ?? t("homeTheEvent") }));
     } catch (err) {
       console.error("Failed to join event:", err);
-      Alert.alert("Error", "Failed to join event. Please try again.");
+      Alert.alert(t("errorTitle"), t("homeJoinFail"));
     } finally {
       setJoining(false);
     }
@@ -322,7 +322,7 @@ export default function Home() {
     const local = notifications.map((n: any) => ({
       id: `local:${n.id}`,
       type: n.type || "notification",
-      title: n.type === "SOS" ? "Emergency Alert" : "Notification",
+      title: n.type === "SOS" ? t("homeNotifEmergency") : t("homeNotifGeneric"),
       body: n.message || "",
       ts: new Date(n.timestamp).getTime() || 0,
       link: linkFor(n.type, n.link),
@@ -332,7 +332,7 @@ export default function Home() {
     const remote = serverNotifs.map((n) => ({
       id: `server:${n.id}`,
       type: n.type,
-      title: n.title || "Notification",
+      title: n.title || t("homeNotifGeneric"),
       body: n.body || "",
       ts: n.createdAt?.toMillis?.() ?? 0,
       link: linkFor(n.type, n.link),
@@ -342,7 +342,7 @@ export default function Home() {
     return [...local, ...remote]
       .filter((n) => !notifState.closed[n.id])
       .sort((a, b) => b.ts - a.ts);
-  }, [notifications, serverNotifs, notifState.closed]);
+  }, [notifications, serverNotifs, notifState.closed, t]);
 
   const isNotifRead = (n: PanelNotif) => n.readRemote || !!notifState.read[n.id];
   const unreadCount = panelNotifs.filter((n) => !isNotifRead(n)).length;
@@ -469,7 +469,7 @@ export default function Home() {
 
           <TouchableOpacity
             onPress={toggleNotification}
-            accessibilityLabel="Notifications"
+            accessibilityLabel={t("a11yNotifications")}
             style={styles.bellButton}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -600,8 +600,8 @@ export default function Home() {
           />
 
           <ActionButton
-            title="Healthcare"
-            subtitle="Appointments & Medications"
+            title={t("homeHealthTitle")}
+            subtitle={t("homeHealthSub")}
             icon="medical-bag"
             color="#2356E1"
             onPress={() => router.push("/(tabs)/healthcare")}
@@ -724,11 +724,11 @@ export default function Home() {
 
               {/* EVENTS NOTIFICATIONS */}
               <Text style={{ color: "#6B7280", marginBottom: 5 }}>
-                Your Joined Events
+                {t("homeJoinedEvents")}
               </Text>
 
               {joinedEvents.length === 0 ? (
-                <Text>No joined events yet</Text>
+                <Text>{t("homeNoJoined")}</Text>
               ) : (
                 joinedEvents.map((event) => (
                   <View
@@ -757,16 +757,16 @@ export default function Home() {
 
               {/* SYSTEM NOTIFICATIONS */}
               <View style={styles.notifHeaderRow}>
-                <Text style={{ color: "#6B7280" }}>System Alerts</Text>
+                <Text style={{ color: "#6B7280" }}>{t("homeSystemAlerts")}</Text>
                 {unreadCount > 0 && (
                   <TouchableOpacity onPress={markAllNotifsRead}>
-                    <Text style={styles.notifActionText}>Mark all as read</Text>
+                    <Text style={styles.notifActionText}>{t("homeMarkAllRead")}</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               {panelNotifs.length === 0 ? (
-                <Text>No alerts yet</Text>
+                <Text>{t("homeNoAlerts")}</Text>
               ) : (
                 panelNotifs.map((n) => {
                   const read = isNotifRead(n);
@@ -785,7 +785,7 @@ export default function Home() {
                         <TouchableOpacity
                           onPress={() => closeNotif(n)}
                           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                          accessibilityLabel="Close notification"
+                          accessibilityLabel={t("homeCloseNotif")}
                         >
                           <Ionicons name="close" size={20} color="#4B5563" />
                         </TouchableOpacity>
@@ -802,12 +802,12 @@ export default function Home() {
                       <View style={styles.notifActions}>
                         {!!n.link && (
                           <TouchableOpacity onPress={() => openNotif(n)}>
-                            <Text style={styles.notifActionText}>Open</Text>
+                            <Text style={styles.notifActionText}>{t("homeOpen")}</Text>
                           </TouchableOpacity>
                         )}
                         {!read && (
                           <TouchableOpacity onPress={() => markNotifRead(n)}>
-                            <Text style={styles.notifActionText}>Mark as read</Text>
+                            <Text style={styles.notifActionText}>{t("homeMarkRead")}</Text>
                           </TouchableOpacity>
                         )}
                       </View>

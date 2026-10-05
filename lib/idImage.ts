@@ -23,7 +23,7 @@ const ATTEMPTS: { width: number; compress: number }[] = [
 export async function pickIdImage(): Promise<PickedIdImage | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
-    throw new Error("Please allow access to your photo library.");
+    throw Object.assign(new Error("Please allow access to your photo library."), { code: "photo-permission" });
   }
 
   const result = await ImagePicker.launchImageLibraryAsync({
@@ -48,7 +48,8 @@ export async function pickIdImage(): Promise<PickedIdImage | null> {
       return { uri: saved.uri, base64: saved.base64 };
     }
   }
-  throw new Error(
-    "That photo is too large. Please take a closer, clearer photo of the ID.",
+  throw Object.assign(
+    new Error("That photo is too large. Please take a closer, clearer photo of the ID."),
+    { code: "photo-too-large" },
   );
 }

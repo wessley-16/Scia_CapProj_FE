@@ -150,11 +150,15 @@ export default function Index() {
     });
   };
 
+  // lib/firebase.ts throws English text; show the Tagalog version of the known one.
+  const loginErrorText = (error: any) =>
+    /no account found/i.test(error?.message ?? "") ? t("loginNoAccount") : t("loginInvalid");
+
   const handleLogin = async () => {
     if (!identifier || !password) {
       Alert.alert(
-        "Error",
-        "Please enter your ID number, full name, or phone number and password.",
+        t("loginErrorTitle"),
+        t("loginEnterBoth"),
       );
       return;
     }
@@ -169,15 +173,15 @@ export default function Index() {
       setFailedAttempts(attempts);
       if (attempts >= FORGOT_PROMPT_AFTER) {
         Alert.alert(
-          "Login Failed",
-          `${error?.message || "Invalid credentials"}\n\nForgot your password? You can reset it with a code sent to your registered mobile number.`,
+          t("loginFailedTitle"),
+          `${loginErrorText(error)}\n\n${t("loginForgotHint")}`,
           [
-            { text: "Try Again", style: "cancel" },
-            { text: "Reset Password", onPress: goToForgotPassword },
+            { text: t("loginTryAgain"), style: "cancel" },
+            { text: t("loginResetPassword"), onPress: goToForgotPassword },
           ],
         );
       } else {
-        Alert.alert("Login Failed", error?.message || "Invalid credentials");
+        Alert.alert(t("loginFailedTitle"), loginErrorText(error));
       }
     } finally {
       setIsLoading(false);
@@ -324,14 +328,13 @@ export default function Index() {
                 {failedAttempts >= FORGOT_PROMPT_AFTER && (
                   <View style={styles.attemptBox}>
                     <Text style={[styles.attemptText, { fontSize: 15 * fontScale }]}>
-                      Having trouble logging in? Reset your password with a code sent to your
-                      registered mobile number.
+                      {t("loginTrouble")}
                     </Text>
                   </View>
                 )}
                 <TouchableOpacity onPress={goToForgotPassword} style={styles.forgotWrap}>
                   <Text style={[styles.forgotText, { fontSize: 15 * fontScale }]}>
-                    Forgot password?
+                    {t("loginForgot")}
                   </Text>
                 </TouchableOpacity>
 

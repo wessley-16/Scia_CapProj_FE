@@ -1,3 +1,4 @@
+import { useSettings } from "@/context/SettingsContext";
 import { Event, EventFormField } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState } from "react";
@@ -15,7 +16,7 @@ import {
   View,
 } from "react-native";
 
-const getTitle = (e: Event) => e.title ?? e.Title ?? "Untitled event";
+const getTitle = (e: Event, fallback = "Untitled event") => e.title ?? e.Title ?? fallback;
 const getDescription = (e: Event) => e.description ?? e.Body ?? "";
 const getLocation = (e: Event) => e.location ?? e.Location ?? "";
 const getDate = (e: Event) => e.date ?? e.Date ?? "";
@@ -37,6 +38,7 @@ export default function EventJoinFormModal({
   onClose,
   onSubmit,
 }: Props) {
+  const { t } = useSettings();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [displayEvent, setDisplayEvent] = useState<Event | null>(null);
 
@@ -63,8 +65,8 @@ export default function EventJoinFormModal({
     if (!readyToJoin) {
       const missing = requiredFields.filter((f) => !answers[f.id]?.trim());
       Alert.alert(
-        "Missing Information",
-        `Please fill in: ${missing.map((f) => f.label).join(", ")}`,
+        t("evMissingTitle"),
+        t("evMissingBody", { fields: missing.map((f) => f.label).join(", ") }),
       );
       return;
     }
@@ -82,7 +84,7 @@ export default function EventJoinFormModal({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={[styles.title, { fontSize: 20 * fontScale }]} numberOfLines={2}>
-              {getTitle(displayEvent)}
+              {getTitle(displayEvent, t("evUntitled"))}
             </Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
               <Ionicons name="close" size={26} color="#374151" />
@@ -115,7 +117,7 @@ export default function EventJoinFormModal({
               <>
                 <View style={styles.divider} />
                 <Text style={[styles.subtitle, { fontSize: 15 * fontScale }]}>
-                  Fill in the information below to join.
+                  {t("evFillIn")}
                 </Text>
 
                 {fields.map((field) => (
@@ -188,7 +190,7 @@ export default function EventJoinFormModal({
             {submitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={[styles.joinBtnText, { fontSize: 17 * fontScale }]}>Join</Text>
+              <Text style={[styles.joinBtnText, { fontSize: 17 * fontScale }]}>{t("evJoin")}</Text>
             )}
           </TouchableOpacity>
         </View>

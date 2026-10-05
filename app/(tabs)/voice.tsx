@@ -73,7 +73,7 @@ function PulseRing({ active, color }: { active: boolean; color: string }) {
 
 export default function VoiceScreen() {
   const router = useRouter();
-  const { fontScale } = useSettings();
+  const { fontScale, t } = useSettings();
 
   const {
     state,
@@ -135,26 +135,26 @@ export default function VoiceScreen() {
 
   useEffect(() => {
     // Always keep the newest answer in view.
-    const t = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
+    return () => clearTimeout(timer);
   }, [turns.length, partialQuestion, errorMessage]);
 
   const fs = (n: number) => n * fontScale;
 
   // ── Words, not just colours ──────────────────────────────────────────
   const statusText =
-    isRecording               ? "Nakikinig po ako…"        :
-    state === "transcribing"  ? "Naiintindihan ko pa po…"   :
-    state === "thinking"      ? "Sandali po, iniisip ko…"   :
-    isSpeaking                ? "Sinasagot ko po…"          :
-    errorMessage              ? "May problema po"           :
-                                 "Handa na po ako";
+    isRecording               ? t("voiceStatusListening")     :
+    state === "transcribing"  ? t("voiceStatusTranscribing")  :
+    state === "thinking"      ? t("voiceStatusThinking")      :
+    isSpeaking                ? t("voiceStatusSpeaking")      :
+    errorMessage              ? t("voiceStatusError")         :
+                                 t("voiceStatusReady");
 
   const hintText =
-    isRecording        ? "Pindutin ulit kapag tapos na kayong magsalita" :
-    isBusy             ? "Sandali lang po…"                              :
-    isSpeaking         ? "Pindutin para itigil ang pagsasalita"          :
-                         "Pindutin ang butones, tapos magsalita";
+    isRecording        ? t("voiceHintRecording") :
+    isBusy             ? t("voiceHintBusy")      :
+    isSpeaking         ? t("voiceHintSpeaking")  :
+                         t("voiceHintIdle");
 
   const buttonColor =
     isRecording ? "#DC2626" :
@@ -175,18 +175,18 @@ export default function VoiceScreen() {
           onPress={() => router.back()}
           style={styles.iconBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Isara"
+          accessibilityLabel={t("voiceA11yClose")}
         >
           <Ionicons name="close" size={30} color="#111827" />
         </TouchableOpacity>
 
-        <Text style={[styles.headerTitle, { fontSize: fs(20) }]}>HealthAI</Text>
+        <Text style={[styles.headerTitle, { fontSize: fs(20) }]}>{t("voiceTitle")}</Text>
 
         <TouchableOpacity
           onPress={clearConversation}
           style={styles.iconBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          accessibilityLabel="Bagong tanong"
+          accessibilityLabel={t("voiceA11yNewQuestion")}
           disabled={isBusy}
         >
           <Ionicons name="refresh" size={26} color={isBusy ? "#D1D5DB" : "#111827"} />
@@ -202,29 +202,27 @@ export default function VoiceScreen() {
         {turns.length === 0 && !partialQuestion && !errorMessage && (
           <View style={styles.emptyCard}>
             <Text style={[styles.emptyTitle, { fontSize: fs(22) }]}>
-              Magtanong po kayo sa akin
+              {t("voiceEmptyTitle")}
             </Text>
             <Text style={[styles.emptyBody, { fontSize: fs(17) }]}>
-              Pindutin ang asul na butones sa ibaba, tapos magsalita nang normal.
-              Pindutin ulit kapag tapos na kayo. Babasahin ko po ang sagot.
+              {t("voiceEmptyBody")}
             </Text>
             <Text style={[styles.emptyHint, { fontSize: fs(15) }]}>
-              Halimbawa: “Ano po ang gamot sa sipon?” o “Paano mag-book ng
-              appointment sa health center?”
+              {t("voiceEmptyExample")}
             </Text>
           </View>
         )}
 
         {turns.map((turn: Turn) => (
           <View key={turn.id} style={styles.turnBlock}>
-            <Text style={[styles.label, { fontSize: fs(14) }]}>SINABI NINYO</Text>
+            <Text style={[styles.label, { fontSize: fs(14) }]}>{t("voiceYouSaid")}</Text>
             <View style={styles.questionCard}>
               <Text style={[styles.questionText, { fontSize: fs(18) }]}>
                 {turn.question}
               </Text>
             </View>
 
-            <Text style={[styles.label, { fontSize: fs(14) }]}>SAGOT NI HEALTHAI</Text>
+            <Text style={[styles.label, { fontSize: fs(14) }]}>{t("voiceAnswerLabel")}</Text>
             <View style={styles.answerCard}>
               <Text style={[styles.answerText, { fontSize: fs(19) }]}>
                 {turn.answer}
@@ -235,7 +233,7 @@ export default function VoiceScreen() {
 
         {!!partialQuestion && (
           <View style={styles.turnBlock}>
-            <Text style={[styles.label, { fontSize: fs(14) }]}>SINABI NINYO</Text>
+            <Text style={[styles.label, { fontSize: fs(14) }]}>{t("voiceYouSaid")}</Text>
             <View style={styles.questionCard}>
               <Text style={[styles.questionText, { fontSize: fs(18) }]}>
                 {partialQuestion}
@@ -264,7 +262,7 @@ export default function VoiceScreen() {
             activeOpacity={0.85}
             disabled={isBusy && !isRecording}
             style={[styles.micButton, { backgroundColor: buttonColor }]}
-            accessibilityLabel={isRecording ? "Itigil ang pagrekord" : "Magsalita"}
+            accessibilityLabel={isRecording ? t("voiceA11yStopRecording") : t("voiceA11ySpeak")}
           >
             <MaterialCommunityIcons name={buttonIcon as any} size={58} color="#fff" />
           </TouchableOpacity>
@@ -277,10 +275,10 @@ export default function VoiceScreen() {
             <TouchableOpacity
               onPress={cancelRecording}
               style={[styles.secondaryBtn, styles.cancelBtn]}
-              accessibilityLabel="Kanselahin"
+              accessibilityLabel={t("voiceCancel")}
             >
               <Ionicons name="close-circle-outline" size={fs(22)} color="#B91C1C" />
-              <Text style={[styles.cancelLabel, { fontSize: fs(16) }]}>Kanselahin</Text>
+              <Text style={[styles.cancelLabel, { fontSize: fs(16) }]}>{t("voiceCancel")}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -290,7 +288,7 @@ export default function VoiceScreen() {
                 styles.secondaryBtn,
                 (!lastTurn || isBusy) && styles.secondaryBtnDisabled,
               ]}
-              accessibilityLabel="Ulitin ang sagot"
+              accessibilityLabel={t("voiceReplay")}
             >
               <Ionicons
                 name="volume-high-outline"
@@ -304,7 +302,7 @@ export default function VoiceScreen() {
                   (!lastTurn || isBusy) && { color: "#9CA3AF" },
                 ]}
               >
-                Ulitin ang sagot
+                {t("voiceReplay")}
               </Text>
             </TouchableOpacity>
           )}

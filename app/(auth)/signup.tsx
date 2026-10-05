@@ -147,7 +147,14 @@ export default function Signup() {
       const picked = await pickIdPhoto();
       if (picked) setIdImage(picked);
     } catch (e: any) {
-      Alert.alert("Photo", e?.message || "Could not use that photo.");
+      Alert.alert(
+        t("ivPhotoTitle"),
+        e?.code === "photo-permission"
+          ? t("ivPhotoPermission")
+          : e?.code === "photo-too-large"
+            ? t("ivPhotoTooLarge")
+            : t("ivPhotoFail"),
+      );
     }
   };
 
@@ -180,46 +187,46 @@ export default function Signup() {
       !gender ||
       !password
     ) {
-      Alert.alert("Missing Fields", "Please fill in all required fields.");
+      Alert.alert(t("suMissingTitle"), t("suMissingBody"));
       return;
     }
     const firstProblem = validateAll();
     if (firstProblem) {
-      Alert.alert("Please Check Your Entries", firstProblem);
+      Alert.alert(t("suCheckEntries"), firstProblem);
       return;
     }
     if (!guardianName.trim() || !guardianPhone.trim()) {
       Alert.alert(
-        "Guardian Required",
-        "Please add a guardian or relative name and contact number. This is who gets alerted if you are unreachable.",
+        t("suGuardianTitle"),
+        t("suGuardianBody"),
       );
       return;
     }
     if (!isPhMobile(guardianPhone.trim())) {
       Alert.alert(
-        "Check the Number",
-        "Please enter a valid PH mobile number for the guardian, e.g. 09171234567.",
+        t("suCheckNumberTitle"),
+        t("suCheckNumberBody"),
       );
       return;
     }
     if (hasSciaId === null) {
       Alert.alert(
-        "Registration Status",
-        "Please tell us if you are already registered as a Senior Citizen.",
+        t("suStatusTitle"),
+        t("suStatusBody"),
       );
       return;
     }
     if (hasSciaId === true && !idNumber.trim()) {
       Alert.alert(
-        "ID Number Required",
-        "Since you are already registered, please enter your Senior Citizen ID Number.",
+        t("suIdNumTitle"),
+        t("suIdNumBody"),
       );
       return;
     }
     if (hasSciaId === true && !idImage) {
       Alert.alert(
-        "ID Photo Required",
-        "Please upload a photo of your Senior Citizen ID so OSCA can verify it.",
+        t("suIdPhotoTitle"),
+        t("suIdPhotoBody"),
       );
       return;
     }
@@ -270,7 +277,7 @@ export default function Signup() {
       await refreshUser();
       router.replace("/(tabs)/home");
     } catch (error: any) {
-      Alert.alert("Error", error?.message || "Registration failed");
+      Alert.alert(t("errorTitle"), t("suFail"));
     } finally {
       setLoading(false);
     }
@@ -286,19 +293,18 @@ export default function Signup() {
       >
         <View style={styles.headerSection}>
           <View style={styles.headerAccent} />
-          <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Register as a Senior Citizen</Text>
+          <Text style={styles.title}>{t("suTitle")}</Text>
+          <Text style={styles.subtitle}>{t("suSubtitle")}</Text>
           <View style={styles.pendingNotice}>
             <Text style={styles.pendingNoticeText}>
-              All new accounts require admin verification before full access is
-              granted.
+              {t("suPendingNotice")}
             </Text>
           </View>
         </View>
 
         <View style={styles.noIdSection}>
           <Text style={styles.noIdQuestion}>
-            Are you already registered as a Senior Citizen? *
+            {t("suQuestion")}
           </Text>
 
           {hasSciaId === null && (
@@ -307,13 +313,13 @@ export default function Signup() {
                 style={styles.idAnswerYes}
                 onPress={() => setHasSciaId(true)}
               >
-                <Text style={styles.idAnswerYesText}>Yes, I'm registered</Text>
+                <Text style={styles.idAnswerYesText}>{t("suYes")}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.idAnswerNo}
                 onPress={() => setHasSciaId(false)}
               >
-                <Text style={styles.idAnswerNoText}>Not yet</Text>
+                <Text style={styles.idAnswerNoText}>{t("suNotYet")}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -321,10 +327,10 @@ export default function Signup() {
           {hasSciaId === true && (
             <View style={styles.idActionCard}>
               <Text style={styles.idActionText}>
-                Please enter your Senior Citizen ID Number below. It is required.
+                {t("suEnterId")}
               </Text>
               <TouchableOpacity onPress={() => setHasSciaId(null)}>
-                <Text style={styles.changeAnswerText}>Change answer</Text>
+                <Text style={styles.changeAnswerText}>{t("suChangeAnswer")}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -334,36 +340,34 @@ export default function Signup() {
               {ncscStatus === "started" ? (
                 <>
                   <Text style={styles.idActionText}>
-                    Did you finish the NCSC registration?
+                    {t("suNcscFinished")}
                   </Text>
                   <TouchableOpacity
                     style={styles.oscaButton}
                     onPress={() => setNcscStatus("completed_claimed")}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.oscaButtonText}>Yes, I finished</Text>
+                    <Text style={styles.oscaButtonText}>{t("suYesFinished")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.idAnswerNo}
                     onPress={() => setNcscStatus("cancelled")}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.idAnswerNoText}>I cancelled</Text>
+                    <Text style={styles.idAnswerNoText}>{t("suCancelled")}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => Linking.openURL(NCSC_FORM_URL)}>
-                    <Text style={styles.changeAnswerText}>Open the form again</Text>
+                    <Text style={styles.changeAnswerText}>{t("suReopenForm")}</Text>
                   </TouchableOpacity>
                 </>
               ) : ncscStatus === "completed_claimed" ? (
                 <Text style={styles.idActionText}>
-                  Thank you. Your NCSC registration will be checked by OSCA
-                  after you create your account.
+                  {t("suNcscThanks")}
                 </Text>
               ) : (
                 <>
                   <Text style={styles.idActionText}>
-                    You can register now at NCSC, or skip this and just create
-                    your account. Registering is optional.
+                    {t("suNcscOptional")}
                   </Text>
                   <TouchableOpacity
                     style={styles.oscaButton}
@@ -373,7 +377,7 @@ export default function Signup() {
                     }}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.oscaButtonText}>Register at NCSC</Text>
+                    <Text style={styles.oscaButtonText}>{t("suRegisterNcsc")}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -383,16 +387,16 @@ export default function Signup() {
                   setNcscStatus(null);
                 }}
               >
-                <Text style={styles.changeAnswerText}>Change answer</Text>
+                <Text style={styles.changeAnswerText}>{t("suChangeAnswer")}</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
-        <Text style={styles.sectionLabel}>Personal Information</Text>
+        <Text style={styles.sectionLabel}>{t("suPersonalInfo")}</Text>
         <View style={styles.inputGroup}>
           <TextInput
-            placeholder="First Name *"
+            placeholder={t("suFirstName")}
             placeholderTextColor="#6B7280"
             style={inputStyle("firstName")}
             value={firstName}
@@ -400,7 +404,7 @@ export default function Signup() {
           />
           {fieldError("firstName")}
           <TextInput
-            placeholder="Middle Name *"
+            placeholder={t("suMiddleName")}
             placeholderTextColor="#6B7280"
             style={inputStyle("midName")}
             value={midName}
@@ -408,7 +412,7 @@ export default function Signup() {
           />
           {fieldError("midName")}
           <TextInput
-            placeholder="Last Name *"
+            placeholder={t("suLastName")}
             placeholderTextColor="#6B7280"
             style={inputStyle("lastName")}
             value={lastName}
@@ -416,7 +420,7 @@ export default function Signup() {
           />
           {fieldError("lastName")}
           <TextInput
-            placeholder="Contact Number *"
+            placeholder={t("suContact")}
             placeholderTextColor="#6B7280"
             style={inputStyle("conNumber")}
             value={conNumber}
@@ -426,14 +430,13 @@ export default function Signup() {
           {fieldError("conNumber")}
         </View>
 
-        <Text style={styles.sectionLabel}>Guardian / Relative Contact</Text>
+        <Text style={styles.sectionLabel}>{t("suGuardianSection")}</Text>
         <Text style={styles.sectionHint}>
-          Who to alert if you don't check in. Required for the safety-monitoring
-          feature.
+          {t("suGuardianHint")}
         </Text>
         <View style={styles.inputGroup}>
           <TextInput
-            placeholder="Guardian/Relative Name *"
+            placeholder={t("suGuardianName")}
             placeholderTextColor="#6B7280"
             style={inputStyle("guardianName")}
             value={guardianName}
@@ -441,7 +444,7 @@ export default function Signup() {
           />
           {fieldError("guardianName")}
           <TextInput
-            placeholder="Guardian Contact Number *"
+            placeholder={t("suGuardianPhone")}
             placeholderTextColor="#6B7280"
             style={inputStyle("guardianPhone")}
             value={guardianPhone}
@@ -450,7 +453,7 @@ export default function Signup() {
           />
           {fieldError("guardianPhone")}
           <TextInput
-            placeholder="Relationship (e.g. Daughter, Son, Neighbor)"
+            placeholder={t("suGuardianRelation")}
             placeholderTextColor="#6B7280"
             style={inputStyle("guardianRelation")}
             value={guardianRelation}
@@ -459,7 +462,7 @@ export default function Signup() {
           {fieldError("guardianRelation")}
         </View>
 
-        <Text style={styles.sectionLabel}>District *</Text>
+        <Text style={styles.sectionLabel}>{t("suDistrict")}</Text>
         <View style={styles.genderRow}>
           {["District 1", "District 2"].map((d) => (
             <TouchableOpacity
@@ -468,13 +471,13 @@ export default function Signup() {
               onPress={() => { setDistrict(d); setBarangay(""); }}
             >
               <Text style={[styles.genderText, district === d && styles.genderTextActive]}>
-                {d}
+                {d === "District 1" ? t("suDistrict1") : t("suDistrict2")}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.sectionLabel}>Barangay *</Text>
+        <Text style={styles.sectionLabel}>{t("suBarangay")}</Text>
         <View style={styles.pickerBox}>
           <Picker
             selectedValue={barangay}
@@ -483,7 +486,7 @@ export default function Signup() {
             style={{ height: 56 }}
           >
             <Picker.Item
-              label={district ? "Select barangay" : "Select a district first"}
+              label={district ? t("suSelectBarangay") : t("suSelectDistrictFirst")}
               value=""
             />
             {barangayOptions.map((b: string) => (
@@ -492,9 +495,9 @@ export default function Signup() {
           </Picker>
         </View>
 
-        <Text style={styles.sectionLabel}>Street / House No. *</Text>
+        <Text style={styles.sectionLabel}>{t("suStreet")}</Text>
         <TextInput
-          placeholder="e.g. 123 Rizal St."
+          placeholder={t("suStreetPh")}
           placeholderTextColor="#6B7280"
           style={inputStyle("street")}
           value={street}
@@ -502,14 +505,14 @@ export default function Signup() {
         />
         {fieldError("street")}
 
-        <Text style={styles.sectionLabel}>Date of Birth *</Text>
+        <Text style={styles.sectionLabel}>{t("suDob")}</Text>
         <TouchableOpacity
           style={styles.dobButton}
           onPress={() => setShowDobPicker(true)}
           activeOpacity={0.7}
         >
           <Text style={[styles.dobButtonText, !dob && styles.placeholder]}>
-            {dob ? formatDisplayDate(dobDate) : "Select your date of birth"}
+            {dob ? formatDisplayDate(dobDate) : t("suSelectDob")}
           </Text>
           <Text style={styles.dobChevron}>›</Text>
         </TouchableOpacity>
@@ -535,11 +538,11 @@ export default function Signup() {
             style={styles.dobConfirmButton}
             onPress={() => setShowDobPicker(false)}
           >
-            <Text style={styles.dobConfirmText}>Confirm Date</Text>
+            <Text style={styles.dobConfirmText}>{t("suConfirmDate")}</Text>
           </TouchableOpacity>
         )}
 
-        <Text style={styles.sectionLabel}>Gender *</Text>
+        <Text style={styles.sectionLabel}>{t("suGender")}</Text>
         <View style={styles.genderRow}>
           {["Male", "Female"].map((g) => (
             <TouchableOpacity
@@ -556,20 +559,20 @@ export default function Signup() {
                   gender === g && styles.genderTextActive,
                 ]}
               >
-                {g}
+                {g === "Male" ? t("genderMale") : t("genderFemale")}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.sectionLabel}>Account Details</Text>
+        <Text style={styles.sectionLabel}>{t("suAccountDetails")}</Text>
         <View style={styles.inputGroup}>
           <View style={styles.optionalWrapper}>
             <TextInput
               placeholder={
                 hasSciaId === true
-                  ? "Senior Citizen ID Number *"
-                  : "Senior Citizen ID Number"
+                  ? t("suIdNumberReq")
+                  : t("suIdNumberOpt")
               }
               placeholderTextColor="#6B7280"
               style={inputStyle("idNumber", { paddingRight: 90 })}
@@ -580,13 +583,13 @@ export default function Signup() {
             />
             <View style={styles.optionalBadge}>
               <Text style={styles.optionalBadgeText}>
-                {hasSciaId === true ? "Required" : "Optional"}
+                {hasSciaId === true ? t("suRequired") : t("suOptional")}
               </Text>
             </View>
           </View>
           {fieldError("idNumber")}
           <TextInput
-            placeholder="Password *"
+            placeholder={t("suPassword")}
             placeholderTextColor="#6B7280"
             secureTextEntry
             style={inputStyle("password")}
@@ -606,7 +609,7 @@ export default function Signup() {
 
         {hasSciaId === true && (
         <>
-        <Text style={styles.sectionLabel}>Upload Senior Citizen ID Photo *</Text>
+        <Text style={styles.sectionLabel}>{t("suUploadLabel")}</Text>
         <TouchableOpacity
           style={styles.uploadCard}
           onPress={pickIdImage}
@@ -615,16 +618,16 @@ export default function Signup() {
           {idImage ? (
             <>
               <Image source={{ uri: idImage.uri }} style={styles.idPreview} />
-              <Text style={styles.uploadChangeText}>Tap to change photo</Text>
+              <Text style={styles.uploadChangeText}>{t("suChangePhoto")}</Text>
             </>
           ) : (
             <>
               <View style={styles.uploadIconBox}>
                 <Text style={styles.uploadIconText}>ID</Text>
               </View>
-              <Text style={styles.uploadTitle}>Upload ID Photo</Text>
+              <Text style={styles.uploadTitle}>{t("suUploadTitle")}</Text>
               <Text style={styles.uploadHint}>
-                OSCA will check this photo against the ID number you entered.
+                {t("suUploadHint")}
               </Text>
             </>
           )}
@@ -641,7 +644,7 @@ export default function Signup() {
           {loading ? (
             <ActivityIndicator color="white" size="small" />
           ) : (
-            <Text style={styles.createButtonText}>Create Account</Text>
+            <Text style={styles.createButtonText}>{t("suCreate")}</Text>
           )}
         </TouchableOpacity>
 

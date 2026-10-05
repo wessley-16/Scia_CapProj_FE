@@ -35,6 +35,7 @@
 //    so lib/voiceAI.ts can reuse this exact same Vertex AI setup and base
 //    voice prompt instead of duplicating it.
 
+import { getCurrentLanguage, tr } from "@/lib/i18n";
 import "@/lib/polyfills";
 // Side-effect import: lib/firebase.ts calls initAppCheck() at load time.
 // Importing it here guarantees App Check is initialized before any Gemini
@@ -154,25 +155,37 @@ export function friendlyAIError(err: unknown): string {
   console.error("[HealthAI]", err);
 
   if (msg.includes("404") || msg.includes("not found") || msg.includes("no longer available")) {
-    return "The assistant is being updated. Please try again later.";
+    return tr("aiErrUpdating");
   }
   if (msg.includes("app check") || msg.includes("attestation") || msg.includes("403") || msg.includes("permission")) {
-    return "The assistant is not available right now. Please try again later.";
+    return tr("aiErrUnavailable");
   }
   if (msg.includes("429") || msg.includes("quota") || msg.includes("resource_exhausted")) {
-    return "Many people are using the assistant right now. Please try again in a few minutes.";
+    return tr("aiErrBusy");
   }
   if (msg.includes("network") || msg.includes("fetch") || msg.includes("timeout")) {
-    return "I cannot reach the internet. Please check your connection and try again.";
+    return tr("aiErrNetwork");
   }
-  return "Sorry, something went wrong. Please try again.";
+  return tr("aiErrGeneric");
 }
 
 // ── Text chat ────────────────────────────────────────────────────────────
+// The app language setting decides the default reply language. Same rule for
+// both: translate the MEANING, sound like a Filipino speaker, never word by word.
+const CHAT_LANGUAGE_RULE = {
+  tl:
+    "WIKA (mas mataas ito kaysa sa naunang tuntunin tungkol sa wika): Sumagot sa natural na Tagalog gamit ang \"po\" at \"opo\", " +
+    "maliban kung malinaw na English ang buong mensahe ng tao. Isulat ito gaya ng sasabihin ng isang Pilipino, " +
+    "hindi salita-por-salita na salin mula sa English. Panatilihin sa English ang mga karaniwang salita gaya ng OSCA, SOS, ID, appointment, at health center.",
+  en:
+    "LANGUAGE: Reply in simple English unless the person clearly writes in Tagalog, then reply in natural Tagalog with po/opo.",
+};
+
 export function getChatModel() {
+  const lang = getCurrentLanguage() === "en" ? "en" : "tl";
   return getGenerativeModel(aiInstance(), {
     model: CHAT_MODEL,
-    systemInstruction: CHAT_PROMPT,
+    systemInstruction: `${CHAT_PROMPT}\n\n${CHAT_LANGUAGE_RULE[lang]}`,
     generationConfig: {
       maxOutputTokens: 1024,
       temperature: 0.7,

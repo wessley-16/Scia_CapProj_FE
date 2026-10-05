@@ -1,3 +1,4 @@
+import { useSettings } from "@/context/SettingsContext";
 import { ChatSession } from "@/hooks/useChatbot";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
@@ -49,14 +50,16 @@ export default function ChatHistoryDrawer({
   onOpenSession,
   onDeleteSession,
 }: Props) {
+  const { t } = useSettings();
+  const shownTitle = (title: string) => (title === "New conversation" ? t("chatNewConversation") : title);
   const handleDelete = (session: ChatSession) => {
     Alert.alert(
-      "Delete Conversation",
-      `Delete "${session.title}"? This can't be undone.`,
+      t("chatDeleteTitle"),
+      t("chatDeleteBody", { title: shownTitle(session.title) }),
       [
-        { text: "Cancel", style: "cancel" },
+        { text: t("cancel"), style: "cancel" },
         {
-          text: "Delete",
+          text: t("chatDelete"),
           style: "destructive",
           onPress: () => onDeleteSession(session.id),
         },
@@ -74,12 +77,12 @@ export default function ChatHistoryDrawer({
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { fontSize: 20 * fontScale }]}>
-            Chat History
+            {t("chatHistory")}
           </Text>
           <TouchableOpacity
             onPress={onClose}
             style={styles.closeBtn}
-            accessibilityLabel="Close"
+            accessibilityLabel={t("a11yClose")}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="close" size={26} color="#374151" />
@@ -98,12 +101,12 @@ export default function ChatHistoryDrawer({
             <Ionicons name="add" size={20} color="#fff" />
           </View>
           <Text style={[styles.newChatText, { fontSize: 16 * fontScale }]}>
-            New Chat
+            {t("chatNew")}
           </Text>
         </TouchableOpacity>
 
         <Text style={[styles.sectionLabel, { fontSize: 13 * fontScale }]}>
-          RECENT CONVERSATIONS
+          {t("chatRecent")}
         </Text>
 
         <FlatList
@@ -136,7 +139,7 @@ export default function ChatHistoryDrawer({
                       isActive && styles.sessionTitleActive,
                     ]}
                   >
-                    {item.title}
+                    {shownTitle(item.title)}
                   </Text>
                   <Text style={[styles.sessionTime, { fontSize: 13 * fontScale }]}>
                     {formatRelativeTime(item.updatedAt)}
@@ -146,7 +149,7 @@ export default function ChatHistoryDrawer({
                   onPress={() => handleDelete(item)}
                   style={styles.deleteBtn}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityLabel="Delete conversation"
+                  accessibilityLabel={t("a11yDeleteChat")}
                 >
                   <Ionicons name="trash-outline" size={18} color="#9CA3AF" />
                 </TouchableOpacity>

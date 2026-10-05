@@ -51,6 +51,7 @@ const LANGUAGE_RULE: Record<VoiceLang, string> = {
   tl:
     "WIKA (mas mataas ito kaysa sa anumang naunang tuntunin tungkol sa wika): Sumagot LAMANG sa Tagalog (Filipino), " +
     "sa simple at pang-araw-araw na salita, kahit English o Taglish ang tanong. Gumamit ng \"po\" at \"opo\". " +
+    "Isulat ito gaya ng sasabihin ng isang Pilipino, hindi salita-por-salita na salin mula sa English. " +
     "Huwag sumagot sa English, maliban sa mga pangalan gaya ng OSCA o SOS, at sa mga numerong bibigkasin " +
     "(halimbawa \"nine one one\").",
 };

@@ -11,6 +11,7 @@
 //  - NEW: every user has a spending cap (lib/aiUsage.ts). It is checked
 //    before each request and updated from the token counts after it.
 
+import { tr } from "@/lib/i18n";
 import {
   CHATBOT_SESSIONS_KEY_PREFIX,
   CHATBOT_STORAGE_KEY,
@@ -56,11 +57,11 @@ const MAX_CONTEXT_MESSAGES = 10;
 // app exit and can never leak into whichever account signs in next.
 const GUEST_SCOPE = "guest";
 
-const INITIAL_MESSAGE: ChatMessage = {
+const getInitialMessage = (): ChatMessage => ({
   id: "initial",
   role: "assistant",
-  text: "Kumusta po! Ako si HealthAI, ang inyong katulong sa kalusugan. Ano po ang maitutulong ko sa inyo ngayon? 😊",
-};
+  text: tr("chatGreeting"),
+});
 
 const getTrimmedMessages = (msgs: ChatMessage[]) =>
   msgs.slice(-MAX_CHATBOT_MESSAGES);
@@ -75,7 +76,7 @@ const deriveTitle = (msgs: ChatMessage[]): string => {
 const createEmptySession = (): ChatSession => ({
   id: generateId(),
   title: "New conversation",
-  messages: [INITIAL_MESSAGE],
+  messages: [getInitialMessage()],
   updatedAt: Date.now(),
 });
 
@@ -294,7 +295,7 @@ export const useChatbot = () => {
         addMessage("user", trimmed);
         addMessage(
           "assistant",
-          isBudgetError(budgetErr) ? AI_LIMIT_MESSAGE : friendlyAIError(budgetErr),
+          isBudgetError(budgetErr) ? tr("aiLimit") : friendlyAIError(budgetErr),
         );
         return;
       }
@@ -306,7 +307,7 @@ export const useChatbot = () => {
       if (!chatRef.current) {
         addMessage(
           "assistant",
-          "Hindi ko po ma-simulan ang chat. Pakisara at buksan ulit ang app. 😊",
+          tr("chatStartFail"),
         );
         return;
       }

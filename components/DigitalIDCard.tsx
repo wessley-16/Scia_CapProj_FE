@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { requestDigitalId } from "@/lib/firebase";
 import { useDigitalId, useDigitalIdRequest } from "@/hooks/useDigitalID";
 
@@ -269,6 +270,7 @@ function IdBack() {
 // ── screen-facing component ───────────────────────────────────────────────────
 export default function DigitalIDCard({ uid }: Props) {
   const { user } = useAuth();
+  const { t } = useSettings();
   const { data, loading, error } = useDigitalId(uid);
   const request = useDigitalIdRequest(uid);
 
@@ -303,7 +305,7 @@ export default function DigitalIDCard({ uid }: Props) {
       // refusal arrives as request.status === "denied" with a message.
     } catch (e) {
       console.warn("requestDigitalId failed:", e);
-      setClaimError("Couldn't send your request. Please check your connection and try again.");
+      setClaimError(t("didClaimFail"));
       setClaiming(false);
     }
   };
@@ -328,13 +330,13 @@ export default function DigitalIDCard({ uid }: Props) {
     return (
       <View onLayout={onLayout} style={[s.panel, s.claimPanel, { minHeight: h || 180 }]}>
         <Ionicons name="card-outline" size={34} color={NAVY} />
-        <Text style={s.claimTitle}>Digital Senior Citizen ID</Text>
+        <Text style={s.claimTitle}>{t("didTitle")}</Text>
         <Text style={s.claimSub}>
           {error
-            ? "Couldn't load your ID. Please try again later."
+            ? t("didLoadError")
             : verified
-              ? "Your account is verified. Claim your Digital ID — it looks just like your physical OSCA ID."
-              : "Available once OSCA verifies your Senior Citizen ID."}
+              ? t("didVerified")
+              : t("didNotYet")}
         </Text>
 
         {!!(denied || claimError) && <Text style={s.claimError}>{denied || claimError}</Text>}
@@ -348,10 +350,10 @@ export default function DigitalIDCard({ uid }: Props) {
           {waiting ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={s.claimBtnText}>Claim Digital ID</Text>
+            <Text style={s.claimBtnText}>{t("didClaim")}</Text>
           )}
         </TouchableOpacity>
-        {waiting && <Text style={s.claimHint}>Creating your Digital ID…</Text>}
+        {waiting && <Text style={s.claimHint}>{t("didCreating")}</Text>}
       </View>
     );
   }
@@ -372,7 +374,7 @@ export default function DigitalIDCard({ uid }: Props) {
         <View style={s.invalidBanner}>
           <Ionicons name="warning" size={16} color="#B91C1C" />
           <Text style={s.invalidText}>
-            This digital ID was deactivated by OSCA. Please contact them.
+            {t("didInvalid")}
           </Text>
         </View>
       )}

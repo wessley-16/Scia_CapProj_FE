@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { Guardian, updateMyUserFields } from "@/lib/firebase";
 import { RULES, RuleKind, sanitize, validate } from "@/lib/validators";
 import { disableSafetyMonitoring, enableSafetyMonitoring } from "@/lib/presence";
@@ -23,6 +24,7 @@ const MAX_GUARDIANS = 3;
 
 export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: number }) {
   const { user, refreshUser } = useAuth();
+  const { t } = useSettings();
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState("");
@@ -45,38 +47,33 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
 
   const turnOn = () => {
     Alert.alert(
-      "Turn on Safety Monitoring?",
-      "SCIA will record your phone's location in the background, even when the app is closed. " +
-        "If your phone shows no activity for 60 minutes and you don't answer an \"Are you safe?\" " +
-        "message at the 50-minute mark, we send a text with your last known location to your " +
-        "guardians and to your barangay office.\n\nYou can turn this off any time.",
+      t("smTurnOnTitle"),
+      t("smTurnOnBody"),
       [
-        { text: "Not now", style: "cancel" },
+        { text: t("smNotNow"), style: "cancel" },
         {
-          text: "I agree",
+          text: t("smAgree"),
           onPress: async () => {
             setBusy(true);
             try {
               const res = await enableSafetyMonitoring(uid);
               if (!res.ok) {
                 Alert.alert(
-                  res.reason === "background" ? "Allow location \"all the time\"" : "Location needed",
-                  res.reason === "background"
-                    ? "Safety Monitoring needs location access all the time so it works when the app is closed. Open Settings > Location and choose \"Allow all the time\"."
-                    : "Please allow location access to use Safety Monitoring.",
-                  [{ text: "Cancel", style: "cancel" }, { text: "Open Settings", onPress: () => Linking.openSettings() }],
+                  res.reason === "background" ? t("smBgTitle") : t("smLocTitle"),
+                  res.reason === "background" ? t("smBgBody") : t("smLocBody"),
+                  [{ text: t("cancel"), style: "cancel" }, { text: t("emOpenSettings"), onPress: () => Linking.openSettings() }],
                 );
               } else {
                 await refreshUser();
                 if (!res.notifications) {
                   Alert.alert(
-                    "Notifications are off",
-                    "Without notifications we can't ask \"Are you safe?\" before alerting your guardians. Turn them on in Settings.",
+                    t("smNotifOffTitle"),
+                    t("smNotifOffBody"),
                   );
                 }
               }
             } catch (e: any) {
-              Alert.alert("Error", e?.message || "Could not turn on Safety Monitoring.");
+              Alert.alert(t("errorTitle"), t("smOnFail"));
             } finally {
               setBusy(false);
             }
@@ -92,7 +89,7 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
       await disableSafetyMonitoring(uid);
       await refreshUser();
     } catch (e: any) {
-      Alert.alert("Error", e?.message || "Could not turn off Safety Monitoring.");
+      Alert.alert(t("errorTitle"), t("smOffFail"));
     } finally {
       setBusy(false);
     }
@@ -105,7 +102,7 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
 
   const addGuardian = async () => {
     if (!name.trim() || !phone.trim()) {
-      setFormError("Please enter the guardian's name and mobile number.");
+      setFormError(t("smNeedNamePhone"));
       return;
     }
     const err =
@@ -126,20 +123,20 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
       setEditing(false);
       setName(""); setPhone(""); setRelationship(""); setFormError("");
     } catch {
-      Alert.alert("Error", "Could not save. Please check your connection.");
+      Alert.alert(t("errorTitle"), t("smSaveFail"));
     } finally {
       setBusy(false);
     }
   };
 
   const removeGuardian = (index: number) =>
-    Alert.alert("Remove guardian?", guardians[index]?.name, [
-      { text: "Cancel", style: "cancel" },
+    Alert.alert(t("smRemoveTitle"), guardians[index]?.name, [
+      { text: t("cancel"), style: "cancel" },
       {
-        text: "Remove",
+        text: t("smRemove"),
         style: "destructive",
         onPress: () => saveGuardians(guardians.filter((_, i) => i !== index)).catch(() =>
-          Alert.alert("Error", "Could not save. Please check your connection.")),
+          Alert.alert(t("errorTitle"), t("smSaveFail"))),
       },
     ]);
 
@@ -147,7 +144,7 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
     <View style={s.card}>
       <View style={s.headerRow}>
         <Ionicons name="shield-checkmark" size={26} color="#2356E1" />
-        <Text style={[s.title, { fontSize: 18 * fontScale }]}>Safety Monitoring</Text>
+        <Text style={[s.title, { fontSize: 18 * fontScale }]}>{t("smTitle")}</Text>
         {busy ? (
           <ActivityIndicator color="#2356E1" />
         ) : (
@@ -156,14 +153,14 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
       </View>
       <Text style={[s.body, { fontSize: 14 * fontScale }]}>
         {on
-          ? "On. If we can't reach your phone for 60 minutes, your guardians and barangay office get a text with your last location. We ask \"Are you safe?\" first, at 50 minutes."
-          : "Turn on to let your guardians and barangay office be alerted if your phone shows no activity for an hour."}
+          ? t("smOnBody")
+          : t("smOffBody")}
       </Text>
 
-      <Text style={[s.sub, { fontSize: 15 * fontScale }]}>Guardians ({guardians.length}/{MAX_GUARDIANS})</Text>
+      <Text style={[s.sub, { fontSize: 15 * fontScale }]}>{t("smGuardians", { count: guardians.length, max: MAX_GUARDIANS })}</Text>
       {guardians.length === 0 && (
         <Text style={[s.hint, { fontSize: 14 * fontScale }]}>
-          No guardian added yet. Only your barangay office would be texted.
+          {t("smNoGuardian")}
         </Text>
       )}
       {guardians.map((g, i) => (
@@ -182,18 +179,18 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
       {guardians.length < MAX_GUARDIANS && (
         <TouchableOpacity style={s.addBtn} onPress={() => setEditing(true)} activeOpacity={0.85}>
           <Ionicons name="add-circle-outline" size={20} color="#2356E1" />
-          <Text style={[s.addText, { fontSize: 15 * fontScale }]}>Add guardian</Text>
+          <Text style={[s.addText, { fontSize: 15 * fontScale }]}>{t("smAddGuardian")}</Text>
         </TouchableOpacity>
       )}
 
       <Modal visible={editing} transparent animationType="fade" onRequestClose={() => setEditing(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={s.overlay}>
           <View style={s.modal}>
-            <Text style={[s.title, { fontSize: 20 * fontScale, marginBottom: 12 }]}>Add guardian</Text>
-            <TextInput style={[s.input, !!formError && s.inputError]} placeholder="Full name" value={name} onChangeText={typed("name", setName)} maxLength={RULES.name.max} />
+            <Text style={[s.title, { fontSize: 20 * fontScale, marginBottom: 12 }]}>{t("smAddGuardian")}</Text>
+            <TextInput style={[s.input, !!formError && s.inputError]} placeholder={t("smFullName")} value={name} onChangeText={typed("name", setName)} maxLength={RULES.name.max} />
             <TextInput
               style={s.input}
-              placeholder="Mobile number (09XXXXXXXXX)"
+              placeholder={t("smMobilePh")}
               keyboardType="phone-pad"
               value={phone}
               onChangeText={typed("phone", setPhone)}
@@ -201,7 +198,7 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
             />
             <TextInput
               style={s.input}
-              placeholder="Relationship (optional)"
+              placeholder={t("smRelationPh")}
               value={relationship}
               onChangeText={typed("relation", setRelationship)}
               maxLength={RULES.relation.max}
@@ -209,10 +206,10 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
             {!!formError && <Text style={s.errorText}>{formError}</Text>}
             <View style={s.btnRow}>
               <TouchableOpacity style={[s.btn, s.btnGhost]} onPress={() => setEditing(false)}>
-                <Text style={s.btnGhostText}>Cancel</Text>
+                <Text style={s.btnGhostText}>{t("cancel")}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[s.btn, s.btnPrimary]} onPress={addGuardian} disabled={busy}>
-                <Text style={s.btnPrimaryText}>Save</Text>
+                <Text style={s.btnPrimaryText}>{t("save")}</Text>
               </TouchableOpacity>
             </View>
           </View>

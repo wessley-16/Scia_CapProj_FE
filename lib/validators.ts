@@ -14,6 +14,8 @@
 // such as Ñ) rather than \p{L}, so this does not depend on the JS engine
 // supporting Unicode property escapes.
 
+import { tr } from "@/lib/i18n";
+
 const L = "A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u00FF\\u0100-\\u017F"; // letters
 const M = "\\u0300-\\u036F"; // combining accents
 
@@ -32,40 +34,40 @@ export const RULES: Record<RuleKind, Rule> = {
     strip: new RegExp(`[^${L}${M}\\s.'-]`, "g"),
     check: new RegExp(`^[${L}][${L}${M}\\s.'-]*$`),
     max: 50,
-    hint: "Letters only. Numbers and symbols are not allowed.",
-    message: "Enter a valid name (letters, spaces, . ' - only).",
+    get hint() { return tr("vNameHint"); },
+    get message() { return tr("vNameMsg"); },
   },
   // Mobile numbers: digits, with an optional leading +.
   phone: {
     strip: /[^\d+]/g,
     check: /^(09\d{9}|\+639\d{9})$/,
     max: 13,
-    hint: "Numbers only.",
-    message: "Enter a valid PH mobile number, e.g. 09171234567.",
+    get hint() { return tr("vPhoneHint"); },
+    get message() { return tr("vPhoneMsg"); },
   },
   // House / block / street lines.
   address: {
     strip: new RegExp(`[^${L}0-9\\s.,#'/-]`, "g"),
     check: new RegExp(`^[${L}0-9][${L}0-9\\s.,#'/-]*$`),
     max: 80,
-    hint: "Letters, numbers and . , # - / only.",
-    message: "Enter a valid address (letters, numbers and . , # - / only).",
+    get hint() { return tr("vAddressHint"); },
+    get message() { return tr("vAddressMsg"); },
   },
   // Senior Citizen / OSCA ID numbers, including TEMP###### ones.
   idNumber: {
     strip: /[^A-Za-z0-9-]/g,
     check: /^[A-Za-z0-9-]{4,20}$/,
     max: 20,
-    hint: "Letters, numbers and dashes only.",
-    message: "Enter a valid ID number (4 to 20 letters or numbers).",
+    get hint() { return tr("vIdHint"); },
+    get message() { return tr("vIdMsg"); },
   },
   // Free relationship text such as "Daughter" or "Neighbor".
   relation: {
     strip: new RegExp(`[^${L}${M}\\s.'-]`, "g"),
     check: new RegExp(`^[${L}][${L}${M}\\s.'-]*$`),
     max: 30,
-    hint: "Letters only.",
-    message: "Enter a valid relationship (letters only).",
+    get hint() { return tr("vRelHint"); },
+    get message() { return tr("vRelMsg"); },
   },
 };
 
@@ -93,24 +95,24 @@ export function validate(kind: RuleKind, raw: string, opts: { required?: boolean
   const required = opts.required ?? true;
   const rule = RULES[kind];
   const v = String(raw ?? "").trim();
-  if (!v) return required ? "This field is required." : "";
+  if (!v) return required ? tr("vRequired") : "";
   return rule.check.test(v) ? "" : rule.message;
 }
 
 export function validateGender(value: string): string {
-  return GENDERS.includes(value) ? "" : "Choose Male or Female.";
+  return GENDERS.includes(value) ? "" : tr("vGender");
 }
 
 /** A select must hold one of its real options. */
 export function validateOption(value: string, options: readonly string[], label = "option"): string {
-  return options.includes(value) ? "" : `Choose a valid ${label} from the list.`;
+  return options.includes(value) ? "" : tr("vOption", { label });
 }
 
 export function validatePassword(value: string): string {
   if (value.length < MIN_PASSWORD_LENGTH) {
-    return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    return tr("vPwShort", { n: MIN_PASSWORD_LENGTH });
   }
-  if (value.length > MAX_PASSWORD_LENGTH) return "Password is too long.";
+  if (value.length > MAX_PASSWORD_LENGTH) return tr("vPwLong");
   return "";
 }
 

@@ -48,7 +48,7 @@ function formatDate(value: any): string {
  */
 export default function IdVerificationCard() {
   const { user, refreshUser } = useAuth();
-  const { fontScale } = useSettings();
+  const { fontScale, t } = useSettings();
 
   const [latest, setLatest] = useState<MyIdVerification | null>(null);
   // null = the senior hasn't typed anything yet, so show the number they gave at
@@ -82,22 +82,29 @@ export default function IdVerificationCard() {
       const picked = await pickIdImage();
       if (picked) setPhoto(picked);
     } catch (e: any) {
-      Alert.alert("Photo", e?.message || "Could not use that photo.");
+      Alert.alert(
+        t("ivPhotoTitle"),
+        e?.code === "photo-permission"
+          ? t("ivPhotoPermission")
+          : e?.code === "photo-too-large"
+            ? t("ivPhotoTooLarge")
+            : t("ivPhotoFail"),
+      );
     }
   };
 
   const send = async () => {
     if (!photo) {
-      Alert.alert("ID Photo Required", "Please add a photo of your OSCA ID.");
+      Alert.alert(t("ivPhotoRequiredTitle"), t("ivPhotoRequiredBody"));
       return;
     }
     setSending(true);
     try {
       await submitIdVerification({ idNumber, imageBase64: photo.base64 });
       setPhoto(null);
-      Alert.alert("Sent to OSCA", "OSCA will check your ID. You'll see the result here.");
+      Alert.alert(t("ivSentTitle"), t("ivSentBody"));
     } catch (e: any) {
-      Alert.alert("Could not send", e?.message || "Please try again.");
+      Alert.alert(t("ivSendFailTitle"), t("tryAgain"));
     } finally {
       setSending(false);
     }
@@ -107,17 +114,19 @@ export default function IdVerificationCard() {
     <View style={s.card}>
       <View style={s.header}>
         <Ionicons name="card-outline" size={22} color={C.primary} />
-        <Text style={[s.title, { fontSize: 17 * fontScale }]}>Verify My OSCA ID</Text>
+        <Text style={[s.title, { fontSize: 17 * fontScale }]}>{t("ivTitle")}</Text>
       </View>
 
       {pending ? (
         <View style={[s.notice, { backgroundColor: C.warningLight }]}>
           <Ionicons name="time-outline" size={20} color={C.warning} />
           <Text style={[s.noticeText, { fontSize: 15 * fontScale }]}>
-            Your ID{latest?.idNumber ? ` (${latest.idNumber})` : ""} was sent
-            {formatDate(latest?.submittedAt) ? ` on ${formatDate(latest?.submittedAt)}` : ""} and
-            is waiting for OSCA to verify. Once verified, your ID number and Digital ID are
-            updated automatically.
+            {t("ivPending", {
+              idPart: latest?.idNumber ? ` (${latest.idNumber})` : "",
+              datePart: formatDate(latest?.submittedAt)
+                ? t("ivDatePart", { date: formatDate(latest?.submittedAt) })
+                : "",
+            })}
           </Text>
         </View>
       ) : (
@@ -126,20 +135,19 @@ export default function IdVerificationCard() {
             <View style={[s.notice, { backgroundColor: C.dangerLight }]}>
               <Ionicons name="alert-circle-outline" size={20} color={C.danger} />
               <Text style={[s.noticeText, { fontSize: 15 * fontScale }]}>
-                OSCA could not verify your last photo. Please check the ID number and send a
-                clearer photo.
+                {t("ivRejected")}
               </Text>
             </View>
           )}
 
           <Text style={[s.help, { fontSize: 15 * fontScale }]}>
             {isTempIdNumber(user.idNumber)
-              ? "You are using a temporary ID. Send a photo of your physical OSCA ID to get your real ID number and a verified Digital ID."
-              : "Send a photo of your physical OSCA ID so OSCA can verify your account."}
+              ? t("ivHelpTemp")
+              : t("ivHelp")}
           </Text>
 
           <TextInput
-            placeholder="OSCA ID number on your card"
+            placeholder={t("ivIdPh")}
             placeholderTextColor="#6B7280"
             style={[s.input, { fontSize: 16 * fontScale }]}
             value={idNumber}
@@ -151,12 +159,12 @@ export default function IdVerificationCard() {
             {photo ? (
               <>
                 <Image source={{ uri: photo.uri }} style={s.preview} resizeMode="contain" />
-                <Text style={[s.photoHint, { fontSize: 14 * fontScale }]}>Tap to change photo</Text>
+                <Text style={[s.photoHint, { fontSize: 14 * fontScale }]}>{t("ivChangePhoto")}</Text>
               </>
             ) : (
               <>
                 <Ionicons name="camera-outline" size={30} color={C.primary} />
-                <Text style={[s.photoHint, { fontSize: 15 * fontScale }]}>Add a photo of your ID</Text>
+                <Text style={[s.photoHint, { fontSize: 15 * fontScale }]}>{t("ivAddPhoto")}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -170,7 +178,7 @@ export default function IdVerificationCard() {
             {sending ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
-              <Text style={[s.buttonText, { fontSize: 16 * fontScale }]}>Send to OSCA</Text>
+              <Text style={[s.buttonText, { fontSize: 16 * fontScale }]}>{t("ivSend")}</Text>
             )}
           </TouchableOpacity>
         </>

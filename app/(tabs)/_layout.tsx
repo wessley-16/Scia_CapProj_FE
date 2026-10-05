@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { useSettings } from "@/context/SettingsContext";
 import { usePresence } from "@/hooks/usePresence";
 import { Ionicons } from "@expo/vector-icons";
 import Entypo from "@expo/vector-icons/Entypo";
@@ -21,6 +22,7 @@ const CustomTabBar = ({
   onScanPress,
 }: any) => {
   const insets = useSafeAreaInsets();
+  const { t } = useSettings();
   const paddingBottom = insets.bottom > 0 ? insets.bottom : 15;
 
   const currentRouteName = state.routes[state.index].name;
@@ -36,8 +38,8 @@ const CustomTabBar = ({
 
   // Only Home and Account appear as tappable tab items
   const iconMap: any = {
-    home: { label: "Home", icon: "home-outline", active: "home" },
-    account: { label: "Account", icon: "person-outline", active: "person" },
+    home: { label: t("tabHome"), icon: "home-outline", active: "home" },
+    account: { label: t("tabAccount"), icon: "person-outline", active: "person" },
   };
 
   const renderTab = (route: any) => {
@@ -98,20 +100,20 @@ const CustomTabBar = ({
 // notice on the signup screen was never actually enforced anywhere.
 const PendingVerificationScreen = ({ onLogout }: { onLogout: () => void }) => {
   const insets = useSafeAreaInsets();
+  const { t } = useSettings();
   return (
     <View style={[styles.pendingWrapper, { paddingTop: insets.top + 24 }]}>
       <View style={styles.pendingCard}>
-        <Text style={styles.pendingTitle}>Account Pending Verification</Text>
+        <Text style={styles.pendingTitle}>{t("pendingTitle")}</Text>
         <Text style={styles.pendingBody}>
-          Your account has been created but is still awaiting review by an
-          OSCA admin. You'll be able to access the app once it's approved.
+          {t("pendingBody")}
         </Text>
         <TouchableOpacity
           style={styles.pendingButton}
           onPress={onLogout}
           activeOpacity={0.8}
         >
-          <Text style={styles.pendingButtonText}>Log Out</Text>
+          <Text style={styles.pendingButtonText}>{t("logOutBtn")}</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -4,6 +4,7 @@
 // and .last_known_location fresh: every 5 min while the app is open (see
 // hooks/usePresence.ts) and every ~10 min in the background (lib/presenceTask.ts).
 // The server (functions/inactivityMonitor.js) does the rest.
+import { tr } from "@/lib/i18n";
 import * as Location from "expo-location";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
@@ -89,8 +90,8 @@ export async function startBackgroundPresence() {
     pausesUpdatesAutomatically: false,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
-      notificationTitle: "SCIA Safety Monitoring is on",
-      notificationBody: "Checking in so your guardians can be alerted if you can't be reached.",
+      notificationTitle: tr("safeServiceTitle"),
+      notificationBody: tr("safeServiceBody"),
       notificationColor: "#2356E1",
     },
   });

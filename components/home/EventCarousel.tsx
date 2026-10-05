@@ -1,4 +1,5 @@
 // components/home/EventCarousel.tsx
+import { useSettings } from "@/context/SettingsContext";
 import { Event } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
@@ -26,7 +27,7 @@ interface Props {
   onJoinPress: (event: Event) => void;
 }
 
-const getTitle = (e: Event) => e.title ?? e.Title ?? "Untitled event";
+const getTitle = (e: Event, fallback = "Untitled event") => e.title ?? e.Title ?? fallback;
 const getDescription = (e: Event) => e.description ?? e.Body ?? "";
 const getLocation = (e: Event) => e.location ?? e.Location ?? "";
 const getDate = (e: Event) => e.date ?? e.Date ?? "";
@@ -48,6 +49,7 @@ const formatWhen = (raw: string) => {
 };
 
 export default function EventCarousel({ events, joinedEventIds, fontScale, onJoinPress }: Props) {
+  const { t } = useSettings();
   const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<FlatList>(null);
 
@@ -78,12 +80,12 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
   const showDetails = (event: Event) => {
     const dateLabel = formatWhen(getDate(event));
     const lines = [
-      dateLabel && `When: ${dateLabel}`,
-      getLocation(event) && `Where: ${getLocation(event)}`,
+      dateLabel && t("evWhen", { value: dateLabel }),
+      getLocation(event) && t("evWhere", { value: getLocation(event) }),
       getDescription(event),
     ].filter(Boolean);
 
-    Alert.alert(getTitle(event), lines.join("\n\n") || "No further details.");
+    Alert.alert(getTitle(event, t("evUntitled")), lines.join("\n\n") || t("evNoDetails"));
   };
 
   if (events.length === 0) {
@@ -91,7 +93,7 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
       <View style={styles.emptyCard}>
         <Ionicons name="information-circle-outline" size={30} color="#12307A" />
         <Text style={[styles.emptyText, { fontSize: 18 * fontScale }]}>
-          No announcements right now.
+          {t("evNone")}
         </Text>
       </View>
     );
@@ -121,7 +123,7 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
           return (
             <View style={[styles.card, { width: CARD_WIDTH, marginRight: CARD_SPACING }]}>
               <Text style={[styles.cardTitle, { fontSize: 22 * fontScale }]} numberOfLines={3}>
-                {getTitle(item)}
+                {getTitle(item, t("evUntitled"))}
               </Text>
 
               {!!dateLabel && (
@@ -148,11 +150,11 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
                 {joined ? (
                   <View style={styles.joinedBadge}>
                     <Ionicons name="checkmark-circle" size={20} color="#16A34A" />
-                    <Text style={[styles.joinedText, { fontSize: 18 * fontScale }]}>You joined this</Text>
+                    <Text style={[styles.joinedText, { fontSize: 18 * fontScale }]}>{t("evJoinedThis")}</Text>
                   </View>
                 ) : isJoinable ? (
                   <TouchableOpacity style={styles.actionBtn} onPress={() => onJoinPress(item)} activeOpacity={0.85}>
-                    <Text style={[styles.actionBtnText, { fontSize: 19 * fontScale }]}>Join</Text>
+                    <Text style={[styles.actionBtnText, { fontSize: 19 * fontScale }]}>{t("evJoin")}</Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity
@@ -161,7 +163,7 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
                     activeOpacity={0.85}
                   >
                     <Text style={[styles.actionBtnText, styles.viewBtnText, { fontSize: 19 * fontScale }]}>
-                      Read more
+                      {t("evReadMore")}
                     </Text>
                   </TouchableOpacity>
                 )}

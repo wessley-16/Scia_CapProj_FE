@@ -31,7 +31,7 @@ const AiChat = () => {
     openSession,
     deleteSession,
   } = useChatbot();
-  const { fontScale } = useSettings();
+  const { fontScale, t } = useSettings();
   const flatListRef = useRef<FlatList>(null);
   const [historyVisible, setHistoryVisible] = useState(false);
 
@@ -127,7 +127,7 @@ const AiChat = () => {
             <View style={styles.typingContainer}>
               <ActivityIndicator size="small" color="#2b5ce6" />
               <Text style={[styles.typingText, { fontSize: 14 * fontScale }]}>
-                HealthAI is typing...
+                {t("chatTyping")}
               </Text>
             </View>
           ) : null
