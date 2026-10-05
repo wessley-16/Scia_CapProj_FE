@@ -25,6 +25,10 @@ import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import IdVerificationCard from "@/components/IdVerificationCard";
 import IdRequestTracker, { isFinishedIdRequest } from "@/components/IdRequestTracker";
+import PickupModal from "@/components/PickupModal";
+import PickupPicker, { OfficeStatusBanner } from "@/components/PickupPicker";
+import { useOffice } from "@/hooks/useOffice";
+import { bookIdPickup, bookableDates, formatPickup, PickupError } from "@/lib/pickup";
 import SafetyMonitoringCard from "@/components/SafetyMonitoringCard";
 import {
   submitIDRequest,
@@ -108,6 +112,11 @@ export default function Account() {
   // Live status of the senior's latest request, straight from Firestore, so the
   // progress survives app restarts and follows what OSCA / the barangay do.
   const [idRequest,      setIdRequest]      = useState<MyIdRequest | null>(null);
+  // City Hall pickup: the senior picks ONE day + time when requesting, and can
+  // change it later from the tracker. `office` is OSCA's live status + hours.
+  const office = useOffice();
+  const [idPickup,        setIdPickup]       = useState<{ date: string; time: string } | null>(null);
+  const [pickupModalOpen, setPickupModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -194,9 +203,15 @@ export default function Account() {
   // ID Request
   const submitIDRequestHandler = async () => {
     if (!user) return;
+    // A time is required whenever OSCA has days open; if none are open, the
+    // senior can still send the request and pick a time later.
+    if (bookableDates(office, 1).length > 0 && !(idPickup?.date && idPickup?.time)) {
+      Alert.alert(t("pkChoose"), t("pkPickFirst"));
+      return;
+    }
     setIdSubmitting(true);
     try {
-      await submitIDRequest({
+      const requestId = await submitIDRequest({
         seniorName:    `${user.firstName || ""} ${user.lastName || ""}`.trim() || t("acSenior"),
         seniorId:      user.idNumber || "N/A",
         address:       user.address  || "",
@@ -207,7 +222,25 @@ export default function Account() {
       });
       setIdReason("");
       setIdModalVisible(false);
-      Alert.alert(t("acIdSubmittedTitle"), t("acIdSubmittedBody"));
+
+      // Book the City Hall slot. The request already exists at this point, so if
+      // the time was just taken the senior simply picks another one in the tracker.
+      let booked = false;
+      if (idPickup?.date && idPickup?.time) {
+        try {
+          await bookIdPickup(requestId, idPickup.date, idPickup.time);
+          booked = true;
+        } catch (bookErr: any) {
+          const key = bookErr instanceof PickupError ? bookErr.messageKey : "pkErrGeneric";
+          Alert.alert(t("acIdSubmittedTitle"), `${t("pkRequestNoTime")}\n\n${t(key)}`);
+        }
+      }
+      if (booked) {
+        Alert.alert(t("acIdSubmittedTitle"), t("pkSubmittedWithTime", { when: formatPickup(idPickup) }));
+      } else if (!idPickup) {
+        Alert.alert(t("acIdSubmittedTitle"), t("acIdSubmittedBody"));
+      }
+      setIdPickup(null);
     } catch (e: any) {
       const inProgress = /already have a physical id request/i.test(e?.message ?? "");
       Alert.alert(
@@ -382,9 +415,16 @@ export default function Account() {
             {t("acPhysicalIdDesc")}
           </Text>
 
+          <OfficeStatusBanner office={office} fontScale={fontScale} />
+
           {idRequest && (
             <View style={s.idTrackerBox}>
-              <IdRequestTracker request={idRequest} fontScale={fontScale} />
+              <IdRequestTracker
+                request={idRequest}
+                fontScale={fontScale}
+                office={office}
+                onEditPickup={() => setPickupModalOpen(true)}
+              />
             </View>
           )}
 
@@ -447,8 +487,9 @@ export default function Account() {
       {/* ID Request modal */}
       <Modal visible={idModalVisible} animationType="slide" transparent>
         <View style={m.overlay}>
-          <View style={m.box}>
+          <View style={[m.box, { maxHeight: "92%" }]}>
             <View style={m.handle} />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={[m.title, { fontSize: 22 * fontScale }]}>{t("acModalTitle")}</Text>
             <Text style={[m.sub, { fontSize: 15 * fontScale }]}>
               {t("acModalSub")}
@@ -464,6 +505,13 @@ export default function Account() {
               multiline
               numberOfLines={3}
             />
+
+            <Text style={[m.label, { fontSize: 15 * fontScale }]}>{t("pkChooseTitle")}</Text>
+            <Text style={[m.sub, { fontSize: 14 * fontScale, textAlign: "left", marginBottom: 12 }]}>{t("pkChooseSub")}</Text>
+            <OfficeStatusBanner office={office} fontScale={fontScale} />
+            <View style={{ marginBottom: 20 }}>
+              <PickupPicker office={office} value={idPickup} onChange={setIdPickup} fontScale={fontScale} />
+            </View>
 
             <TouchableOpacity
               style={[m.submitBtn, idSubmitting && { opacity: 0.65 }]}
@@ -487,9 +535,22 @@ export default function Account() {
             >
               <Text style={[m.cancelText, { fontSize: 16 * fontScale }]}>{t("cancel")}</Text>
             </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
+
+      {/* Change the City Hall pickup time of the current request */}
+      {idRequest && (
+        <PickupModal
+          visible={pickupModalOpen}
+          onClose={() => setPickupModalOpen(false)}
+          requestId={idRequest.id}
+          current={idRequest.pickup}
+          office={office}
+          fontScale={fontScale}
+        />
+      )}
 
       {/* Notification panel */}
       {showNotif && (

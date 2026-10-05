@@ -826,8 +826,13 @@ export function subscribeToHealthCenters(
 
 // ── PHYSICAL ID REQUEST ───────────────────────────────────────────────────────
 // Lifecycle (written by the admin dashboard, see src/lib/idRequestStatus.js there):
-//   pending → (approved) → processing → delivered → received → done
-//   and pending / processing / delivered → cancelled (or rejected on review)
+//   pending → processing → ready (claim at the OSCA Office) → done
+//   and pending / processing / ready → cancelled (or rejected on review)
+// Only the OSCA admin releases physical IDs, in person at the OSCA Office (located
+// at City Hall). There is no barangay
+// delivery any more, so the senior books ONE pickup day + time (see lib/pickup.ts).
+// "delivered" / "received" / "released" are the old barangay steps; requests
+// still sitting there are shown as "ready" (see components/IdRequestTracker).
 export interface IDRequest {
   seniorName: string;
   seniorId: string;
@@ -843,8 +848,10 @@ export type IdRequestStatus =
   | "pending"
   | "approved"
   | "processing"
-  | "delivered"
-  | "received"
+  | "ready"
+  | "delivered" // legacy (barangay delivery) - treated as "ready"
+  | "received" // legacy
+  | "released" // legacy
   | "done"
   | "cancelled"
   | "rejected";
@@ -854,8 +861,10 @@ export const ACTIVE_ID_REQUEST_STATUSES = [
   "pending",
   "approved",
   "processing",
+  "ready",
   "delivered",
   "received",
+  "released",
 ];
 
 export interface MyIdRequest {
@@ -867,9 +876,11 @@ export interface MyIdRequest {
   createdAt?: any;
   updatedAt?: any;
   processedAt?: any;
-  deliveredAt?: any;
-  receivedAt?: any;
+  readyAt?: any;
   claimedAt?: any;
+  // OSCA Office pickup slot (PH time strings), set by bookIdPickup.
+  pickup?: { date: string; time: string; bookedBy?: string };
+  pickupChanges?: number;
   cancelledAt?: any;
 }
 
@@ -886,9 +897,9 @@ export async function submitIDRequest(data: IDRequest) {
     throw new Error("You already have a physical ID request in progress.");
   }
 
-  // `barangay` is what lets the barangay's sub-admin see the request and mark it
-  // received / claimed (firestore.rules + IDManagement.jsx both filter on it).
-  // Stored with the admin dashboard's spelling of the barangay name.
+  // `barangay` is only where the senior lives (the dashboard uses it for reports
+  // and lets that barangay's sub-admin see the request). Stored with the admin
+  // dashboard's spelling of the barangay name.
   const barangay = adminBarangayName(data.barangay) ?? undefined;
 
   const docRef = await addDoc(

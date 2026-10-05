@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { MyIdRequest } from "@/lib/firebase";
+import { DEFAULT_OFFICE, formatPickup, MAX_SENIOR_CHANGES, OfficeSettings } from "@/lib/pickup";
 import { useSettings } from "@/context/SettingsContext";
 
 const C = {
@@ -28,19 +29,22 @@ type Step = {
 const STEPS: Step[] = [
   { key: "pending", label: "Request sent", stamp: "createdAt", hint: "Waiting for OSCA to review your request." },
   { key: "processing", label: "Being processed", stamp: "processedAt", hint: "OSCA is preparing your ID." },
-  { key: "delivered", label: "Delivered to your barangay", stamp: "deliveredAt", hint: "OSCA sent your ID to your barangay hall." },
-  { key: "received", label: "Ready for pick-up", stamp: "receivedAt", hint: "Your barangay has your ID. You can claim it there." },
+  { key: "ready", label: "Ready to claim at OSCA", stamp: "readyAt", hint: "Go to the OSCA Office at City Hall on your pickup day." },
   { key: "done", label: "Claimed", stamp: "claimedAt", hint: "You have picked up your ID." },
 ];
 
 // Legacy "approved" (reviewed, not yet processing) sits on the first step.
+// The old barangay steps (delivered / received / released) no longer exist:
+// only OSCA at City Hall releases IDs, so those requests show as "ready".
 const STEP_INDEX: Record<string, number> = {
   pending: 0,
   approved: 0,
   processing: 1,
+  ready: 2,
   delivered: 2,
-  received: 3,
-  done: 4,
+  received: 2,
+  released: 2,
+  done: 3,
 };
 
 function formatStamp(value: any): string {
@@ -69,9 +73,15 @@ export const isFinishedIdRequest = (status?: string) =>
 export default function IdRequestTracker({
   request,
   fontScale = 1,
+  office = DEFAULT_OFFICE,
+  onEditPickup,
 }: {
   request: MyIdRequest;
   fontScale?: number;
+  /** Live OSCA office settings (for the City Hall address in the pickup card). */
+  office?: OfficeSettings;
+  /** Opens the "choose / change pickup time" sheet. */
+  onEditPickup?: () => void;
 }) {
   const { t } = useSettings();
   const status = request.status;
@@ -95,6 +105,9 @@ export default function IdRequestTracker({
   }
 
   const current = STEP_INDEX[status] ?? 0;
+  const isReady = current === 2;
+  const pickup = request.pickup?.date && request.pickup?.time ? request.pickup : null;
+  const canChange = (request.pickupChanges || 0) < MAX_SENIOR_CHANGES || request.pickup?.bookedBy === "osca";
 
   return (
     <View>
@@ -147,11 +160,68 @@ export default function IdRequestTracker({
           </View>
         );
       })}
+
+      {status !== "done" && (
+        <View style={[s.pickupCard, isReady && { backgroundColor: C.successLight, borderColor: C.success }]}>
+          <View style={s.pickupHead}>
+            <Ionicons name="calendar" size={22} color={isReady ? C.success : C.primary} />
+            <Text style={[s.pickupTitle, { fontSize: 16 * fontScale }]}>{t("pkYourPickup")}</Text>
+          </View>
+
+          {pickup ? (
+            <>
+              <Text style={[s.pickupWhen, { fontSize: 17 * fontScale }]}>{formatPickup(pickup)}</Text>
+              <Text style={[s.pickupBody, { fontSize: 14 * fontScale }]}>
+                {t("pkGoTo", { place: office.location, when: formatPickup(pickup) })}
+              </Text>
+              {pickup.bookedBy === "osca" && (
+                <Text style={[s.pickupBody, { fontSize: 14 * fontScale, fontWeight: "700" }]}>{t("pkSetByOsca")}</Text>
+              )}
+            </>
+          ) : (
+            <Text style={[s.pickupBody, { fontSize: 15 * fontScale }]}>
+              {isReady ? t("idrReadyNoTime") : t("pkNotSet")}
+            </Text>
+          )}
+
+          {!!onEditPickup && (pickup ? canChange : true) && (
+            <TouchableOpacity style={s.pickupBtn} onPress={onEditPickup} activeOpacity={0.85}>
+              <Ionicons name={pickup ? "create-outline" : "calendar-outline"} size={20} color="#fff" />
+              <Text style={[s.pickupBtnText, { fontSize: 16 * fontScale }]}>
+                {pickup ? t("pkChange") : t("pkChoose")}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }
 
 const s = StyleSheet.create({
+  pickupCard: {
+    marginTop: 6,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: "#BFDBFE",
+    backgroundColor: C.primaryLight,
+  },
+  pickupHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  pickupTitle: { fontWeight: "800", color: C.text },
+  pickupWhen: { fontWeight: "800", color: C.primary, lineHeight: 24 },
+  pickupBody: { color: C.textSub, lineHeight: 21, marginTop: 4 },
+  pickupBtn: {
+    marginTop: 12,
+    minHeight: 50,
+    borderRadius: 12,
+    backgroundColor: C.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  pickupBtnText: { color: "#fff", fontWeight: "800" },
   row: { flexDirection: "row" },
   rail: { alignItems: "center", width: 32, marginRight: 12 },
   dot: {
