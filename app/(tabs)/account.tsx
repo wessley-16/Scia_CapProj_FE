@@ -93,7 +93,7 @@ const row = StyleSheet.create({
     marginRight:     14,
   },
   text:  { flex: 1 },
-  label: { fontSize: 13, color: C.textMuted, fontWeight: "600", marginBottom: 2 },
+  label: { fontSize: 14, color: C.textMuted, fontWeight: "600", marginBottom: 2 },
   value: { fontSize: 17, color: C.text,     fontWeight: "700", lineHeight: 22 },
 });
 
@@ -566,7 +566,7 @@ export default function Account() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={[n.sectionLabel, { fontSize: 13 * fontScale }]}>{t("acJoinedEvents")}</Text>
+              <Text style={[n.sectionLabel, { fontSize: 14 * fontScale }]}>{t("acJoinedEvents")}</Text>
               {joinedEvents.length === 0 ? (
                 <View style={n.emptyBox}>
                   <Ionicons name="calendar-outline" size={32} color={C.textMuted} />
@@ -588,7 +588,7 @@ export default function Account() {
                 ))
               )}
 
-              <Text style={[n.sectionLabel, { fontSize: 13 * fontScale }]}>{t("acSystemAlerts")}</Text>
+              <Text style={[n.sectionLabel, { fontSize: 14 * fontScale }]}>{t("acSystemAlerts")}</Text>
               {notifications.length === 0 ? (
                 <View style={n.emptyBox}>
                   <Ionicons name="notifications-off-outline" size={32} color={C.textMuted} />
@@ -609,7 +609,7 @@ export default function Account() {
                       </Text>
                     </View>
                     <Text style={[n.notifCardSub, { fontSize: 14 * fontScale }]}>{notif.message}</Text>
-                    <Text style={[n.notifCardTime, { fontSize: 13 * fontScale }]}>{new Date(notif.timestamp).toLocaleString()}</Text>
+                    <Text style={[n.notifCardTime, { fontSize: 14 * fontScale }]}>{new Date(notif.timestamp).toLocaleString()}</Text>
                   </View>
                 ))
               )}
@@ -686,7 +686,7 @@ const s = StyleSheet.create({
     borderColor:     "#fff",
   },
   removePhotoBtn: { marginTop: 8 },
-  removePhotoText: { color: C.danger, fontSize: 13, fontWeight: "600" },
+  removePhotoText: { color: C.danger, fontSize: 14, fontWeight: "600" },
 
   heroName: {
     fontSize:   24,
@@ -725,7 +725,7 @@ const s = StyleSheet.create({
     borderLeftWidth:   3,
     borderLeftColor:   C.accent,
   },
-  pendingNoteText: { fontSize: 13, color: C.warning, lineHeight: 19, fontWeight: "500" },
+  pendingNoteText: { fontSize: 14, color: C.warning, lineHeight: 19, fontWeight: "500" },
 
   // Section card
   sectionCard: {
@@ -825,7 +825,7 @@ const s = StyleSheet.create({
   },
   quickText:  { flex: 1 },
   quickTitle: { fontSize: 16, fontWeight: "700", color: C.text,    marginBottom: 2 },
-  quickSub:   { fontSize: 13, color: C.textSub },
+  quickSub:   { fontSize: 14, color: C.textSub },
 });
 
 // Modal styles
@@ -916,7 +916,7 @@ const n = StyleSheet.create({
   },
   panelTitle: { fontSize: 22, fontWeight: "800", color: C.text },
   sectionLabel: {
-    fontSize:      12,
+    fontSize: 14,
     fontWeight:    "700",
     color:         C.textMuted,
     letterSpacing: 0.8,
@@ -939,5 +939,5 @@ const n = StyleSheet.create({
   notifCardMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
   notifCardTitle: { fontSize: 16, fontWeight: "700", color: C.text,    marginBottom: 4 },
   notifCardSub:   { fontSize: 14, color: C.textSub,  marginBottom: 2 },
-  notifCardTime:  { fontSize: 13, color: C.textMuted, marginTop: 4 },
+  notifCardTime:  { fontSize: 14, color: C.textMuted, marginTop: 4 },
 });

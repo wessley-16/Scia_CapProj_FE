@@ -28,7 +28,7 @@ function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
           <View style={styles.botAvatar}>
             <MaterialCommunityIcons name="shield-star" size={18} color="white" />
           </View>
-          <Text style={[styles.headerText, { fontSize: 13 * fontScale }]}>
+          <Text style={[styles.headerText, { fontSize: 14 * fontScale }]}>
             HEALTHAI ASSISTANT • {message.time || "NOW"}
           </Text>
         </View>
@@ -37,7 +37,7 @@ function ChatMessageBubble({ message, fontScale }: ChatMessageBubbleProps) {
       {/* User header */}
       {isUser && (
         <View style={[styles.header, styles.headerUser]}>
-          <Text style={[styles.headerText, { fontSize: 13 * fontScale }]}>
+          <Text style={[styles.headerText, { fontSize: 14 * fontScale }]}>
             YOU • {message.time || "JUST NOW"}
           </Text>
         </View>

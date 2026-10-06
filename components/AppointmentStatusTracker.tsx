@@ -62,7 +62,7 @@ export default function AppointmentStatusTracker({ status, fontScale = 1 }: Prop
     return (
       <View style={styles.cancelledRow}>
         <Ionicons name="close-circle" size={20} color={RED} />
-        <Text style={[styles.cancelledText, { fontSize: 13 * fontScale }]}>
+        <Text style={[styles.cancelledText, { fontSize: 14 * fontScale }]}>
           {t("apptCancelledMsg")}
         </Text>
       </View>
@@ -93,7 +93,7 @@ export default function AppointmentStatusTracker({ status, fontScale = 1 }: Prop
                 <Text
                   style={[
                     styles.stepLabel,
-                    { fontSize: 11 * fontScale },
+                    { fontSize: 14 * fontScale },
                     done && { color: "#1F2937", fontWeight: "700" },
                   ]}
                   numberOfLines={1}
@@ -114,7 +114,7 @@ export default function AppointmentStatusTracker({ status, fontScale = 1 }: Prop
         })}
       </View>
 
-      <Text style={[styles.hint, { fontSize: 12 * fontScale }]}>
+      <Text style={[styles.hint, { fontSize: 14 * fontScale }]}>
         {current === "pending" && t("apptHintPending")}
         {current === "confirmed" && t("apptHintConfirmed")}
         {current === "completed" && t("apptHintCompleted")}
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   },
   dotCurrent: { transform: [{ scale: 1.15 }] },
   line: { flex: 1, height: 3, marginTop: 10, marginHorizontal: -6, borderRadius: 2 },
-  stepLabel: { marginTop: 4, color: "#9CA3AF", textAlign: "center" },
+  stepLabel: { marginTop: 4, color: "#6B7280", textAlign: "center" },
   hint: { marginTop: 8, color: "#6B7280", fontStyle: "italic" },
   cancelledRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 10 },
   cancelledText: { flex: 1, color: "#991B1B" },

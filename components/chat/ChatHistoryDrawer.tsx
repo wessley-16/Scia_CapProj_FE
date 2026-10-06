@@ -105,7 +105,7 @@ export default function ChatHistoryDrawer({
           </Text>
         </TouchableOpacity>
 
-        <Text style={[styles.sectionLabel, { fontSize: 13 * fontScale }]}>
+        <Text style={[styles.sectionLabel, { fontSize: 14 * fontScale }]}>
           {t("chatRecent")}
         </Text>
 
@@ -141,7 +141,7 @@ export default function ChatHistoryDrawer({
                   >
                     {shownTitle(item.title)}
                   </Text>
-                  <Text style={[styles.sessionTime, { fontSize: 13 * fontScale }]}>
+                  <Text style={[styles.sessionTime, { fontSize: 14 * fontScale }]}>
                     {formatRelativeTime(item.updatedAt)}
                   </Text>
                 </View>

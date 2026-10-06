@@ -35,7 +35,8 @@ const DICTS: Record<string, Record<string, string>> = { en, tl };
 const LANGUAGE_KEY = 'language_v2';
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
-  const [fontScale, setFontScaleState] = useState<number>(1);
+  // Larger text by default: NN/g found tiny type is a recurring problem for older users.
+  const [fontScale, setFontScaleState] = useState<number>(1.25);
   // Tagalog by default: most SCIA users are Filipino seniors.
   const [language, setLanguageState] = useState<string>('tl');
 
@@ -44,7 +45,11 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
       try {
         const storedFontScale = await AsyncStorage.getItem('fontScale');
         const storedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
-        if (storedFontScale) setFontScaleState(parseFloat(storedFontScale));
+        if (storedFontScale) {
+          // The old "Small" size (0.75) is no longer offered; lift it to the standard size.
+          const saved = parseFloat(storedFontScale);
+          if (Number.isFinite(saved)) setFontScaleState(Math.max(1, saved));
+        }
         if (storedLanguage === 'en' || storedLanguage === 'tl') {
           setLanguageState(storedLanguage);
           setCurrentLanguage(storedLanguage);

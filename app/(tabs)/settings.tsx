@@ -10,9 +10,9 @@ import DigitalIDCard from "@/components/DigitalIDCard";
 
 
 const fontOptions = [
-  { labelKey: "small", value: 0.75 },
   { labelKey: "medium", value: 1 },
   { labelKey: "large", value: 1.25 },
+  { labelKey: "extraLarge", value: 1.5 },
 ];
 
 const languageOptions = [

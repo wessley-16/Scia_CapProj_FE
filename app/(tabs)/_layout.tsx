@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   label: {
-    fontSize: 13,
+    fontSize: 15,
     marginTop: 4,
     fontWeight: "700",
   },
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   scanLabel: {
-    fontSize: 13,
+    fontSize: 15,
     color: "#E5E7EB",
     fontWeight: "600",
     textAlign: "center",

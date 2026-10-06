@@ -568,7 +568,7 @@ export default function Healthcare() {
                   <Text style={[styles.cardNext, { fontSize: 14 * fontScale }]}>
                     {t("hcNext", { time: getNextDoseTime(med) })}
                   </Text>
-                  <Text style={[styles.cardSub, { fontSize: 11 * fontScale, color: "#9CA3AF" }]}>
+                  <Text style={[styles.cardSub, { fontSize: 14 * fontScale, color: "#6B7280" }]}>
                     {t("hcEveryShort", { n: med.interval })}
                   </Text>
                 </View>
@@ -684,7 +684,7 @@ export default function Healthcare() {
                     {t("hcApptAt", { date: appt.date, time: appt.time })}
                   </Text>
                   {appt.notes ? (
-                    <Text style={[styles.apptSub, { fontSize: 12 * fontScale, color: "#9CA3AF" }]}>
+                    <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: "#6B7280" }]}>
                       {appt.notes}
                     </Text>
                   ) : null}
@@ -1105,10 +1105,10 @@ const styles = StyleSheet.create({
   badge: { backgroundColor: "#FEF3C7", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   badgeConfirmed: { backgroundColor: "#D1FAE5" },
   badgeCancelled: { backgroundColor: "#FEE2E2" },
-  badgeText: { fontSize: 13, fontWeight: "bold", color: "#374151" },
+  badgeText: { fontSize: 14, fontWeight: "bold", color: "#374151" },
   apptCancelHint: {
-    fontSize: 12,
-    color: "#9CA3AF",
+    fontSize: 14,
+    color: "#6B7280",
     marginTop: 8,
     fontStyle: "italic",
   },
@@ -1205,7 +1205,7 @@ const styles = StyleSheet.create({
   amPmBtnActive: { backgroundColor: "#2356E1", borderColor: "#2356E1" },
   amPmTxt: { color: "#374151", fontWeight: "bold", fontSize: 15 },
   amPmTxtActive: { color: "white" },
-  hintText: { fontSize: 13, color: "#6B7280", marginTop: 4, marginBottom: 16, fontStyle: "italic" },
+  hintText: { fontSize: 14, color: "#6B7280", marginTop: 4, marginBottom: 16, fontStyle: "italic" },
   errorBox: {
     backgroundColor: "rgba(239,68,68,0.1)",
     borderWidth: 1,

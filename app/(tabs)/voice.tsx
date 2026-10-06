@@ -299,7 +299,7 @@ export default function VoiceScreen() {
                 style={[
                   styles.secondaryLabel,
                   { fontSize: fs(16) },
-                  (!lastTurn || isBusy) && { color: "#9CA3AF" },
+                  (!lastTurn || isBusy) && { color: "#6B7280" },
                 ]}
               >
                 {t("voiceReplay")}

@@ -227,7 +227,7 @@ const s = StyleSheet.create({
   sub: { fontWeight: "700", color: "#111827", marginTop: 14, marginBottom: 6 },
   hint: { color: "#6B7280" },
   inputError: { borderColor: "#DC2626", backgroundColor: "#FEF2F2" },
-  errorText: { color: "#DC2626", fontSize: 13, fontWeight: "600", marginBottom: 8 },
+  errorText: { color: "#DC2626", fontSize: 14, fontWeight: "600", marginBottom: 8 },
   guardianRow: { flexDirection: "row", alignItems: "center", backgroundColor: "#F3F6FF", borderRadius: 12, padding: 12, marginTop: 8 },
   gName: { fontWeight: "700", color: "#111827" },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },

@@ -56,8 +56,8 @@ export function OfficeStatusBanner({ office, fontScale = 1 }: { office: OfficeSe
           {t("pkOfficeLabel")}: {label}
         </Text>
         {!!note && <Text style={[s.bannerNote, { fontSize: 14 * fontScale }]}>{note}</Text>}
-        <Text style={[s.bannerNote, { fontSize: 13 * fontScale }]}>{formatOfficeHours(office)}</Text>
-        <Text style={[s.bannerNote, { fontSize: 13 * fontScale }]}>{office.location}</Text>
+        <Text style={[s.bannerNote, { fontSize: 14 * fontScale }]}>{formatOfficeHours(office)}</Text>
+        <Text style={[s.bannerNote, { fontSize: 14 * fontScale }]}>{office.location}</Text>
       </View>
     </View>
   );
@@ -143,7 +143,7 @@ export default function PickupPicker({
                   <Text style={[s.timeText, { fontSize: 16 * fontScale }, active && s.activeText, disabled && s.disabledText]}>
                     {formatTime12(tm)}
                   </Text>
-                  <Text style={[s.seatText, { fontSize: 12 * fontScale }, active && { color: "#DBEAFE" }, disabled && s.disabledText]}>
+                  <Text style={[s.seatText, { fontSize: 14 * fontScale }, active && { color: "#DBEAFE" }, disabled && s.disabledText]}>
                     {left <= 0 ? t("pkFull") : t("pkSeatsLeft", { n: left })}
                   </Text>
                 </TouchableOpacity>
@@ -200,7 +200,7 @@ const s = StyleSheet.create({
   activeBtn: { backgroundColor: C.primary, borderColor: C.primary },
   activeText: { color: "#fff" },
   disabledBtn: { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB" },
-  disabledText: { color: "#9CA3AF" },
+  disabledText: { color: "#6B7280" },
   selectedBox: {
     flexDirection: "row",
     alignItems: "center",

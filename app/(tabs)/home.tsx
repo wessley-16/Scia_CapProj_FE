@@ -1100,7 +1100,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  notifBadgeText: { color: "white", fontSize: 11, fontWeight: "800" },
+  notifBadgeText: { color: "white", fontSize: 14, fontWeight: "800" },
   notifHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",

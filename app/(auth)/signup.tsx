@@ -7,7 +7,7 @@ import {
   saveNcscStatus,
 } from "@/lib/firebase";
 import { DISTRICT_1_BARANGAYS, DISTRICT_2_BARANGAYS } from "@/constants/barangays";
-import { Picker } from "@react-native-picker/picker";
+import BarangayPickerField from "@/components/BarangayPickerField";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { pickIdImage as pickIdPhoto, PickedIdImage } from "@/lib/idImage";
 import {
@@ -74,6 +74,9 @@ export default function Signup() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showDobPicker, setShowDobPicker] = useState(false);
+  // Typing a birthday is easier than a spinner for many seniors (NN/g: "why won't they just let me type the time").
+  const [dobText, setDobText] = useState("");
+  const [dobTextError, setDobTextError] = useState("");
 
   const [hasSciaId, setHasSciaId] = useState<null | boolean>(null);
   // The user is not signed in yet on this screen, so the NCSC progress is
@@ -141,6 +144,27 @@ export default function Signup() {
 
   const isPhMobile = (v: string) =>
     /^(09\d{9}|\+639\d{9})$/.test(v.replace(/[\s-]/g, ""));
+
+  const onDobText = (raw: string) => {
+    const digits = raw.replace(/\D/g, "").slice(0, 8);
+    const shown =
+      digits.length > 4 ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+      : digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}`
+      : digits;
+    setDobText(shown);
+    setDobTextError("");
+    if (digits.length < 8) { setDob(""); return; }
+    const mm = Number(digits.slice(0, 2)), dd = Number(digits.slice(2, 4)), yy = Number(digits.slice(4));
+    const d = new Date(yy, mm - 1, dd);
+    const real = d.getFullYear() === yy && d.getMonth() === mm - 1 && d.getDate() === dd;
+    if (!real || d < new Date(1920, 0, 1) || d > latestSeniorBirthDate()) {
+      setDob("");
+      setDobTextError(t("suDobBad"));
+      return;
+    }
+    setDobDate(d);
+    setDob(formatStoredDate(d));
+  };
 
   const pickIdImage = async () => {
     try {
@@ -478,22 +502,16 @@ export default function Signup() {
         </View>
 
         <Text style={styles.sectionLabel}>{t("suBarangay")}</Text>
-        <View style={styles.pickerBox}>
-          <Picker
-            selectedValue={barangay}
-            onValueChange={setBarangay}
-            enabled={district.length > 0}
-            style={{ height: 56 }}
-          >
-            <Picker.Item
-              label={district ? t("suSelectBarangay") : t("suSelectDistrictFirst")}
-              value=""
-            />
-            {barangayOptions.map((b: string) => (
-              <Picker.Item key={b} label={b} value={b} />
-            ))}
-          </Picker>
-        </View>
+        <BarangayPickerField
+          value={barangay}
+          options={barangayOptions}
+          disabled={district.length === 0}
+          placeholder={district ? t("suSelectBarangay") : t("suSelectDistrictFirst")}
+          title={t("suPickBarangay")}
+          hasError={!!errors.barangay}
+          onSelect={setBarangay}
+        />
+        {fieldError("barangay")}
 
         <Text style={styles.sectionLabel}>{t("suStreet")}</Text>
         <TextInput
@@ -506,6 +524,18 @@ export default function Signup() {
         {fieldError("street")}
 
         <Text style={styles.sectionLabel}>{t("suDob")}</Text>
+        <TextInput
+          placeholder={t("suDobTypePh")}
+          placeholderTextColor="#4B5563"
+          accessibilityLabel={t("suDobType")}
+          style={[styles.input, dobTextError ? styles.inputError : null]}
+          value={dobText}
+          onChangeText={onDobText}
+          keyboardType="number-pad"
+          maxLength={10}
+        />
+        {dobTextError ? <Text style={styles.errorText}>{dobTextError}</Text> : null}
+        <Text style={styles.dobOr}>{t("suDobOrPick")}</Text>
         <TouchableOpacity
           style={styles.dobButton}
           onPress={() => setShowDobPicker(true)}
@@ -529,6 +559,10 @@ export default function Signup() {
               if (selectedDate) {
                 setDobDate(selectedDate);
                 setDob(formatStoredDate(selectedDate));
+                setDobText(
+                  `${String(selectedDate.getMonth() + 1).padStart(2, "0")}/${String(selectedDate.getDate()).padStart(2, "0")}/${selectedDate.getFullYear()}`,
+                );
+                setDobTextError("");
               }
             }}
           />
@@ -726,7 +760,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
   },
-  optionalBadgeText: { fontSize: 13, color: "#6B7280", fontStyle: "italic" },
+  optionalBadgeText: { fontSize: 14, color: "#6B7280", fontStyle: "italic" },
+  dobOr: { fontSize: 15, color: "#4B5563", marginTop: 10, marginBottom: 6 },
   dobButton: {
     backgroundColor: "#FFFFFF",
     borderWidth: 1.5,

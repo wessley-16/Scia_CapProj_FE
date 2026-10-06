@@ -453,7 +453,7 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
   invalidText: { flex: 1, fontSize: 12, color: "#991B1B" },
-  flipHint: { fontSize: 11, color: "#9CA3AF", textAlign: "center", marginTop: 6 },
+  flipHint: { fontSize: 11, color: "#6B7280", textAlign: "center", marginTop: 6 },
 });
 
 // front face — numbers are the CSS values in Oscaidcard.css
