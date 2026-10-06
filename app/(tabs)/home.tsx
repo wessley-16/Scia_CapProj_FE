@@ -486,68 +486,28 @@ export default function Home() {
           </TouchableOpacity>
         </View>
 
-        {/* DIGITAL ID — only rendered (and only unlocked) once the admin has
-            verified the senior actually holds a physical Senior Citizen ID
-            card; DigitalIdCard itself handles the verified/pending states. */}
-        <View style={styles.digitalIdContainer}>
-          <DigitalIDCard uid={user?.uid} />
-        </View>
+        {/* QUICK TILES — the few things seniors need most, one big word each.
+            SOS is first and red; every tile is at least 110 pt tall. */}
+        <View style={styles.tilesWrap}>
+          <Text style={[styles.tilesTitle, { fontSize: 22 * fontScale }]}>{t("tileQuickTitle")}</Text>
 
-        {/* ANNOUNCEMENTS — always visible (no dropdown) so seniors see the
-            important details straight away */}
-        <View style={styles.programContainer}>
-          <View style={styles.programHeader}>
-            <MaterialCommunityIcons name="bullhorn-outline" size={32} color="#12307A" />
-            <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>
-              {t("programUpdates")}
-            </Text>
+          <Tile wide title={t("tileSos")} subtitle={t("callForHelp")} icon="alarm-light" color="#C81E1E" onPress={goToEmergency} fontScale={fontScale} />
+
+          <View style={styles.tileRow}>
+            <Tile title={t("tileHealth")} icon="medical-bag" color="#0F766E" onPress={() => router.push("/(tabs)/healthcare")} fontScale={fontScale} />
+            <Tile title={t("tileMeds")} icon="pill" color="#0F766E" onPress={goToMedicine} fontScale={fontScale} />
           </View>
 
-          <EventCarousel
-            events={events}
-            joinedEventIds={joinedEvents.map((e) => e.id)}
-            fontScale={fontScale}
-            onJoinPress={handleJoinPress}
-          />
+          <View style={styles.tileRow}>
+            <Tile title={t("tileChat")} icon="chat-processing-outline" color="#1A56C4" onPress={goToChat} fontScale={fontScale} />
+            <Tile title={t("tileVoice")} icon="microphone-outline" color="#1A56C4" onPress={goToVoice} fontScale={fontScale} />
+          </View>
+
+          <Tile wide title={t("tileGov")} icon="file-document" color="#374151" onPress={goToDocs} fontScale={fontScale} />
         </View>
 
-        <View style={styles.assistantContainer}>
-          {/* CHAT ASSISTANT */}
-          <TouchableOpacity style={styles.assistant} onPress={goToChat}>
-            <MaterialCommunityIcons
-              name="robot-outline"
-              size={46}
-              color="#2563EB"
-            />
-
-            <View>
-              <Text style={[styles.assistantTitle, { fontSize: 19 * fontScale }]}>{t("chatAssistant")}</Text>
-              <Text style={[styles.assistantSub, { fontSize: 15 * fontScale }]}>
-                {t("howCanIHelp")}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* VOICE ASSISTANT */}
-          <TouchableOpacity style={styles.assistant} onPress={goToVoice}>
-            <MaterialCommunityIcons
-              name="microphone-outline"
-              size={46}
-              color="#2563EB"
-            />
-
-            <View>
-              <Text style={[styles.assistantTitle, { fontSize: 19 * fontScale }]}>{t("voiceAssistant")}</Text>
-              <Text style={[styles.assistantSub, { fontSize: 15 * fontScale }]}>
-                {t("speakAndGetHelp")}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* BUTTONS */}
-        <View style= {styles.moduleContainer}>
-          
+        {/* NEXT MEDICINE — tap to see every medicine in a scrollable pop-up */}
+        <View style={styles.reminderWrap}>
           {/* REMINDER — tap to see every medicine in a scrollable pop-up */}
           <TouchableOpacity
             style={styles.reminder}
@@ -589,34 +549,33 @@ export default function Home() {
               color="#2356E1"
             />
           </TouchableOpacity>
+        </View>
 
-          <ActionButton
-            title={t("sosEmergency")}
-            subtitle={t("callForHelp")}
-            icon="alarm-light"
-            color="#CE2029"
-            onPress={goToEmergency}
-            fontScale={fontScale}
-          />
+        {/* DIGITAL ID — only rendered (and only unlocked) once the admin has
+            verified the senior actually holds a physical Senior Citizen ID
+            card; DigitalIdCard itself handles the verified/pending states. */}
+        <View style={styles.digitalIdContainer}>
+          <DigitalIDCard uid={user?.uid} />
+        </View>
 
-          <ActionButton
-            title={t("homeHealthTitle")}
-            subtitle={t("homeHealthSub")}
-            icon="medical-bag"
-            color="#2356E1"
-            onPress={() => router.push("/(tabs)/healthcare")}
-            fontScale={fontScale}
-          />
+        {/* ANNOUNCEMENTS — always visible (no dropdown) so seniors see the
+            important details straight away */}
+        <View style={styles.programContainer}>
+          <View style={styles.programHeader}>
+            <MaterialCommunityIcons name="bullhorn-outline" size={32} color="#12307A" />
+            <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>
+              {t("programUpdates")}
+            </Text>
+          </View>
 
-          <ActionButton
-            title={t("governmentWebsites")}
-            subtitle={t("visitOfficialSites")}
-            icon="file-document"
-            color="#2356E1"
-            onPress={goToDocs}
+          <EventCarousel
+            events={events}
+            joinedEventIds={joinedEvents.map((e) => e.id)}
             fontScale={fontScale}
+            onJoinPress={handleJoinPress}
           />
         </View>
+
       </ScrollView>
 
       {/* MEDICINE REMINDERS POP-UP */}
@@ -825,6 +784,25 @@ export default function Home() {
 }
 
 /* BUTTON COMPONENT */
+function Tile({ title, subtitle, icon, color, onPress, fontScale, wide }: any) {
+  return (
+    <TouchableOpacity
+      style={[styles.tile, wide && styles.tileWide, { backgroundColor: color }]}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={subtitle ? `${title}. ${subtitle}` : title}
+    >
+      <MaterialCommunityIcons name={icon} size={wide ? 48 : 44} color="#fff" />
+      <View style={wide ? { flex: 1 } : undefined}>
+        <Text style={[styles.tileText, wide && { textAlign: "left" }, { fontSize: (wide ? 24 : 20) * fontScale }]}>{title}</Text>
+        {!!subtitle && <Text style={[styles.tileSub, { fontSize: 16 * fontScale }]}>{subtitle}</Text>}
+      </View>
+      {wide && <Ionicons name="chevron-forward" size={30} color="#fff" />}
+    </TouchableOpacity>
+  );
+}
+
 function ActionButton({
   title,
   subtitle,
@@ -917,6 +895,25 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     marginTop: 16,
   },
+
+  tilesWrap: { marginHorizontal: 12, marginTop: 16 },
+  tilesTitle: { fontWeight: "800", color: "#111827", marginBottom: 12 },
+  tileRow: { flexDirection: "row", gap: 12, marginTop: 12 },
+  tile: {
+    flex: 1,
+    minHeight: 130,
+    borderRadius: 22,
+    padding: 14,
+    marginTop: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    elevation: 3,
+  },
+  tileWide: { flex: undefined, flexDirection: "row", minHeight: 110, marginTop: 12, gap: 16, paddingHorizontal: 20 },
+  tileText: { color: "#FFFFFF", fontWeight: "800", textAlign: "center" },
+  tileSub: { color: "#FFFFFF", marginTop: 2 },
+  reminderWrap: { marginHorizontal: 12, marginTop: 8 },
 
   assistantContainer: {
     flexDirection: "row",
@@ -1020,7 +1017,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 20,
     elevation: 3,
+    // A visible border makes the card read as a button (older users often can't
+    // tell whether a plain white card is tappable).
+    borderWidth: 2,
+    borderColor: "#1A56C4",
   },
+  assistantHint: { marginTop: 8, color: "#1A56C4", fontWeight: "800", textAlign: "center" },
 
   assistantTitle: {
     fontSize: 19,

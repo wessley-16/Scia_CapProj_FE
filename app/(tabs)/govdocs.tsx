@@ -1,3 +1,4 @@
+import BackBar from "@/components/BackBar";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -19,6 +20,7 @@ export default function govdocs() {
   const { t } = useSettings();
   return (
     <SafeAreaView style={styles.safeArea}>
+      <BackBar />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.container}

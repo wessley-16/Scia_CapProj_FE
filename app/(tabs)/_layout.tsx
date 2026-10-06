@@ -36,9 +36,12 @@ const CustomTabBar = ({
     return null;
   }
 
-  // Only Home and Account appear as tappable tab items
+  // Four big, labeled destinations around the voice button. SOS is part of the
+  // bar so emergency help is on screen at all times and never scrolls away.
   const iconMap: any = {
     home: { label: t("tabHome"), icon: "home-outline", active: "home" },
+    healthcare: { label: t("tabHealth"), icon: "medkit-outline", active: "medkit" },
+    emergency: { label: t("tabSos"), icon: "alert-circle-outline", active: "alert-circle", sos: true },
     account: { label: t("tabAccount"), icon: "person-outline", active: "person" },
   };
 
@@ -47,11 +50,31 @@ const CustomTabBar = ({
     const item = iconMap[route.name];
     if (!item) return null;
 
+    if (item.sos) {
+      return (
+        <TouchableOpacity
+          key={route.key}
+          onPress={() => navigation.navigate(route.name)}
+          style={styles.tabItem}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t("sosTabA11y")}
+        >
+          <View style={[styles.sosTab, isFocused && styles.sosTabActive]}>
+            <Ionicons name="alert-circle" size={26} color="white" />
+            <Text style={styles.sosText}>{item.label}</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
     return (
       <TouchableOpacity
         key={route.key}
         onPress={() => navigation.navigate(route.name)}
         style={styles.tabItem}
+        accessibilityRole="button"
+        accessibilityLabel={item.label}
       >
         <Ionicons
           name={isFocused ? item.active : item.icon}
@@ -65,8 +88,10 @@ const CustomTabBar = ({
     );
   };
 
-  const leftTabs = state.routes.filter((r: any) => r.name === "home");
-  const rightTabs = state.routes.filter((r: any) => r.name === "account");
+  const byName = (names: string[]) =>
+    names.map((n) => state.routes.find((r: any) => r.name === n)).filter(Boolean);
+  const leftTabs = byName(["home", "healthcare"]);
+  const rightTabs = byName(["emergency", "account"]);
 
   return (
     <View style={[styles.wrapper, { paddingBottom }]}>
@@ -75,7 +100,7 @@ const CustomTabBar = ({
 
         {/* Center Voice Assist button slot */}
         <View style={styles.centerSlot}>
-          <Text style={styles.scanLabel}>Voice Assist</Text>
+          <Text style={styles.scanLabel}>{t("tabVoice")}</Text>
         </View>
 
         {rightTabs.map(renderTab)}
@@ -224,6 +249,19 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "700",
   },
+  sosTab: {
+    minWidth: 62,
+    minHeight: 58,
+    paddingHorizontal: 6,
+    borderRadius: 16,
+    backgroundColor: "#DC2626",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sosTabActive: { backgroundColor: "#B91C1C" },
+  sosText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900", letterSpacing: 0.5, marginTop: -2 },
   centerSlot: {
     width: 80,
     height: "100%",
@@ -300,3 +338,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+  

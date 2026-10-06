@@ -1,3 +1,4 @@
+import BackBar from "@/components/BackBar";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import AntDesign from "@expo/vector-icons/AntDesign";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -491,6 +492,7 @@ export default function Healthcare() {
   // Render
   return (
     <SafeAreaView style={styles.safeArea}>
+      <BackBar />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>

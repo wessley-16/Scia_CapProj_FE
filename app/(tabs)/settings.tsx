@@ -1,3 +1,4 @@
+import BackBar from "@/components/BackBar";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
@@ -61,6 +62,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <BackBar />
       <ScrollView
         contentContainerStyle={[
           styles.container,

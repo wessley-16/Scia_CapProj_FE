@@ -226,7 +226,7 @@ export const en: Dict = {
     emLocAccessTitle: 'Location Access Needed',
     emLocAccessBody: 'SCIA needs location access to send accurate SOS alerts. Please enable it in your device settings.',
     emOpenSettings: 'Open Settings',
-    emLocDeniedErr: 'Location permission denied.',
+    emLocDeniedErr: 'SCIA cannot see your location yet. Please allow location access in Settings.',
     emLocOffTitle: 'Location Services Off',
     emLocOffBody: 'Please turn on Location/GPS in your device settings so your location can be sent with your SOS.',
     emLocOffErr: 'Location services are turned off.',
@@ -289,7 +289,7 @@ export const en: Dict = {
     hcReminderNotSetBody: 'We could not set the alarm for this medicine. Please try again.',
     hcNotifTitle: '⏰ Medicine Reminder',
     hcNotifBody: 'Time to take {name}!',
-    hcMissingTitle: 'Incomplete Information',
+    hcMissingTitle: 'Almost There',
     hcMissingBody: 'Please fill in all the fields, including the time of the first alarm.',
     hcBadIntervalTitle: 'Invalid Interval',
     hcBadIntervalBody: 'The time between alarms must be at least 1 hour.',
@@ -380,7 +380,7 @@ export const en: Dict = {
 
     // ID verification card
     ivPhotoTitle: 'Photo',
-    ivPhotoFail: 'We could not use that photo.',
+    ivPhotoFail: 'We could not use that photo. Please try another one.',
     ivPhotoRequiredTitle: 'ID Photo Needed',
     ivPhotoRequiredBody: 'Please add a photo of your OSCA ID.',
     ivSentTitle: 'Sent to OSCA',
@@ -412,20 +412,20 @@ export const en: Dict = {
 
     // Form validation messages
     vNameHint: 'Letters only. Numbers and symbols are not allowed.',
-    vNameMsg: 'Enter a valid name (letters, spaces, . \' - only).',
+    vNameMsg: 'Please type the name using letters only. Spaces and . \' - are okay.',
     vPhoneHint: 'Numbers only.',
-    vPhoneMsg: 'Enter a valid PH mobile number, e.g. 09171234567.',
+    vPhoneMsg: 'Please type your mobile number like this: 09171234567.',
     vAddressHint: 'Letters, numbers and . , # - / only.',
-    vAddressMsg: 'Enter a valid address (letters, numbers and . , # - / only).',
+    vAddressMsg: 'Please type your address using letters, numbers and . , # - /',
     vIdHint: 'Letters, numbers and dashes only.',
-    vIdMsg: 'Enter a valid ID number (4 to 20 letters or numbers).',
+    vIdMsg: 'Please type your ID number using 4 to 20 letters or numbers.',
     vRelHint: 'Letters only.',
-    vRelMsg: 'Enter a valid relationship (letters only).',
-    vRequired: 'This field is required.',
+    vRelMsg: 'Please type the relationship using letters only (example: Anak).',
+    vRequired: 'Please fill this in.',
     vGender: 'Choose Male or Female.',
-    vOption: 'Choose a valid {label} from the list.',
-    vPwShort: 'Password must be at least {n} characters.',
-    vPwLong: 'Password is too long.',
+    vOption: 'Please pick a {label} from the list.',
+    vPwShort: 'Please use at least {n} characters for your password.',
+    vPwLong: 'That password is a bit too long. Please use a shorter one.',
     genderMale: 'Male',
     genderFemale: 'Female',
 
@@ -488,7 +488,7 @@ export const en: Dict = {
     evJoinedThis: 'You joined this',
     evJoin: 'Join',
     evReadMore: 'Read more',
-    evMissingTitle: 'Missing Information',
+    evMissingTitle: 'Almost There',
     evMissingBody: 'Please fill in: {fields}',
     evFillIn: 'Fill in the information below to join.',
 
@@ -543,7 +543,7 @@ export const en: Dict = {
     acNotification: 'Notification',
 
     // Sign-up screen
-    suMissingTitle: 'Incomplete Information',
+    suMissingTitle: 'Almost There',
     suMissingBody: 'Please fill in all the required fields.',
     suCheckEntries: 'Please Check Your Entries',
     suGuardianTitle: 'Guardian Needed',
@@ -637,7 +637,7 @@ export const en: Dict = {
     fpSrvTooMany: 'Too many code requests. Please try again later or ask OSCA to reset your password.',
     fpSrvUnavailable: 'We could not send the code right now. Please try again or contact OSCA.',
     fpSrvBadCode: 'That code is not valid or has expired. Request a new one.',
-    fpSrvTooManyWrong: 'Too many wrong codes. Request a new code.',
+    fpSrvTooManyWrong: 'That code did not match several times. Please ask for a new code.',
 
     // Camera, settings, safety prompts
     camLimit: 'Limit Reached',
@@ -683,11 +683,11 @@ export const en: Dict = {
     aiErrBusy: 'Many people are using the assistant right now. Please try again in a few minutes.',
     aiErrNetwork: 'I cannot connect to the internet. Please check your connection and try again.',
     aiErrGeneric: 'Sorry, something went wrong. Please try again.',
-    loginErrorTitle: 'Error',
+    loginErrorTitle: 'Something Went Wrong',
     loginEnterBoth: 'Please enter your ID number, full name, or phone number, and your password.',
-    loginFailedTitle: 'Login Failed',
+    loginFailedTitle: 'Could Not Log In',
     loginNoAccount: 'No account was found for that ID, phone number, or name. Please check what you typed.',
-    loginInvalid: 'Wrong login details.',
+    loginInvalid: 'We could not find an account with that NSCID and password. Please check them and try again, or tap "Forgot password?".',
     loginForgotHint: 'Forgot your password? You can reset it with a code that we text to your registered mobile number.',
     loginTryAgain: 'Try Again',
     loginResetPassword: 'Reset Password',
@@ -776,6 +776,24 @@ export const en: Dict = {
     idrStep_ready: 'Ready to claim at OSCA',
     idrHint_ready: 'Go to the OSCA Office on your pickup day. The OSCA admin will hand you your ID.',
     idrReadyNoTime: 'Your ID is ready. Please choose a pickup day and time below.',
+
+    // Navigation + senior-friendly cues
+    tabHealth: 'Health',
+    tabSos: 'SOS',
+    tabVoice: 'Ask by voice',
+    backBtn: 'Back',
+    backA11y: 'Go back to the previous screen',
+    sosTabA11y: 'Emergency SOS. Opens the emergency screen.',
+    tapHint: 'Tap here',
+
+    // Home tiles
+    tileSos: 'SOS',
+    tileHealth: 'Health',
+    tileMeds: 'Medicine',
+    tileChat: 'Ask by chat',
+    tileVoice: 'Ask by voice',
+    tileGov: 'Government websites',
+    tileQuickTitle: 'What do you need today?',
 };
 
 export const tl: Dict = {
@@ -988,7 +1006,7 @@ export const tl: Dict = {
     emLocAccessTitle: 'Kailangan ang Access sa Lokasyon',
     emLocAccessBody: 'Kailangan ng SCIA ang access sa lokasyon para maipadala nang tama ang SOS. Paki-on po ito sa settings ng inyong telepono.',
     emOpenSettings: 'Buksan ang Settings',
-    emLocDeniedErr: 'Hindi pinayagan ang access sa lokasyon.',
+    emLocDeniedErr: 'Hindi pa nakikita ng SCIA ang inyong lokasyon. Pakipayagan po ang access sa lokasyon sa Settings.',
     emLocOffTitle: 'Nakapatay ang Lokasyon',
     emLocOffBody: 'Paki-on po ang Location/GPS sa settings ng telepono para maipadala ang inyong lokasyon kasama ng SOS.',
     emLocOffErr: 'Nakapatay ang location services.',
@@ -1051,7 +1069,7 @@ export const tl: Dict = {
     hcReminderNotSetBody: 'Hindi na-set ang alarm para sa gamot na ito. Pakisubukan ulit.',
     hcNotifTitle: '⏰ Paalala sa Gamot',
     hcNotifBody: 'Oras na po para inumin ang {name}!',
-    hcMissingTitle: 'Kulang ang Impormasyon',
+    hcMissingTitle: 'Halos Tapos Na',
     hcMissingBody: 'Paki-punan po ang lahat ng patlang, kasama ang oras ng unang alarm.',
     hcBadIntervalTitle: 'Hindi Wasto ang Pagitan',
     hcBadIntervalBody: 'Dapat hindi bababa sa 1 oras ang pagitan ng mga alarm.',
@@ -1142,7 +1160,7 @@ export const tl: Dict = {
 
     // ID verification card
     ivPhotoTitle: 'Larawan',
-    ivPhotoFail: 'Hindi magamit ang larawang iyon.',
+    ivPhotoFail: 'Hindi magamit ang larawang iyon. Subukan po ang ibang larawan.',
     ivPhotoRequiredTitle: 'Kailangan ang Larawan ng ID',
     ivPhotoRequiredBody: 'Magdagdag po ng larawan ng inyong OSCA ID.',
     ivSentTitle: 'Naipadala sa OSCA',
@@ -1174,20 +1192,20 @@ export const tl: Dict = {
 
     // Form validation messages
     vNameHint: 'Letra lang po ang puwede. Bawal ang numero at simbolo.',
-    vNameMsg: 'Maglagay po ng wastong pangalan (letra, espasyo, . \' - lang).',
+    vNameMsg: 'Letra lang po ang gamitin sa pangalan. Puwede ang espasyo at . \' -',
     vPhoneHint: 'Numero lang po ang puwede.',
-    vPhoneMsg: 'Maglagay po ng wastong mobile number sa Pilipinas, hal. 09171234567.',
+    vPhoneMsg: 'Ganito po ang pagsulat ng mobile number: 09171234567.',
     vAddressHint: 'Letra, numero at . , # - / lang po ang puwede.',
-    vAddressMsg: 'Maglagay po ng wastong tirahan (letra, numero at . , # - / lang).',
+    vAddressMsg: 'Isulat po ang tirahan gamit ang letra, numero at . , # - /',
     vIdHint: 'Letra, numero at gitling lang po ang puwede.',
-    vIdMsg: 'Maglagay po ng wastong ID number (4 hanggang 20 letra o numero).',
+    vIdMsg: 'Isulat po ang ID number gamit ang 4 hanggang 20 letra o numero.',
     vRelHint: 'Letra lang po ang puwede.',
-    vRelMsg: 'Maglagay po ng wastong relasyon (letra lang).',
-    vRequired: 'Kailangang sagutan ito.',
+    vRelMsg: 'Letra lang po ang gamitin sa relasyon (hal. Anak).',
+    vRequired: 'Pakisagutan po ito.',
     vGender: 'Pumili po ng Lalaki o Babae.',
-    vOption: 'Pumili po ng wastong {label} mula sa listahan.',
-    vPwShort: 'Dapat hindi bababa sa {n} karakter ang password.',
-    vPwLong: 'Masyadong mahaba ang password.',
+    vOption: 'Pumili po ng {label} mula sa listahan.',
+    vPwShort: 'Gumamit po ng hindi bababa sa {n} karakter para sa password.',
+    vPwLong: 'Medyo mahaba po ang password. Gumamit po ng mas maikli.',
     genderMale: 'Lalaki',
     genderFemale: 'Babae',
 
@@ -1250,7 +1268,7 @@ export const tl: Dict = {
     evJoinedThis: 'Kasali na kayo rito',
     evJoin: 'Sumali',
     evReadMore: 'Basahin pa',
-    evMissingTitle: 'Kulang ang Impormasyon',
+    evMissingTitle: 'Halos Tapos Na',
     evMissingBody: 'Paki-punan po ang: {fields}',
     evFillIn: 'Punan ang impormasyon sa ibaba para makasali.',
 
@@ -1305,7 +1323,7 @@ export const tl: Dict = {
     acNotification: 'Abiso',
 
     // Sign-up screen
-    suMissingTitle: 'Kulang ang Impormasyon',
+    suMissingTitle: 'Halos Tapos Na',
     suMissingBody: 'Paki-punan po ang lahat ng kailangang sagutan.',
     suCheckEntries: 'Pakisuri ang Inyong mga Sagot',
     suGuardianTitle: 'Kailangan ng Guardian',
@@ -1399,7 +1417,7 @@ export const tl: Dict = {
     fpSrvTooMany: 'Napakaraming hiling ng code. Subukan ulit mamaya o hilingin sa OSCA na palitan ang inyong password.',
     fpSrvUnavailable: 'Hindi maipadala ang code ngayon. Pakisubukan ulit o makipag-ugnayan sa OSCA.',
     fpSrvBadCode: 'Hindi wasto o expired na ang code na iyon. Humingi ng bago.',
-    fpSrvTooManyWrong: 'Napakaraming maling code. Humingi ng bagong code.',
+    fpSrvTooManyWrong: 'Ilang beses nang hindi tumugma ang code. Humingi po ng bagong code.',
 
     // Camera, settings, safety prompts
     camLimit: 'Naabot na ang Limitasyon',
@@ -1445,11 +1463,11 @@ export const tl: Dict = {
     aiErrBusy: 'Maraming gumagamit ng assistant ngayon. Pakisubukan ulit pagkatapos ng ilang minuto.',
     aiErrNetwork: 'Hindi po ako makakonekta sa internet. Pakisuri ang inyong connection at subukan ulit.',
     aiErrGeneric: 'Pasensya na po, may nangyaring problema. Pakisubukan ulit.',
-    loginErrorTitle: 'May Problema',
+    loginErrorTitle: 'May Problema Po',
     loginEnterBoth: 'Ilagay po ang inyong ID number, buong pangalan, o numero ng telepono, at ang inyong password.',
-    loginFailedTitle: 'Hindi Nakapag-log In',
+    loginFailedTitle: 'Hindi Pa Po Kayo Nakapag-log In',
     loginNoAccount: 'Walang nakitang account para sa ID, numero, o pangalang iyon. Pakisuri po ang inyong inilagay.',
-    loginInvalid: 'Mali ang inilagay na detalye sa pag-log in.',
+    loginInvalid: 'Hindi namin nakita ang account na may ganitong NSCID at password. Pakisuri po at subukan ulit, o pindutin ang "Nakalimutan ang password?".',
     loginForgotHint: 'Nakalimutan ang password? Maaari ninyo itong palitan gamit ang code na ite-text namin sa inyong nakarehistrong mobile number.',
     loginTryAgain: 'Subukan Ulit',
     loginResetPassword: 'Palitan ang Password',
@@ -1539,4 +1557,22 @@ export const tl: Dict = {
     idrStep_ready: 'Puwede nang kunin sa OSCA',
     idrHint_ready: 'Pumunta sa OSCA Office sa araw ng inyong pagkuha. Ang OSCA admin ang mag-aabot ng inyong ID.',
     idrReadyNoTime: 'Handa na ang inyong ID. Pumili po ng araw at oras ng pagkuha sa ibaba.',
+
+    // Navigation + senior-friendly cues
+    tabHealth: 'Kalusugan',
+    tabSos: 'SOS',
+    tabVoice: 'Magtanong',
+    backBtn: 'Bumalik',
+    backA11y: 'Bumalik sa nakaraang screen',
+    sosTabA11y: 'Emergency SOS. Bubuksan ang emergency screen.',
+    tapHint: 'Pindutin dito',
+
+    // Home tiles
+    tileSos: 'SOS',
+    tileHealth: 'Kalusugan',
+    tileMeds: 'Gamot',
+    tileChat: 'Magtanong',
+    tileVoice: 'Boses',
+    tileGov: 'Mga Website ng Gobyerno',
+    tileQuickTitle: 'Ano po ang kailangan ninyo ngayon?',
 };

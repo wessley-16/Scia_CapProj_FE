@@ -1,3 +1,4 @@
+import BackBar from "@/components/BackBar";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
@@ -304,6 +305,7 @@ export default function EmergencyScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <BackBar />
       {/* Top bar, centered title, no settings button */}
       <View style={styles.topBar}>
         <Ionicons name="alert-circle" size={22} color="#fff" style={styles.topBarIcon} />
