@@ -1,7 +1,7 @@
 import BackBar from "@/components/BackBar";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Palette } from '../../constants/theme';
 import { useSettings } from '../../context/SettingsContext';
 import { useAuth } from '../../context/AuthContext';
 import { sendSOSAlert, subscribeToSOSAlert } from '../../lib/firebase';
@@ -78,6 +79,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 }
 
 export default function EmergencyScreen() {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { fontScale, t } = useSettings();
   const { user } = useAuth();
 
@@ -308,7 +311,7 @@ export default function EmergencyScreen() {
       <BackBar />
       {/* Top bar, centered title, no settings button */}
       <View style={styles.topBar}>
-        <Ionicons name="alert-circle" size={22} color="#fff" style={styles.topBarIcon} />
+        <Ionicons name="alert-circle" size={22} color={c.onColor} style={styles.topBarIcon} />
         <Text style={[styles.topBarTitle, { fontSize: 22 * fontScale }]}>{t('emTitle')}</Text>
       </View>
 
@@ -330,7 +333,7 @@ export default function EmergencyScreen() {
               accessibilityLabel={t('emA11yButton')}
               accessibilityHint={t('emA11yHint')}
             >
-              <Ionicons name="alert-circle-outline" size={38} color="#fff" style={{ marginBottom: 4 }} />
+              <Ionicons name="alert-circle-outline" size={38} color={c.onColor} style={{ marginBottom: 4 }} />
               <Text style={[styles.sosText, { fontSize: 24 * fontScale }]}>
                 {cooldownActive ? t('emSent') : isHolding ? String(secondsLeft) : t('emHold')}
               </Text>
@@ -344,7 +347,7 @@ export default function EmergencyScreen() {
         {/* Status banners */}
         {isDispatched && (
           <View style={[styles.banner, styles.bannerDispatched]}>
-            <Ionicons name="checkmark-circle" size={24} color="#065F46" style={styles.bannerIcon} />
+            <Ionicons name="checkmark-circle" size={24} color={c.success} style={styles.bannerIcon} />
             <View style={styles.bannerTextWrap}>
               <Text style={[styles.bannerTitle, styles.bannerTitleDispatched, { fontSize: 17 * fontScale }]}>
                 {t('emDispatchedTitle')}
@@ -358,7 +361,7 @@ export default function EmergencyScreen() {
 
         {cooldownActive && !isDispatched && (
           <View style={[styles.banner, styles.bannerWaiting]}>
-            <Ionicons name="time-outline" size={24} color="#D97706" style={styles.bannerIcon} />
+            <Ionicons name="time-outline" size={24} color={c.warning} style={styles.bannerIcon} />
             <View style={styles.bannerTextWrap}>
               <Text style={[styles.bannerTitle, styles.bannerTitleWaiting, { fontSize: 17 * fontScale }]}>
                 {t('emWaitingTitle')}
@@ -373,22 +376,22 @@ export default function EmergencyScreen() {
         {/* Map */}
         <View style={styles.mapSection}>
           <Text style={[styles.sectionLabel, { fontSize: 15 * fontScale }]}>
-            <Ionicons name="location-outline" size={14} color="#C0181F" /> Your pinned location
+            <Ionicons name="location-outline" size={14} color={c.dangerStrong} /> Your pinned location
           </Text>
           <View style={styles.mapWrapper}>
             {mapLoadFailed ? (
               <View style={styles.mapPlaceholder}>
-                <Ionicons name="cloud-offline-outline" size={36} color="#C0181F" style={{ opacity: 0.5, marginBottom: 8 }} />
+                <Ionicons name="cloud-offline-outline" size={36} color={c.dangerStrong} style={{ opacity: 0.5, marginBottom: 8 }} />
                 <Text style={[styles.mapPlaceholderText, { fontSize: 16 * fontScale, textAlign: 'center', paddingHorizontal: 16 }]}>
                   {t('mapLoadFailed')}
                 </Text>
                 <View style={styles.mapRetryRow}>
                   <TouchableOpacity style={styles.mapRetryBtn} onPress={handleRetryMap}>
-                    <Ionicons name="refresh" size={16} color="#C0181F" />
+                    <Ionicons name="refresh" size={16} color={c.dangerStrong} />
                     <Text style={[styles.mapRetryBtnText, { fontSize: 15 * fontScale }]}>{t('retry')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.mapRetryBtn} onPress={openInMapsApp}>
-                    <Ionicons name="open-outline" size={16} color="#C0181F" />
+                    <Ionicons name="open-outline" size={16} color={c.dangerStrong} />
                     <Text style={[styles.mapRetryBtnText, { fontSize: 15 * fontScale }]}>{t('openInMaps')}</Text>
                   </TouchableOpacity>
                 </View>
@@ -406,7 +409,7 @@ export default function EmergencyScreen() {
                 startInLoadingState
                 renderLoading={() => (
                   <View style={styles.mapPlaceholder}>
-                    <ActivityIndicator color="#C0181F" />
+                    <ActivityIndicator color={c.dangerStrong} />
                   </View>
                 )}
                 onError={() => setMapLoadFailed(true)}
@@ -414,13 +417,13 @@ export default function EmergencyScreen() {
               />
             ) : locationError ? (
               <View style={styles.mapPlaceholder}>
-                <Ionicons name="warning-outline" size={36} color="#C0181F" style={{ opacity: 0.6, marginBottom: 8 }} />
+                <Ionicons name="warning-outline" size={36} color={c.dangerStrong} style={{ opacity: 0.6, marginBottom: 8 }} />
                 <Text style={[styles.mapPlaceholderText, { fontSize: 16 * fontScale, textAlign: 'center', paddingHorizontal: 16 }]}>
                   {locationError}
                 </Text>
                 <View style={styles.mapRetryRow}>
                   <TouchableOpacity style={styles.mapRetryBtn} onPress={fetchLocation}>
-                    <Ionicons name="refresh" size={16} color="#C0181F" />
+                    <Ionicons name="refresh" size={16} color={c.dangerStrong} />
                     <Text style={[styles.mapRetryBtnText, { fontSize: 15 * fontScale }]}>{t('retry')}</Text>
                   </TouchableOpacity>
                 </View>
@@ -428,15 +431,15 @@ export default function EmergencyScreen() {
             ) : (
               <View style={styles.mapPlaceholder}>
                 {isFetchingLocation ? (
-                  <ActivityIndicator color="#C0181F" style={{ marginBottom: 8 }} />
+                  <ActivityIndicator color={c.dangerStrong} style={{ marginBottom: 8 }} />
                 ) : (
-                  <Ionicons name="map-outline" size={40} color="#C0181F" style={{ opacity: 0.4, marginBottom: 8 }} />
+                  <Ionicons name="map-outline" size={40} color={c.dangerStrong} style={{ opacity: 0.4, marginBottom: 8 }} />
                 )}
                 <Text style={[styles.mapPlaceholderText, { fontSize: 16 * fontScale }]}>Fetching location…</Text>
               </View>
             )}
             <TouchableOpacity style={styles.refreshBtn} onPress={fetchLocation} accessibilityLabel="Refresh location">
-              <Ionicons name="locate" size={20} color="#fff" />
+              <Ionicons name="locate" size={20} color={c.onColor} />
             </TouchableOpacity>
           </View>
         </View>
@@ -446,7 +449,7 @@ export default function EmergencyScreen() {
           <Text style={[styles.infoCardTitle, { fontSize: 15 * fontScale }]}>Alert details</Text>
 
           <View style={styles.infoRow}>
-            <Ionicons name="person-outline" size={20} color="#C0181F" style={styles.infoIcon} />
+            <Ionicons name="person-outline" size={20} color={c.dangerStrong} style={styles.infoIcon} />
             <View style={styles.infoField}>
               <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Name</Text>
               <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>{name}</Text>
@@ -454,7 +457,7 @@ export default function EmergencyScreen() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="home-outline" size={20} color="#C0181F" style={styles.infoIcon} />
+            <Ionicons name="home-outline" size={20} color={c.dangerStrong} style={styles.infoIcon} />
             <View style={styles.infoField}>
               <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Registered address (home)</Text>
               <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>{user?.address || 'Not set'}</Text>
@@ -462,7 +465,7 @@ export default function EmergencyScreen() {
           </View>
 
           <View style={styles.infoRow}>
-            <Ionicons name="business-outline" size={20} color="#C0181F" style={styles.infoIcon} />
+            <Ionicons name="business-outline" size={20} color={c.dangerStrong} style={styles.infoIcon} />
             <View style={styles.infoField}>
               <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>Current location (where you are now)</Text>
               <Text style={[styles.infoVal, { fontSize: 18 * fontScale }]}>
@@ -473,7 +476,7 @@ export default function EmergencyScreen() {
 
           {activeSosId && (
             <View style={[styles.infoRow, styles.infoRowLast]}>
-              <Ionicons name="radio-outline" size={20} color="#C0181F" style={styles.infoIcon} />
+              <Ionicons name="radio-outline" size={20} color={c.dangerStrong} style={styles.infoIcon} />
               <View style={styles.infoField}>
                 <Text style={[styles.infoKey, { fontSize: 16 * fontScale }]}>{t('emStatus')}</Text>
                 <View style={[
@@ -497,7 +500,7 @@ export default function EmergencyScreen() {
 
         {/* Instruction */}
         <View style={styles.instructionCard}>
-          <Ionicons name="information-circle-outline" size={20} color="#EA580C" style={{ marginRight: 10, marginTop: 1 }} />
+          <Ionicons name="information-circle-outline" size={20} color={c.warning} style={{ marginRight: 10, marginTop: 1 }} />
           <Text style={[styles.instructionText, { fontSize: 16 * fontScale }]}>
             {t('emInstruction')}
           </Text>
@@ -508,69 +511,69 @@ export default function EmergencyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea:             { flex: 1, backgroundColor: '#F8F9FA' },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  safeArea:             { flex: 1, backgroundColor: c.surfaceAlt },
 
   // Top bar, centered, no settings button
-  topBar:               { backgroundColor: '#C0181F', paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  topBar:               { backgroundColor: c.dangerStrong, paddingVertical: 16, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   topBarIcon:           { marginRight: 8 },
-  topBarTitle:          { color: '#fff', fontSize: 20, fontWeight: '600', letterSpacing: 0.5 },
+  topBarTitle:          { color: c.onColor, fontSize: 20, fontWeight: '600', letterSpacing: 0.5 },
 
   scroll:               { padding: 20, paddingBottom: 120 },
 
   // SOS area
   sosArea:              { alignItems: 'center', paddingVertical: 24 },
-  sosLabel:             { fontSize: 17, color: '#374151', textAlign: 'center', lineHeight: 24, marginBottom: 20 },
-  sosLabelBold:         { fontWeight: '700', color: '#C0181F' },
-  sosOuter:             { width: 210, height: 210, borderRadius: 105, backgroundColor: '#FFE5E5', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#E08080' },
-  sosDashedRing:        { position: 'absolute', inset: -12, width: 234, height: 234, borderRadius: 117, borderWidth: 2, borderStyle: 'dashed', borderColor: '#C0181F', opacity: 0.35 },
-  sosSpinRing:          { position: 'absolute', width: 230, height: 230, borderRadius: 115, borderWidth: 3, borderTopColor: '#C0181F', borderRightColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: 'transparent' },
-  sosButton:            { width: 180, height: 180, borderRadius: 90, backgroundColor: '#C0181F', alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#C0181F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 10 },
-  sosText:              { color: '#fff', fontSize: 24, fontWeight: '700', letterSpacing: 1 },
+  sosLabel:             { fontSize: 17, color: c.textStrong, textAlign: 'center', lineHeight: 24, marginBottom: 20 },
+  sosLabelBold:         { fontWeight: '700', color: c.dangerStrong },
+  sosOuter:             { width: 210, height: 210, borderRadius: 105, backgroundColor: c.dangerSoft, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: c.danger },
+  sosDashedRing:        { position: 'absolute', inset: -12, width: 234, height: 234, borderRadius: 117, borderWidth: 2, borderStyle: 'dashed', borderColor: c.dangerStrong, opacity: 0.35 },
+  sosSpinRing:          { position: 'absolute', width: 230, height: 230, borderRadius: 115, borderWidth: 3, borderTopColor: c.dangerStrong, borderRightColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: 'transparent' },
+  sosButton:            { width: 180, height: 180, borderRadius: 90, backgroundColor: c.dangerStrong, alignItems: 'center', justifyContent: 'center', elevation: 8, shadowColor: '#C0181F', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.45, shadowRadius: 10 },
+  sosText:              { color: c.onColor, fontSize: 24, fontWeight: '700', letterSpacing: 1 },
   sosSubText:           { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginTop: 3 },
 
   // Banners
   banner:               { borderRadius: 14, padding: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start', borderWidth: 1.5 },
-  bannerWaiting:        { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' },
-  bannerDispatched:     { backgroundColor: '#ECFDF5', borderColor: '#34D399' },
+  bannerWaiting:        { backgroundColor: c.warningSoft, borderColor: c.warning },
+  bannerDispatched:     { backgroundColor: c.successSoft, borderColor: c.success },
   bannerIcon:           { marginRight: 12, marginTop: 1 },
   bannerTextWrap:       { flex: 1 },
   bannerTitle:          { fontWeight: '600', marginBottom: 3, fontSize: 17 },
-  bannerTitleWaiting:   { color: '#92400E' },
-  bannerTitleDispatched:{ color: '#065F46' },
+  bannerTitleWaiting:   { color: c.warningText },
+  bannerTitleDispatched:{ color: c.success },
   bannerBody:           { lineHeight: 22, fontSize: 16 },
-  bannerBodyWaiting:    { color: '#78350F' },
-  bannerBodyDispatched: { color: '#047857' },
+  bannerBodyWaiting:    { color: c.warningText },
+  bannerBodyDispatched: { color: c.success },
 
   // Map
   mapSection:           { marginBottom: 16 },
-  sectionLabel:         { fontSize: 15, color: '#4B5563', marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
-  mapWrapper:           { height: 200, borderRadius: 16, overflow: 'hidden', borderWidth: 2, borderColor: '#C0181F' },
+  sectionLabel:         { fontSize: 15, color: c.textSecondary, marginBottom: 8, flexDirection: 'row', alignItems: 'center' },
+  mapWrapper:           { height: 200, borderRadius: 16, overflow: 'hidden', borderWidth: 2, borderColor: c.dangerStrong },
   map:                  { flex: 1 },
-  mapPlaceholder:       { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6' },
-  mapPlaceholderText:   { color: '#4B5563', fontSize: 16 },
+  mapPlaceholder:       { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surfaceAlt },
+  mapPlaceholderText:   { color: c.textSecondary, fontSize: 16 },
   mapRetryRow:          { flexDirection: 'row', marginTop: 12, gap: 10 },
-  mapRetryBtn:          { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#C0181F', borderRadius: 20, paddingVertical: 12, paddingHorizontal: 16, gap: 6, minHeight: 44 },
-  mapRetryBtnText:      { color: '#C0181F', fontWeight: '700', fontSize: 15 },
-  refreshBtn:           { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#C0181F', borderRadius: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', elevation: 4 },
+  mapRetryBtn:          { flexDirection: 'row', alignItems: 'center', backgroundColor: c.surface, borderWidth: 1.5, borderColor: c.dangerStrong, borderRadius: 20, paddingVertical: 12, paddingHorizontal: 16, gap: 6, minHeight: 44 },
+  mapRetryBtnText:      { color: c.dangerStrong, fontWeight: '700', fontSize: 15 },
+  refreshBtn:           { position: 'absolute', bottom: 10, right: 10, backgroundColor: c.dangerStrong, borderRadius: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', elevation: 4 },
 
   // Info card
-  infoCard:             { backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, borderColor: '#D1D5DB', padding: 16, marginBottom: 16 },
-  infoCardTitle:        { fontSize: 15, fontWeight: '600', color: '#6B7280', letterSpacing: 0.4, marginBottom: 12 },
-  infoRow:              { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#F3F4F6' },
+  infoCard:             { backgroundColor: c.surface, borderRadius: 16, borderWidth: 1, borderColor: c.border, padding: 16, marginBottom: 16 },
+  infoCardTitle:        { fontSize: 15, fontWeight: '600', color: c.textMuted, letterSpacing: 0.4, marginBottom: 12 },
+  infoRow:              { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: c.surfaceAlt },
   infoRowLast:          { borderBottomWidth: 0 },
   infoIcon:             { marginRight: 12, marginTop: 2 },
   infoField:            { flex: 1 },
-  infoKey:              { fontSize: 14, color: '#6B7280', marginBottom: 2 },
-  infoVal:              { fontSize: 18, color: '#111827', fontWeight: '600' },
+  infoKey:              { fontSize: 14, color: c.textMuted, marginBottom: 2 },
+  infoVal:              { fontSize: 18, color: c.text, fontWeight: '600' },
   statusPill:           { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  statusPillPending:    { backgroundColor: '#FEF3C7' },
-  statusPillDispatched: { backgroundColor: '#D1FAE5' },
+  statusPillPending:    { backgroundColor: c.warningSoft },
+  statusPillDispatched: { backgroundColor: c.successSoft },
   statusPillText:       { fontSize: 15, fontWeight: '600' },
-  statusPillTextPending:    { color: '#92400E' },
-  statusPillTextDispatched: { color: '#065F46' },
+  statusPillTextPending:    { color: c.warningText },
+  statusPillTextDispatched: { color: c.success },
 
   // Instruction
-  instructionCard:      { backgroundColor: '#FFF7ED', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#FED7AA', flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
-  instructionText:      { color: '#7C2D12', fontSize: 16, lineHeight: 24, flex: 1 },
+  instructionCard:      { backgroundColor: c.warningSoft, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: c.warningSoft, flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  instructionText:      { color: c.warningText, fontSize: 16, lineHeight: 24, flex: 1 },
 });

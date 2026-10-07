@@ -1,22 +1,25 @@
+import SpeakButton from "@/components/SpeakButton";
+import { Palette } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { MyIdRequest } from "@/lib/firebase";
 import { DEFAULT_OFFICE, formatPickup, MAX_SENIOR_CHANGES, OfficeSettings } from "@/lib/pickup";
 import { useSettings } from "@/context/SettingsContext";
 
-const C = {
-  primary: "#1A56C4",
-  primaryLight: "#EBF2FF",
-  success: "#059669",
-  successLight: "#ECFDF5",
-  danger: "#DC2626",
-  dangerLight: "#FEF2F2",
-  text: "#111827",
-  textSub: "#4B5563",
-  textMuted: "#6B7280",
-  line: "#D1D5DB",
-};
+const makeColors = (p: Palette) => ({
+  primary: p.info,
+  primaryLight: p.surfaceSoft,
+  success: p.success,
+  successLight: p.successSoft,
+  danger: p.danger,
+  dangerLight: p.dangerSoft,
+  text: p.text,
+  textSub: p.textSecondary,
+  textMuted: p.textMuted,
+  line: p.border,
+});
+type Colors = ReturnType<typeof makeColors>;
 
 type Step = {
   key: string;
@@ -83,6 +86,9 @@ export default function IdRequestTracker({
   /** Opens the "choose / change pickup time" sheet. */
   onEditPickup?: () => void;
 }) {
+  const { colors: palette } = useSettings();
+  const C = useMemo(() => makeColors(palette), [palette]);
+  const s = useMemo(() => makeS(C), [C]);
   const { t } = useSettings();
   const status = request.status;
 
@@ -108,6 +114,16 @@ export default function IdRequestTracker({
   const isReady = current === 2;
   const pickup = request.pickup?.date && request.pickup?.time ? request.pickup : null;
   const canChange = (request.pickupChanges || 0) < MAX_SENIOR_CHANGES || request.pickup?.bookedBy === "osca";
+  // What the read-aloud button says: where the request is now, then the pickup.
+  const currentKey = STEPS[Math.min(current, STEPS.length - 1)].key;
+  const spokenHint = status === "approved" ? t("idrApproved") : t("idrHint_" + currentKey);
+  const spokenText = [
+    t("idrStep_" + currentKey) + ".",
+    status === "done" ? "" : spokenHint,
+    pickup && status !== "done" ? t("pkGoTo", { place: office.location, when: formatPickup(pickup) }) : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <View>
@@ -194,17 +210,19 @@ export default function IdRequestTracker({
           )}
         </View>
       )}
+
+      <SpeakButton text={spokenText} style={{ marginTop: 12 }} />
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const makeS = (C: Colors) => StyleSheet.create({
   pickupCard: {
     marginTop: 6,
     padding: 14,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: "#BFDBFE",
+    borderColor: C.line,
     backgroundColor: C.primaryLight,
   },
   pickupHead: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },

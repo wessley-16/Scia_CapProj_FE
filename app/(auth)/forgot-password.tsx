@@ -1,7 +1,8 @@
+import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 import { requestPasswordResetOtp, resetPasswordWithOtp } from "@/lib/firebase";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -29,6 +30,8 @@ const cleanOtp = (v: string) => v.replace(/\D/g, "").slice(0, 6);
 type Step = "request" | "verify";
 
 export default function ForgotPassword() {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
   const { fontScale, t } = useSettings() as { fontScale?: number; t: (k: string, v?: Record<string, string | number>) => string };
   // The server sends English error text; show the Tagalog version of the known ones.
@@ -152,7 +155,7 @@ export default function ForgotPassword() {
               <TextInput
                 style={fieldStyle("identifier")}
                 placeholder={t("fpIdPh")}
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={c.textMuted}
                 value={identifier}
                 onChangeText={(v) => {
                   setIdentifier(cleanIdentifier(v));
@@ -171,7 +174,7 @@ export default function ForgotPassword() {
                 activeOpacity={0.8}
               >
                 {loading ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator color={c.onColor} />
                 ) : (
                   <Text style={[styles.primaryText, { fontSize: 17 * scale }]}>{t("fpSendCode")}</Text>
                 )}
@@ -183,7 +186,7 @@ export default function ForgotPassword() {
               <TextInput
                 style={[...fieldStyle("otp"), styles.otpInput]}
                 placeholder="000000"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={c.textMuted}
                 value={otp}
                 onChangeText={(v) => {
                   setOtp(cleanOtp(v));
@@ -200,7 +203,7 @@ export default function ForgotPassword() {
               <TextInput
                 style={fieldStyle("newPassword")}
                 placeholder={t("fpPasswordPh", { n: MIN_PASSWORD })}
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={c.textMuted}
                 value={newPassword}
                 onChangeText={(v) => {
                   setNewPassword(v.slice(0, MAX_PASSWORD));
@@ -215,7 +218,7 @@ export default function ForgotPassword() {
               <TextInput
                 style={fieldStyle("confirmPassword")}
                 placeholder={t("fpConfirmPh")}
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={c.textMuted}
                 value={confirmPassword}
                 onChangeText={(v) => {
                   setConfirmPassword(v.slice(0, MAX_PASSWORD));
@@ -235,7 +238,7 @@ export default function ForgotPassword() {
                 activeOpacity={0.8}
               >
                 {loading ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator color={c.onColor} />
                 ) : (
                   <Text style={[styles.primaryText, { fontSize: 17 * scale }]}>{t("fpReset")}</Text>
                 )}
@@ -270,33 +273,33 @@ export default function ForgotPassword() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F3F4F6" },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: c.surfaceAlt },
   container: { padding: 24, paddingBottom: 40 },
-  title: { fontWeight: "800", color: "#111827", marginTop: 8 },
-  subtitle: { color: "#4B5563", marginTop: 8, marginBottom: 12, lineHeight: 23 },
+  title: { fontWeight: "800", color: c.text, marginTop: 8 },
+  subtitle: { color: c.textSecondary, marginTop: 8, marginBottom: 12, lineHeight: 23 },
   label: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: c.primaryStrong,
     marginTop: 16,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,
-    color: "#111827",
+    color: c.text,
     minHeight: 52,
   },
-  inputError: { borderColor: "#DC2626", backgroundColor: "#FEF2F2" },
+  inputError: { borderColor: c.danger, backgroundColor: c.dangerSoft },
   otpInput: { letterSpacing: 8, textAlign: "center", fontWeight: "700" },
-  errorText: { color: "#B91C1C", fontSize: 14, marginTop: 6, lineHeight: 20 },
+  errorText: { color: c.danger, fontSize: 14, marginTop: 6, lineHeight: 20 },
   primaryBtn: {
-    backgroundColor: "#1D4ED8",
+    backgroundColor: c.primaryStrong,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
@@ -306,16 +309,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   btnDisabled: { opacity: 0.6 },
-  primaryText: { color: "white", fontWeight: "800" },
+  primaryText: { color: c.onColor, fontWeight: "800" },
   linkText: {
-    color: "#1D4ED8",
+    color: c.primaryStrong,
     fontSize: 15,
     fontWeight: "600",
     textDecorationLine: "underline",
     textAlign: "center",
     paddingVertical: 8,
   },
-  linkDisabled: { color: "#6B7280", textDecorationLine: "none" },
-  helpText: { color: "#4B5563", fontSize: 14, lineHeight: 21, marginTop: 20, textAlign: "center" },
+  linkDisabled: { color: c.textMuted, textDecorationLine: "none" },
+  helpText: { color: c.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 20, textAlign: "center" },
   backWrap: { marginTop: 8 },
 });

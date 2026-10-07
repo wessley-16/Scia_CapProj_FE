@@ -1,6 +1,7 @@
+import { Palette } from "@/constants/theme";
 import BackBar from "@/components/BackBar";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
@@ -16,8 +17,9 @@ const openLink = (url: string, t: (key: string) => string) => {
   );
 };
 
-export default function govdocs() {
-  const { t } = useSettings();
+export default function GovDocs() {
+  const { t, colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <SafeAreaView style={styles.safeArea}>
       <BackBar />
@@ -37,7 +39,7 @@ export default function govdocs() {
               <MaterialCommunityIcons
                 name="id-card"
                 size={60}
-                color="#2356E1"
+                color={c.primary}
               />
             </View>
 
@@ -56,7 +58,7 @@ export default function govdocs() {
               <MaterialCommunityIcons
                 name="account-group"
                 size={60}
-                color="#2356E1"
+                color={c.primary}
               />
             </View>
 
@@ -75,7 +77,7 @@ export default function govdocs() {
               <MaterialCommunityIcons
                 name="account-tie"
                 size={60}
-                color="#2356E1"
+                color={c.primary}
               />
             </View>
 
@@ -94,7 +96,7 @@ export default function govdocs() {
               <MaterialCommunityIcons
                 name="hospital"
                 size={60}
-                color="#2356E1"
+                color={c.primary}
               />
             </View>
 
@@ -113,7 +115,7 @@ export default function govdocs() {
               <MaterialCommunityIcons
                 name="hospital-box"
                 size={60}
-                color="#2356E1"
+                color={c.primary}
               />
             </View>
 
@@ -132,7 +134,7 @@ export default function govdocs() {
               <MaterialCommunityIcons
                 name="credit-card"
                 size={60}
-                color="#2356E1"
+                color={c.primary}
               />
             </View>
 
@@ -151,7 +153,7 @@ export default function govdocs() {
               <MaterialCommunityIcons
                 name="cash"
                 size={60}
-                color="#2356E1"
+                color={c.primary}
               />
             </View>
 
@@ -170,7 +172,7 @@ export default function govdocs() {
               <MaterialCommunityIcons
                 name="file-document"
                 size={60}
-                color="#2356E1"
+                color={c.primary}
               />
             </View>
 
@@ -185,10 +187,10 @@ export default function govdocs() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F6F9",
+    backgroundColor: c.bg,
   },
   scrollView: {
     flex: 1,
@@ -201,13 +203,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 26,
     fontWeight: "bold",
-    color: "#1F2937",
+    color: c.text,
     marginBottom: 20,
   },
   websiteLink: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: c.surface,
     borderRadius: 16,
     padding: 14,
     marginBottom: 20,
@@ -230,7 +232,7 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#111827",
+    color: c.text,
     lineHeight: 26,
   },
 })

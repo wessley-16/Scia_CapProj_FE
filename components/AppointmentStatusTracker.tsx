@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import SpeakButton from "@/components/SpeakButton";
+import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 
 /**
@@ -44,10 +46,6 @@ const STEP_INDEX: Record<Exclude<AppointmentStatus, "cancelled">, number> = {
   completed: 2,
 };
 
-const BLUE = "#2356E1";
-const GREEN = "#10B981";
-const RED = "#EF4444";
-const GRAY = "#D1D5DB";
 
 type Props = {
   status: unknown;
@@ -55,6 +53,12 @@ type Props = {
 };
 
 export default function AppointmentStatusTracker({ status, fontScale = 1 }: Props) {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
+  const BLUE = c.primary;
+  const GREEN = c.success;
+  const RED = c.danger;
+  const GRAY = c.border;
   const { t } = useSettings();
   const current = normalizeAppointmentStatus(status);
 
@@ -119,11 +123,17 @@ export default function AppointmentStatusTracker({ status, fontScale = 1 }: Prop
         {current === "confirmed" && t("apptHintConfirmed")}
         {current === "completed" && t("apptHintCompleted")}
       </Text>
+      <SpeakButton
+        style={{ marginTop: 10 }}
+        text={
+          current === "pending" ? t("apptHintPending") : current === "confirmed" ? t("apptHintConfirmed") : t("apptHintCompleted")
+        }
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   wrap: { marginTop: 10 },
   track: { flexDirection: "row", alignItems: "flex-start" },
   stepCol: { alignItems: "center", width: 64 },
@@ -137,8 +147,8 @@ const styles = StyleSheet.create({
   },
   dotCurrent: { transform: [{ scale: 1.15 }] },
   line: { flex: 1, height: 3, marginTop: 10, marginHorizontal: -6, borderRadius: 2 },
-  stepLabel: { marginTop: 4, color: "#6B7280", textAlign: "center" },
-  hint: { marginTop: 8, color: "#6B7280", fontStyle: "italic" },
+  stepLabel: { marginTop: 4, color: c.textMuted, textAlign: "center" },
+  hint: { marginTop: 8, color: c.textMuted, fontStyle: "italic" },
   cancelledRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginTop: 10 },
-  cancelledText: { flex: 1, color: "#991B1B" },
+  cancelledText: { flex: 1, color: c.danger },
 });

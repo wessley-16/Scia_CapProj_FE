@@ -36,6 +36,7 @@ export interface OfficeSettings {
   status: OfficeState;
   statusNote: string;
   location: string;
+  phone: string; // OSCA office number shown on the Tulong (help) button
   schedule: OfficeSchedule;
   closedDates: string[];
   advanceDays: number;
@@ -51,6 +52,7 @@ export const DEFAULT_OFFICE: OfficeSettings = {
   status: "open",
   statusNote: "",
   location: "OSCA Office, Valenzuela City Hall",
+  phone: "",
   schedule: { days: [1, 2, 3, 4, 5], start: "08:00", end: "12:00", slotMinutes: 30, capacityPerSlot: 3 },
   closedDates: [],
   advanceDays: 30,
@@ -95,6 +97,7 @@ export function mergeOffice(raw: any): OfficeSettings {
     status,
     statusNote: typeof r.statusNote === "string" ? r.statusNote : "",
     location: r.location || DEFAULT_OFFICE.location,
+    phone: typeof r.phone === "string" ? r.phone.trim() : "",
     schedule: {
       days: Array.isArray(s.days) && s.days.length ? s.days.map(Number) : DEFAULT_OFFICE.schedule.days,
       start: s.start || DEFAULT_OFFICE.schedule.start,

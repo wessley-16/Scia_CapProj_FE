@@ -104,6 +104,12 @@ export interface Guardian {
   name: string;
   phone: string;
   relationship?: string;
+  // Opt-in text messages to this guardian. Off unless switched on here; read by
+  // SCIA_Admin_Firebase/functions/guardianSms.js (keep the names in sync).
+  notify?: {
+    idReady?: boolean;
+    appointmentConfirmed?: boolean;
+  };
 }
 
 export interface PresenceLocation {

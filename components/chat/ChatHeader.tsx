@@ -59,6 +59,10 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     padding: 10,
+    minWidth: 52,
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
   },
   titleContainer: {
     flexDirection: "row",

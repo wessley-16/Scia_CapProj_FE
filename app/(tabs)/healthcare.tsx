@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar } from "react-native-calendars";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
+import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 import { canonicalBarangay } from "@/constants/valenzuelaDistricts";
 import { Medicine } from "@/interfaces/interfaces";
@@ -56,6 +57,8 @@ type AppointmentType = {
 type ActiveTab = "medicine" | "appointment";
 
 export default function Healthcare() {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const { fontScale, t } = useSettings();
   const { user } = useAuth();
   // Booked automatically at the 3S Center of the barangay filled in at sign-up.
@@ -91,6 +94,9 @@ export default function Healthcare() {
   const [appointments, setAppointments] = useState<AppointmentType[]>([]);
   const [apptError, setApptError] = useState("");
   const [submittingAppt, setSubmittingAppt] = useState(false);
+  // Booking is four short steps: type, time, notes, then a check.
+  const [apptStep, setApptStep] = useState(0);
+  const APPT_STEPS = 4;
   const [apptsLoading, setApptsLoading] = useState(true);
   const [apptsLoadError, setApptsLoadError] = useState(false);
 
@@ -153,7 +159,7 @@ export default function Healthcare() {
           name: "Medication Reminders",
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 400, 200, 400, 200, 400],
-          lightColor: "#EF4444",
+          lightColor: c.danger,
           sound: "alarm.wav",
         });
       }
@@ -395,6 +401,35 @@ export default function Healthcare() {
   };
 
   // Appointment Functions
+  const timeProblem = (): string => {
+    if (!apptHour || !apptMinute) return t("hcApptFillAll");
+    const h = parseInt(apptHour);
+    const m = parseInt(apptMinute);
+    if (isNaN(h) || isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) return t("hcApptBadTime");
+    return "";
+  };
+
+  const apptNext = () => {
+    if (apptStep === 0 && !selectedDate) {
+      setApptError(t("hcSelectDateFirst"));
+      return;
+    }
+    if (apptStep === 1) {
+      const problem = timeProblem();
+      if (problem) {
+        setApptError(problem);
+        return;
+      }
+    }
+    setApptError("");
+    setApptStep((n) => Math.min(n + 1, APPT_STEPS - 1));
+  };
+
+  const apptBack = () => {
+    setApptError("");
+    setApptStep((n) => Math.max(n - 1, 0));
+  };
+
   const submitAppointmentHandler = async () => {
     if (!selectedDate || !apptHour || !apptMinute || !apptType) {
       setApptError(t("hcApptFillAll"));
@@ -403,6 +438,7 @@ export default function Healthcare() {
     const h = parseInt(apptHour);
     const m = parseInt(apptMinute);
     if (isNaN(h) || isNaN(m) || h < 1 || h > 12 || m < 0 || m > 59) {
+      setApptStep(1);
       setApptError(t("hcApptBadTime"));
       return;
     }
@@ -447,14 +483,14 @@ export default function Healthcare() {
   const getMarkedDates = () => {
     const marked: { [key: string]: any } = {};
     appointments.forEach((a) => {
-      marked[a.date] = { marked: true, dotColor: "#2563EB" };
+      marked[a.date] = { marked: true, dotColor: c.primary };
     });
     if (selectedDate) {
       marked[selectedDate] = {
         ...marked[selectedDate],
         selected: true,
-        selectedColor: "#2356E1",
-        selectedTextColor: "white",
+        selectedColor: c.primary,
+        selectedTextColor: c.onColor,
       };
     }
     return marked;
@@ -496,7 +532,7 @@ export default function Healthcare() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
-          <MaterialCommunityIcons name="hospital-box-outline" size={26} color="#1F2937" />
+          <MaterialCommunityIcons name="hospital-box-outline" size={26} color={c.text} />
           <Text style={[styles.headerTitle, { fontSize: 24 * fontScale }]}>
             {t("hcTitle")}
           </Text>
@@ -510,7 +546,7 @@ export default function Healthcare() {
             <MaterialCommunityIcons
               name="pill"
               size={18}
-              color={activeTab === "medicine" ? "white" : "#2356E1"}
+              color={activeTab === "medicine" ? c.onColor : c.primary}
             />
             <Text style={[styles.tabBtnText, activeTab === "medicine" && styles.tabBtnTextActive, { fontSize: 15 * fontScale }]}>
               {t("hcTabMedicine")}
@@ -523,7 +559,7 @@ export default function Healthcare() {
             <Ionicons
               name="calendar-outline"
               size={18}
-              color={activeTab === "appointment" ? "white" : "#2356E1"}
+              color={activeTab === "appointment" ? c.onColor : c.primary}
             />
             <Text style={[styles.tabBtnText, activeTab === "appointment" && styles.tabBtnTextActive, { fontSize: 15 * fontScale }]}>
               {t("hcTabAppointment")}
@@ -543,7 +579,7 @@ export default function Healthcare() {
             style={styles.primaryBtn}
             onPress={() => setMedicineModalVisible(true)}
           >
-            <MaterialCommunityIcons name="plus" size={22} color="white" />
+            <MaterialCommunityIcons name="plus" size={22} color={c.onColor} />
             <Text style={[styles.primaryBtnText, { fontSize: 17 * fontScale }]}>
               {t("hcAddMedicineBtn")}
             </Text>
@@ -551,7 +587,7 @@ export default function Healthcare() {
 
           {medicines.length === 0 ? (
             <View style={styles.emptyState}>
-              <MaterialCommunityIcons name="pill" size={60} color="#D1D5DB" />
+              <MaterialCommunityIcons name="pill" size={60} color={c.border} />
               <Text style={[styles.emptyText, { fontSize: 18 * fontScale }]}>{t("hcNoMedicines")}</Text>
               <Text style={[styles.emptySubText, { fontSize: 15 * fontScale }]}>
                 {t("hcNoMedicinesSub")}
@@ -570,7 +606,7 @@ export default function Healthcare() {
                   <Text style={[styles.cardNext, { fontSize: 14 * fontScale }]}>
                     {t("hcNext", { time: getNextDoseTime(med) })}
                   </Text>
-                  <Text style={[styles.cardSub, { fontSize: 14 * fontScale, color: "#6B7280" }]}>
+                  <Text style={[styles.cardSub, { fontSize: 14 * fontScale, color: c.textMuted }]}>
                     {t("hcEveryShort", { n: med.interval })}
                   </Text>
                 </View>
@@ -586,7 +622,7 @@ export default function Healthcare() {
                     ])
                   }
                 >
-                  <MaterialCommunityIcons name="trash-can-outline" size={24} color="#EF4444" />
+                  <MaterialCommunityIcons name="trash-can-outline" size={24} color={c.danger} />
                 </TouchableOpacity>
               </TouchableOpacity>
             ))
@@ -602,7 +638,7 @@ export default function Healthcare() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.infoBox}>
-            <Ionicons name="information-circle-outline" size={18} color="#1E40AF" />
+            <Ionicons name="information-circle-outline" size={18} color={c.primaryDark} />
             <Text style={[styles.infoText, { fontSize: 14 * fontScale }]}>
               {myBarangay
                 ? t("hcApptInfo1", { barangay: myBarangay })
@@ -619,17 +655,17 @@ export default function Healthcare() {
               }}
               markedDates={getMarkedDates()}
               theme={{
-                selectedDayBackgroundColor: "#2356E1",
-                todayTextColor: "#2356E1",
-                dotColor: "#2356E1",
+                selectedDayBackgroundColor: c.primary,
+                todayTextColor: c.primary,
+                dotColor: c.primary,
               }}
             />
           </View>
 
           {selectedDate ? (
             <View style={styles.selectedDateBox}>
-              <Text style={[{ fontSize: 16 * fontScale, color: "#374151" }]}>{t("hcSelectedDate")}</Text>
-              <Text style={[{ fontSize: 17 * fontScale, fontWeight: "bold", color: "#1E3A8A" }]}>
+              <Text style={[{ fontSize: 16 * fontScale, color: c.textStrong }]}>{t("hcSelectedDate")}</Text>
+              <Text style={[{ fontSize: 17 * fontScale, fontWeight: "bold", color: c.primaryDark }]}>
                 {selectedDate}
               </Text>
             </View>
@@ -637,9 +673,9 @@ export default function Healthcare() {
 
           <TouchableOpacity
             style={[styles.primaryBtn, { marginTop: 12 }]}
-            onPress={() => { setAppointModalVisible(true); setApptError(""); }}
+            onPress={() => { setApptStep(0); setAppointModalVisible(true); setApptError(""); }}
           >
-            <Ionicons name="calendar" size={20} color="white" />
+            <Ionicons name="calendar" size={20} color={c.onColor} />
             <Text style={[styles.primaryBtnText, { fontSize: 17 * fontScale }]}>
               {t("hcBookAtCenter")}
             </Text>
@@ -650,11 +686,11 @@ export default function Healthcare() {
           {apptsLoading ? (
             <Text style={[styles.apptSub, { fontSize: 14 * fontScale }]}>{t("hcApptsLoading")}</Text>
           ) : apptsLoadError ? (
-            <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: "#B91C1C" }]}>
+            <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: c.danger }]}>
               {t("hcApptsLoadError")}
             </Text>
           ) : appointments.length === 0 ? (
-            <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: "#6B7280" }]}>
+            <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: c.textMuted }]}>
               {t("hcApptsNone")}
             </Text>
           ) : (
@@ -686,7 +722,7 @@ export default function Healthcare() {
                     {t("hcApptAt", { date: appt.date, time: appt.time })}
                   </Text>
                   {appt.notes ? (
-                    <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: "#6B7280" }]}>
+                    <Text style={[styles.apptSub, { fontSize: 14 * fontScale, color: c.textMuted }]}>
                       {appt.notes}
                     </Text>
                   ) : null}
@@ -711,7 +747,7 @@ export default function Healthcare() {
           style={styles.fabBtn}
           onPress={() => router.push("/screen/camera")}
         >
-          <AntDesign name="camera" size={26} color="white" />
+          <AntDesign name="camera" size={26} color={c.onColor} />
         </TouchableOpacity>
       </View>
 
@@ -725,7 +761,7 @@ export default function Healthcare() {
               <Text style={styles.label}>{t("hcMedName")}</Text>
               <TextInput
                 placeholder={t("hcMedNamePh")}
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={c.textMuted}
                 value={medicineName}
                 onChangeText={setMedicineName}
                 style={styles.input}
@@ -734,7 +770,7 @@ export default function Healthcare() {
               <Text style={styles.label}>{t("hcMedPurpose")}</Text>
               <TextInput
                 placeholder={t("hcMedPurposePh")}
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={c.textMuted}
                 value={description}
                 onChangeText={setDescription}
                 style={styles.input}
@@ -743,7 +779,7 @@ export default function Healthcare() {
               <Text style={styles.label}>{t("hcDosageAmount")}</Text>
               <TextInput
                 placeholder={t("hcDosageAmountPh")}
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={c.textMuted}
                 value={dosage}
                 onChangeText={setDosage}
                 keyboardType="decimal-pad"
@@ -766,7 +802,7 @@ export default function Healthcare() {
               <Text style={styles.label}>{t("hcInterval")}</Text>
               <TextInput
                 placeholder={t("hcIntervalPh")}
-                placeholderTextColor="#6B7280"
+                placeholderTextColor={c.textMuted}
                 value={interval}
                 onChangeText={setInterval}
                 keyboardType="number-pad"
@@ -777,7 +813,7 @@ export default function Healthcare() {
               <View style={styles.timeRow}>
                 <TextInput
                   placeholder="HH"
-                  placeholderTextColor="#6B7280"
+                  placeholderTextColor={c.textMuted}
                   value={medStartHour}
                   onChangeText={(v) => setMedStartHour(v.replace(/[^0-9]/g, ""))}
                   style={[styles.input, styles.timeInput]}
@@ -787,7 +823,7 @@ export default function Healthcare() {
                 <Text style={styles.timeSep}>:</Text>
                 <TextInput
                   placeholder="MM"
-                  placeholderTextColor="#6B7280"
+                  placeholderTextColor={c.textMuted}
                   value={medStartMinute}
                   onChangeText={(v) => setMedStartMinute(v.replace(/[^0-9]/g, ""))}
                   style={[styles.input, styles.timeInput]}
@@ -844,13 +880,13 @@ export default function Healthcare() {
                   <Text style={styles.detailVal}>{t("hcEveryLong", { n: selectedMedicine.interval })}</Text>
                 </View>
                 <View style={[styles.detailRow, styles.nextDoseHighlight]}>
-                  <Text style={[styles.detailLabel, { color: "#2563EB" }]}>{t("hcDetailNextDose")}</Text>
-                  <Text style={[styles.detailVal, { color: "#1E40AF", fontWeight: "bold" }]}>
+                  <Text style={[styles.detailLabel, { color: c.primary }]}>{t("hcDetailNextDose")}</Text>
+                  <Text style={[styles.detailVal, { color: c.primaryDark, fontWeight: "bold" }]}>
                     {getNextDoseTime(selectedMedicine)}
                   </Text>
                 </View>
                 <TouchableOpacity
-                  style={[styles.saveBtn, { backgroundColor: "#10B981", marginTop: 20 }]}
+                  style={[styles.saveBtn, { backgroundColor: c.success, marginTop: 20 }]}
                   onPress={takeMedicineNow}
                 >
                   <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>{t("hcMarkTaken")}</Text>
@@ -881,73 +917,125 @@ export default function Healthcare() {
 
               {selectedDate ? (
                 <View style={styles.selectedDateBox}>
-                  <Text style={{ fontSize: 15 * fontScale, color: "#374151" }}>{t("hcDateSelected")}</Text>
-                  <Text style={{ fontWeight: "bold", color: "#1E3A8A", fontSize: 16 * fontScale }}>
+                  <Text style={{ fontSize: 15 * fontScale, color: c.textStrong }}>{t("hcDateSelected")}</Text>
+                  <Text style={{ fontWeight: "bold", color: c.primaryDark, fontSize: 16 * fontScale }}>
                     {selectedDate}
                   </Text>
                 </View>
               ) : (
-                <Text style={{ color: "#DC2626", marginBottom: 8, fontSize: 14 * fontScale }}>
+                <Text style={{ color: c.danger, marginBottom: 8, fontSize: 14 * fontScale }}>
                   {t("hcSelectDateFirst")}
                 </Text>
               )}
 
-              <Text style={styles.label}>{t("hcApptType")}</Text>
-              <View style={styles.pickerBox}>
-                <Picker
-                  selectedValue={apptType}
-                  onValueChange={(v) => setApptType(v)}
-                  style={{ height: 50 }}
-                >
-                  {appointmentTypes.map((tName) => (
-                    <Picker.Item key={tName} label={apptTypeLabel(tName)} value={tName} />
-                  ))}
-                </Picker>
+              <Text style={[styles.stepText, { fontSize: 16 * fontScale }]}>
+                {t("suStepOf", { n: apptStep + 1, total: APPT_STEPS })}
+              </Text>
+              <View style={styles.stepTrack}>
+                <View style={[styles.stepFill, { width: `${((apptStep + 1) / APPT_STEPS) * 100}%` }]} />
               </View>
 
-              <Text style={styles.label}>{t("hcTime")}</Text>
-              <View style={styles.timeRow}>
-                <TextInput
-                  placeholder="HH"
-                  placeholderTextColor="#6B7280"
-                  value={apptHour}
-                  onChangeText={(v) => setApptHour(v.replace(/[^0-9]/g, ""))}
-                  style={[styles.input, styles.timeInput]}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                />
-                <Text style={styles.timeSep}>:</Text>
-                <TextInput
-                  placeholder="MM"
-                  placeholderTextColor="#6B7280"
-                  value={apptMinute}
-                  onChangeText={(v) => setApptMinute(v.replace(/[^0-9]/g, ""))}
-                  style={[styles.input, styles.timeInput]}
-                  keyboardType="number-pad"
-                  maxLength={2}
-                />
-                <View style={styles.amPmRow}>
-                  {(["AM", "PM"] as const).map((v) => (
-                    <TouchableOpacity
-                      key={v}
-                      style={[styles.amPmBtn, apptAmPm === v && styles.amPmBtnActive]}
-                      onPress={() => setApptAmPm(v)}
+              {apptStep === 0 && (
+                <>
+                  <Text style={styles.label}>{t("hcApptType")}</Text>
+                  <View style={styles.pickerBox}>
+                    <Picker
+                      selectedValue={apptType}
+                      onValueChange={(v) => setApptType(v)}
+                      style={{ height: 50 }}
                     >
-                      <Text style={[styles.amPmTxt, apptAmPm === v && styles.amPmTxtActive]}>{v}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
+                      {appointmentTypes.map((tName) => (
+                        <Picker.Item key={tName} label={apptTypeLabel(tName)} value={tName} />
+                      ))}
+                    </Picker>
+                  </View>
+                </>
+              )}
 
-              <Text style={styles.label}>{t("hcNotes")}</Text>
-              <TextInput
-                placeholder={t("hcNotesPh")}
-                placeholderTextColor="#6B7280"
-                value={apptNotes}
-                onChangeText={setApptNotes}
-                style={[styles.input, { height: 70 }]}
-                multiline
-              />
+              {apptStep === 1 && (
+                <>
+                  <Text style={styles.label}>{t("hcTime")}</Text>
+                  <View style={styles.timeRow}>
+                    <TextInput
+                      placeholder="HH"
+                      placeholderTextColor={c.textMuted}
+                      value={apptHour}
+                      onChangeText={(v) => setApptHour(v.replace(/[^0-9]/g, ""))}
+                      style={[styles.input, styles.timeInput]}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                    />
+                    <Text style={styles.timeSep}>:</Text>
+                    <TextInput
+                      placeholder="MM"
+                      placeholderTextColor={c.textMuted}
+                      value={apptMinute}
+                      onChangeText={(v) => setApptMinute(v.replace(/[^0-9]/g, ""))}
+                      style={[styles.input, styles.timeInput]}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                    />
+                    <View style={styles.amPmRow}>
+                      {(["AM", "PM"] as const).map((v) => (
+                        <TouchableOpacity
+                          key={v}
+                          style={[styles.amPmBtn, apptAmPm === v && styles.amPmBtnActive]}
+                          onPress={() => setApptAmPm(v)}
+                        >
+                          <Text style={[styles.amPmTxt, apptAmPm === v && styles.amPmTxtActive]}>{v}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {apptStep === 2 && (
+                <>
+                  <Text style={styles.label}>{t("hcNotes")}</Text>
+                  <TextInput
+                    placeholder={t("hcNotesPh")}
+                    placeholderTextColor={c.textMuted}
+                    value={apptNotes}
+                    onChangeText={setApptNotes}
+                    style={[styles.input, { height: 70 }]}
+                    multiline
+                  />
+                </>
+              )}
+
+              {apptStep === 3 && (
+                <>
+                  <Text style={[styles.reviewTitle, { fontSize: 22 * fontScale }]}>{t("suReviewTitle")}</Text>
+                  <Text style={[styles.apptCenter, { fontSize: 15 * fontScale, textAlign: "left" }]}>{t("suReviewHint")}</Text>
+                  {[
+                    { label: t("hcApptType"), value: apptTypeLabel(apptType), to: 0 },
+                    {
+                      label: t("hcTime"),
+                      value: apptHour && apptMinute
+                        ? `${apptHour.padStart(2, "0")}:${apptMinute.padStart(2, "0")} ${apptAmPm}`
+                        : "",
+                      to: 1,
+                    },
+                    { label: t("hcNotes"), value: apptNotes.trim() || t("acRvNoReason"), to: 2 },
+                  ].map((row) => (
+                    <View key={row.label} style={styles.reviewRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.reviewLabel, { fontSize: 14 * fontScale }]}>{row.label}</Text>
+                        <Text style={[styles.reviewValue, { fontSize: 18 * fontScale }]}>{row.value}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.reviewEdit}
+                        onPress={() => setApptStep(row.to)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t("suEdit")}: ${row.label}`}
+                      >
+                        <Text style={[styles.reviewEditText, { fontSize: 16 * fontScale }]}>{t("suEdit")}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </>
+              )}
 
               {apptError ? (
                 <View style={styles.errorBox}>
@@ -955,19 +1043,34 @@ export default function Healthcare() {
                 </View>
               ) : null}
 
-              <TouchableOpacity
-                style={[styles.saveBtn, submittingAppt && { opacity: 0.7 }]}
-                onPress={submitAppointmentHandler}
-                disabled={submittingAppt}
-              >
-                {submittingAppt ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>
-                    {t("hcSubmit")}
-                  </Text>
+              {apptStep === APPT_STEPS - 1 && (
+                <TouchableOpacity
+                  style={[styles.saveBtn, submittingAppt && { opacity: 0.7 }]}
+                  onPress={submitAppointmentHandler}
+                  disabled={submittingAppt}
+                >
+                  {submittingAppt ? (
+                    <ActivityIndicator color={c.onColor} />
+                  ) : (
+                    <Text style={[styles.saveBtnText, { fontSize: 17 * fontScale }]}>
+                      {t("hcSubmit")}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              <View style={styles.stepNavRow}>
+                {apptStep > 0 && (
+                  <TouchableOpacity style={styles.stepBack} onPress={apptBack} disabled={submittingAppt} accessibilityRole="button">
+                    <Text style={[styles.stepBackText, { fontSize: 18 * fontScale }]}>{t("backBtn")}</Text>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+                {apptStep < APPT_STEPS - 1 && (
+                  <TouchableOpacity style={styles.stepNext} onPress={apptNext} accessibilityRole="button">
+                    <Text style={[styles.stepNextText, { fontSize: 18 * fontScale }]}>{t("suNext")}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
               <TouchableOpacity
                 style={styles.cancelLink}
                 onPress={() => setAppointModalVisible(false)}
@@ -982,13 +1085,13 @@ export default function Healthcare() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F4F6F9" },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: c.bg },
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 8,
-    backgroundColor: "#F4F6F9",
+    backgroundColor: c.bg,
   },
   headerTitleRow: {
     flexDirection: "row",
@@ -999,11 +1102,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#1F2937",
+    color: c.text,
   },
   tabSwitcher: {
     flexDirection: "row",
-    backgroundColor: "#E5E7EB",
+    backgroundColor: c.border,
     borderRadius: 12,
     padding: 4,
     marginBottom: 4,
@@ -1018,9 +1121,9 @@ const styles = StyleSheet.create({
     gap: 6,
     minHeight: 44,
   },
-  tabBtnActive: { backgroundColor: "#2356E1" },
-  tabBtnText: { fontSize: 15, color: "#2356E1", fontWeight: "600" },
-  tabBtnTextActive: { color: "white" },
+  tabBtnActive: { backgroundColor: c.primary },
+  tabBtnText: { fontSize: 15, color: c.primary, fontWeight: "600" },
+  tabBtnTextActive: { color: c.onColor },
   scrollView: { flex: 1 },
   tabContent: {
     paddingHorizontal: 20,
@@ -1028,7 +1131,7 @@ const styles = StyleSheet.create({
     paddingBottom: 160,
   },
   primaryBtn: {
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
     borderRadius: 12,
     padding: 16,
     flexDirection: "row",
@@ -1038,9 +1141,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     minHeight: 52,
   },
-  primaryBtnText: { color: "white", fontWeight: "bold", fontSize: 17 },
+  primaryBtnText: { color: c.onColor, fontWeight: "bold", fontSize: 17 },
   card: {
-    backgroundColor: "white",
+    backgroundColor: c.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 14,
@@ -1048,33 +1151,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
   },
-  cardTitle: { fontSize: 19, fontWeight: "bold", color: "#1F2937", marginBottom: 3 },
-  cardSub: { fontSize: 15, color: "#374151", marginBottom: 2 },
-  cardNext: { fontSize: 14, color: "#2563EB", fontWeight: "600", marginTop: 2 },
+  cardTitle: { fontSize: 19, fontWeight: "bold", color: c.text, marginBottom: 3 },
+  cardSub: { fontSize: 15, color: c.textStrong, marginBottom: 2 },
+  cardNext: { fontSize: 14, color: c.primary, fontWeight: "600", marginTop: 2 },
   emptyState: { alignItems: "center", paddingVertical: 50 },
-  emptyText: { fontSize: 18, fontWeight: "bold", color: "#6B7280", marginTop: 14 },
-  emptySubText: { fontSize: 15, color: "#6B7280", marginTop: 6 },
+  emptyText: { fontSize: 18, fontWeight: "bold", color: c.textMuted, marginTop: 14 },
+  emptySubText: { fontSize: 15, color: c.textMuted, marginTop: 6 },
   infoBox: {
+    borderWidth: 1.5,
+    borderColor: c.border,
     flexDirection: "row",
-    backgroundColor: "#EFF6FF",
+    backgroundColor: c.surfaceSoft,
     borderRadius: 10,
     padding: 12,
     marginBottom: 14,
     gap: 8,
     alignItems: "flex-start",
   },
-  infoText: { flex: 1, fontSize: 14, color: "#1E40AF", lineHeight: 20 },
+  infoText: { flex: 1, fontSize: 14, color: c.primaryDark, lineHeight: 20 },
   calendarWrapper: {
+    borderWidth: 1.5,
+    borderColor: c.cardBorder,
     borderRadius: 16,
     overflow: "hidden",
-    backgroundColor: "white",
+    backgroundColor: c.surface,
     elevation: 3,
     marginBottom: 14,
   },
   selectedDateBox: {
-    backgroundColor: "#EFF6FF",
+    borderWidth: 1.5,
+    borderColor: c.border,
+    backgroundColor: c.surfaceSoft,
     padding: 12,
     borderRadius: 10,
     flexDirection: "row",
@@ -1085,38 +1194,38 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#374151",
+    color: c.textStrong,
     marginTop: 20,
     marginBottom: 10,
   },
   apptCard: {
-    backgroundColor: "white",
+    backgroundColor: c.surface,
     borderRadius: 12,
     padding: 14,
     marginBottom: 12,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
   },
-  apptConfirmed: { borderColor: "#10B981", backgroundColor: "#ECFDF5" },
-  apptCancelled: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
+  apptConfirmed: { borderColor: c.success, backgroundColor: c.successSoft },
+  apptCancelled: { borderColor: c.danger, backgroundColor: c.dangerSoft },
   apptRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
-  apptType: { fontSize: 17, fontWeight: "bold", color: "#1F2937", flex: 1 },
-  apptSub: { fontSize: 14, color: "#374151", marginTop: 2 },
-  apptCenter: { color: "#2356E1", fontWeight: "600", marginBottom: 14, textAlign: "center", fontSize: 15 },
-  badge: { backgroundColor: "#FEF3C7", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  badgeConfirmed: { backgroundColor: "#D1FAE5" },
-  badgeCancelled: { backgroundColor: "#FEE2E2" },
-  badgeText: { fontSize: 14, fontWeight: "bold", color: "#374151" },
+  apptType: { fontSize: 17, fontWeight: "bold", color: c.text, flex: 1 },
+  apptSub: { fontSize: 14, color: c.textStrong, marginTop: 2 },
+  apptCenter: { color: c.primary, fontWeight: "600", marginBottom: 14, textAlign: "center", fontSize: 15 },
+  badge: { backgroundColor: c.warningSoft, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  badgeConfirmed: { backgroundColor: c.successSoft },
+  badgeCancelled: { backgroundColor: c.dangerSoft },
+  badgeText: { fontSize: 14, fontWeight: "bold", color: c.textStrong },
   apptCancelHint: {
     fontSize: 14,
-    color: "#6B7280",
+    color: c.textMuted,
     marginTop: 8,
     fontStyle: "italic",
   },
   fab: { position: "absolute", bottom: 100, right: 20 },
   fabBtn: {
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -1130,7 +1239,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalBox: {
-    backgroundColor: "white",
+    backgroundColor: c.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -1140,36 +1249,36 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#1F2937",
+    color: c.text,
     marginBottom: 16,
     textAlign: "center",
   },
   label: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#374151",
+    color: c.textStrong,
     marginBottom: 6,
   },
   input: {
     borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     borderRadius: 10,
     padding: 14,
     marginBottom: 14,
     fontSize: 17,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: c.surfaceAlt,
     minHeight: 50,
   },
   pickerBox: {
     borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     borderRadius: 10,
     marginBottom: 14,
     overflow: "hidden",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: c.surfaceAlt,
   },
   saveBtn: {
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
@@ -1177,14 +1286,14 @@ const styles = StyleSheet.create({
     minHeight: 52,
     justifyContent: "center",
   },
-  saveBtnText: { color: "white", fontWeight: "bold", fontSize: 17 },
+  saveBtnText: { color: c.onColor, fontWeight: "bold", fontSize: 17 },
   cancelLink: { marginTop: 12, alignItems: "center", padding: 12 },
-  cancelLinkText: { color: "#EF4444", fontWeight: "bold", fontSize: 17 },
+  cancelLinkText: { color: c.danger, fontWeight: "bold", fontSize: 17 },
   detailRow: { marginBottom: 12 },
-  detailLabel: { fontSize: 15, color: "#6B7280", marginBottom: 2 },
-  detailVal: { fontSize: 18, color: "#1F2937", fontWeight: "500" },
+  detailLabel: { fontSize: 15, color: c.textMuted, marginBottom: 2 },
+  detailVal: { fontSize: 18, color: c.text, fontWeight: "500" },
   nextDoseHighlight: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: c.surfaceSoft,
     padding: 10,
     borderRadius: 8,
     marginTop: 6,
@@ -1195,26 +1304,82 @@ const styles = StyleSheet.create({
   amPmRow: { flexDirection: "row", marginLeft: 8 },
   amPmBtn: {
     borderWidth: 1.5,
-    borderColor: "#9CA3AF",
+    borderColor: c.textMuted,
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 8,
     marginLeft: 4,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: c.surfaceAlt,
     minHeight: 44,
     justifyContent: "center",
   },
-  amPmBtnActive: { backgroundColor: "#2356E1", borderColor: "#2356E1" },
-  amPmTxt: { color: "#374151", fontWeight: "bold", fontSize: 15 },
-  amPmTxtActive: { color: "white" },
-  hintText: { fontSize: 14, color: "#6B7280", marginTop: 4, marginBottom: 16, fontStyle: "italic" },
+  amPmBtnActive: { backgroundColor: c.primary, borderColor: c.primary },
+  amPmTxt: { color: c.textStrong, fontWeight: "bold", fontSize: 15 },
+  amPmTxtActive: { color: c.onColor },
+  hintText: { fontSize: 14, color: c.textMuted, marginTop: 4, marginBottom: 16, fontStyle: "italic" },
   errorBox: {
     backgroundColor: "rgba(239,68,68,0.1)",
     borderWidth: 1,
-    borderColor: "#EF4444",
+    borderColor: c.danger,
     borderRadius: 10,
     padding: 12,
     marginBottom: 12,
   },
-  errorText: { color: "#B91C1C", fontWeight: "bold", textAlign: "center", fontSize: 15 },
+  errorText: { color: c.danger, fontWeight: "bold", textAlign: "center", fontSize: 15 },
+  // Step-by-step booking
+  stepText: { fontSize: 16, fontWeight: "700", color: c.textStrong, textAlign: "center", marginBottom: 8 },
+  stepTrack: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: c.surfaceAlt,
+    borderWidth: 1,
+    borderColor: c.border,
+    overflow: "hidden",
+    marginBottom: 18,
+  },
+  stepFill: { height: "100%", backgroundColor: c.primary },
+  stepNavRow: { flexDirection: "row", gap: 12, marginTop: 4, marginBottom: 4 },
+  stepBack: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: c.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepBackText: { color: c.primary, fontSize: 18, fontWeight: "800" },
+  stepNext: {
+    flex: 2,
+    minHeight: 56,
+    borderRadius: 14,
+    backgroundColor: c.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepNextText: { color: c.onColor, fontSize: 18, fontWeight: "800" },
+  reviewTitle: { fontSize: 22, fontWeight: "800", color: c.text, marginBottom: 6 },
+  reviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  reviewLabel: { fontSize: 14, fontWeight: "700", color: c.textMuted, marginBottom: 2 },
+  reviewValue: { fontSize: 18, fontWeight: "700", color: c.text, lineHeight: 24 },
+  reviewEdit: {
+    minHeight: 48,
+    minWidth: 84,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: c.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  reviewEditText: { fontSize: 16, fontWeight: "800", color: c.primary },
 });

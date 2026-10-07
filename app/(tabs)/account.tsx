@@ -1,9 +1,10 @@
+import { Palette } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter, useFocusEffect } from "expo-router";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,28 +40,33 @@ import {
 } from "@/lib/firebase";
 
 // Colour tokens
-const C = {
-  primary:       "#1A56C4",
-  primaryLight:  "#EBF2FF",
-  primaryDark:   "#0F3A8A",
-  accent:        "#F59E0B",
-  danger:        "#DC2626",
-  dangerLight:   "#FEF2F2",
-  success:       "#059669",
-  successLight:  "#ECFDF5",
-  warning:       "#D97706",
-  warningLight:  "#FFFBEB",
-  bg:            "#F0F4FB",
-  card:          "#FFFFFF",
-  text:          "#111827",
-  textSub:       "#4B5563",
-  textMuted:     "#6B7280",
-  border:        "#9CA3AF",
-  shadow:        "#1A56C4",
-};
+const makeColors = (p: Palette) => ({
+  primary: p.info,
+  primaryLight: p.surfaceSoft,
+  primaryDark: p.primaryDark,
+  accent: p.warning,
+  danger: p.danger,
+  dangerLight: p.dangerSoft,
+  success: p.success,
+  successLight: p.successSoft,
+  warning: p.warning,
+  warningLight: p.warningSoft,
+  bg: p.bg,
+  card: p.surface,
+  text: p.text,
+  textSub: p.textSecondary,
+  textMuted: p.textMuted,
+  border: p.border,
+  shadow: p.primary,
+  outline: p.cardBorder,
+});
+type Colors = ReturnType<typeof makeColors>;
 
 // Info row component
 function InfoRow({ icon, label, value, fontScale }: { icon: any; label: string; value: string; fontScale: number }) {
+  const { colors: palette } = useSettings();
+  const C = useMemo(() => makeColors(palette), [palette]);
+  const row = useMemo(() => makeRow(C), [C]);
   const { t } = useSettings();
   return (
     <View style={row.wrap}>
@@ -75,7 +81,7 @@ function InfoRow({ icon, label, value, fontScale }: { icon: any; label: string; 
   );
 }
 
-const row = StyleSheet.create({
+const makeRow = (C: Colors) => StyleSheet.create({
   wrap: {
     flexDirection:  "row",
     alignItems:     "center",
@@ -99,6 +105,11 @@ const row = StyleSheet.create({
 
 // Main screen
 export default function Account() {
+  const { colors: palette } = useSettings();
+  const C = useMemo(() => makeColors(palette), [palette]);
+  const s = useMemo(() => makeS(C), [C]);
+  const m = useMemo(() => makeM(C), [C]);
+  const n = useMemo(() => makeN(C), [C]);
   const { fontScale, t } = useSettings();
   const { user, refreshUser, clearUser } = useAuth();
   const router = useRouter();
@@ -109,6 +120,9 @@ export default function Account() {
   const [idModalVisible, setIdModalVisible] = useState(false);
   const [idReason,       setIdReason]       = useState("");
   const [idSubmitting,   setIdSubmitting]   = useState(false);
+  // The request form is three short steps: reason, pickup time, then a check.
+  const [idStep, setIdStep] = useState(0);
+  const ID_STEPS = 3;
   // Live status of the senior's latest request, straight from Firestore, so the
   // progress survives app restarts and follows what OSCA / the barangay do.
   const [idRequest,      setIdRequest]      = useState<MyIdRequest | null>(null);
@@ -198,6 +212,15 @@ export default function Account() {
         },
       },
     ]);
+  };
+
+  const idNextStep = () => {
+    // Same rule as the final submit: pick a time whenever OSCA has days open.
+    if (idStep === 1 && bookableDates(office, 1).length > 0 && !(idPickup?.date && idPickup?.time)) {
+      Alert.alert(t("pkChoose"), t("pkPickFirst"));
+      return;
+    }
+    setIdStep((n) => Math.min(n + 1, ID_STEPS - 1));
   };
 
   // ID Request
@@ -429,7 +452,7 @@ export default function Account() {
           )}
 
           {(!idRequest || isFinishedIdRequest(idRequest.status)) && (
-            <TouchableOpacity style={s.idRequestBtn} onPress={() => setIdModalVisible(true)} activeOpacity={0.85}>
+            <TouchableOpacity style={s.idRequestBtn} onPress={() => { setIdStep(0); setIdModalVisible(true); }} activeOpacity={0.85}>
               <Ionicons name="send-outline" size={20} color="#fff" />
               <Text style={[s.idRequestBtnText, { fontSize: 17 * fontScale }]}>
                 {idRequest ? t("acRequestAnother") : t("acRequestPhysical")}
@@ -448,7 +471,7 @@ export default function Account() {
           </View>
 
           <TouchableOpacity style={s.quickAction} onPress={() => router.push("/settings")} activeOpacity={0.8}>
-            <View style={[s.quickIconBox, { backgroundColor: "#EBF2FF" }]}>
+            <View style={[s.quickIconBox, { backgroundColor: C.primaryLight }]}>
               <Ionicons name="settings-outline" size={24} color={C.primary} />
             </View>
             <View style={s.quickText}>
@@ -458,8 +481,19 @@ export default function Account() {
             <Ionicons name="chevron-forward" size={20} color={C.textMuted} />
           </TouchableOpacity>
 
+          <TouchableOpacity style={s.quickAction} onPress={() => router.push("/(tabs)/help" as any)} activeOpacity={0.8}>
+            <View style={[s.quickIconBox, { backgroundColor: C.primaryLight }]}>
+              <Ionicons name="call-outline" size={24} color={C.primary} />
+            </View>
+            <View style={s.quickText}>
+              <Text style={[s.quickTitle, { fontSize: 16 * fontScale }]}>{t("tileHelp")}</Text>
+              <Text style={[s.quickSub, { fontSize: 14 * fontScale }]}>{t("tileHelpSub")}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={C.textMuted} />
+          </TouchableOpacity>
+
           <TouchableOpacity style={s.quickAction} onPress={toggleNotification} activeOpacity={0.8}>
-            <View style={[s.quickIconBox, { backgroundColor: "#FEF3C7" }]}>
+            <View style={[s.quickIconBox, { backgroundColor: C.warningLight }]}>
               <Ionicons name="notifications-outline" size={24} color={C.accent} />
             </View>
             <View style={s.quickText}>
@@ -491,42 +525,102 @@ export default function Account() {
             <View style={m.handle} />
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={[m.title, { fontSize: 22 * fontScale }]}>{t("acModalTitle")}</Text>
-            <Text style={[m.sub, { fontSize: 15 * fontScale }]}>
-              {t("acModalSub")}
+            <Text style={[m.stepText, { fontSize: 16 * fontScale }]}>
+              {t("suStepOf", { n: idStep + 1, total: ID_STEPS })}
             </Text>
-
-            <Text style={[m.label, { fontSize: 15 * fontScale }]}>{t("acReason")}</Text>
-            <TextInput
-              placeholder={t("acReasonPh")}
-              placeholderTextColor={C.textMuted}
-              value={idReason}
-              onChangeText={setIdReason}
-              style={[m.input, { fontSize: 16 * fontScale }]}
-              multiline
-              numberOfLines={3}
-            />
-
-            <Text style={[m.label, { fontSize: 15 * fontScale }]}>{t("pkChooseTitle")}</Text>
-            <Text style={[m.sub, { fontSize: 14 * fontScale, textAlign: "left", marginBottom: 12 }]}>{t("pkChooseSub")}</Text>
-            <OfficeStatusBanner office={office} fontScale={fontScale} />
-            <View style={{ marginBottom: 20 }}>
-              <PickupPicker office={office} value={idPickup} onChange={setIdPickup} fontScale={fontScale} />
+            <View style={m.track}>
+              <View style={[m.fill, { width: `${((idStep + 1) / ID_STEPS) * 100}%` }]} />
             </View>
 
-            <TouchableOpacity
-              style={[m.submitBtn, idSubmitting && { opacity: 0.65 }]}
-              onPress={submitIDRequestHandler}
-              disabled={idSubmitting}
-              activeOpacity={0.85}
-            >
-              {idSubmitting
-                ? <ActivityIndicator color="#fff" />
-                : <>
-                    <Ionicons name="send-outline" size={20} color="#fff" />
-                    <Text style={[m.submitText, { fontSize: 17 * fontScale }]}>{t("acSubmitRequest")}</Text>
-                  </>
-              }
-            </TouchableOpacity>
+            {idStep === 0 && (
+              <>
+                <Text style={[m.sub, { fontSize: 15 * fontScale }]}>
+                  {t("acModalSub")}
+                </Text>
+
+                <Text style={[m.label, { fontSize: 15 * fontScale }]}>{t("acReason")}</Text>
+                <TextInput
+                  placeholder={t("acReasonPh")}
+                  placeholderTextColor={C.textMuted}
+                  value={idReason}
+                  onChangeText={setIdReason}
+                  style={[m.input, { fontSize: 16 * fontScale }]}
+                  multiline
+                  numberOfLines={3}
+                />
+              </>
+            )}
+
+            {idStep === 1 && (
+              <>
+                <Text style={[m.label, { fontSize: 15 * fontScale }]}>{t("pkChooseTitle")}</Text>
+                <Text style={[m.sub, { fontSize: 14 * fontScale, textAlign: "left", marginBottom: 12 }]}>{t("pkChooseSub")}</Text>
+                <OfficeStatusBanner office={office} fontScale={fontScale} />
+                <View style={{ marginBottom: 20 }}>
+                  <PickupPicker office={office} value={idPickup} onChange={setIdPickup} fontScale={fontScale} />
+                </View>
+              </>
+            )}
+
+            {idStep === 2 && (
+              <>
+                <Text style={[m.reviewTitle, { fontSize: 22 * fontScale }]}>{t("suReviewTitle")}</Text>
+                <Text style={[m.sub, { fontSize: 15 * fontScale, textAlign: "left" }]}>{t("suReviewHint")}</Text>
+                <View style={m.reviewRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[m.reviewLabel, { fontSize: 14 * fontScale }]}>{t("acReason")}</Text>
+                    <Text style={[m.reviewValue, { fontSize: 18 * fontScale }]}>{idReason.trim() || t("acRvNoReason")}</Text>
+                  </View>
+                  <TouchableOpacity style={m.reviewEdit} onPress={() => setIdStep(0)} accessibilityRole="button">
+                    <Text style={[m.reviewEditText, { fontSize: 16 * fontScale }]}>{t("suEdit")}</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={m.reviewRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[m.reviewLabel, { fontSize: 14 * fontScale }]}>{t("acRvTime")}</Text>
+                    <Text style={[m.reviewValue, { fontSize: 18 * fontScale }]}>
+                      {idPickup?.date && idPickup?.time ? formatPickup(idPickup) : t("acRvNoTime")}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={m.reviewEdit} onPress={() => setIdStep(1)} accessibilityRole="button">
+                    <Text style={[m.reviewEditText, { fontSize: 16 * fontScale }]}>{t("suEdit")}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity
+                  style={[m.submitBtn, { marginTop: 8 }, idSubmitting && { opacity: 0.65 }]}
+                  onPress={submitIDRequestHandler}
+                  disabled={idSubmitting}
+                  activeOpacity={0.85}
+                >
+                  {idSubmitting
+                    ? <ActivityIndicator color="#fff" />
+                    : <>
+                        <Ionicons name="send-outline" size={20} color="#fff" />
+                        <Text style={[m.submitText, { fontSize: 17 * fontScale }]}>{t("acSubmitRequest")}</Text>
+                      </>
+                  }
+                </TouchableOpacity>
+              </>
+            )}
+
+            <View style={m.navRow}>
+              {idStep > 0 && (
+                <TouchableOpacity
+                  style={m.navBack}
+                  onPress={() => setIdStep((n) => Math.max(n - 1, 0))}
+                  disabled={idSubmitting}
+                  accessibilityRole="button"
+                >
+                  <Text style={[m.navBackText, { fontSize: 18 * fontScale }]}>{t("backBtn")}</Text>
+                </TouchableOpacity>
+              )}
+              {idStep < ID_STEPS - 1 && (
+                <TouchableOpacity style={m.navNext} onPress={idNextStep} accessibilityRole="button">
+                  <Text style={[m.navNextText, { fontSize: 18 * fontScale }]}>{t("suNext")}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             <TouchableOpacity
               style={m.cancelBtn}
@@ -624,7 +718,7 @@ export default function Account() {
 
 // Styles
 
-const s = StyleSheet.create({
+const makeS = (C: Colors) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.bg },
 
   // Top bar
@@ -645,7 +739,7 @@ const s = StyleSheet.create({
   },
   topBarTitle: { fontSize: 20, fontWeight: "800", color: C.text },
   topBarActions: { flexDirection: "row", alignItems: "center", gap: 4 },
-  iconBtn: { padding: 10, borderRadius: 10, minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  iconBtn: { padding: 10, borderRadius: 10, minWidth: 52, minHeight: 52, alignItems: "center", justifyContent: "center" },
   logoutBtn: { marginLeft: 4 },
 
   // Scroll
@@ -654,6 +748,8 @@ const s = StyleSheet.create({
 
   // Hero card
   heroCard: {
+    borderWidth: 1.5,
+    borderColor: C.outline,
     backgroundColor: C.card,
     borderRadius:    24,
     padding:         24,
@@ -729,6 +825,8 @@ const s = StyleSheet.create({
 
   // Section card
   sectionCard: {
+    borderWidth: 1.5,
+    borderColor: C.outline,
     backgroundColor: C.card,
     borderRadius:    20,
     padding:         20,
@@ -829,7 +927,7 @@ const s = StyleSheet.create({
 });
 
 // Modal styles
-const m = StyleSheet.create({
+const makeM = (C: Colors) => StyleSheet.create({
   overlay: {
     flex:            1,
     justifyContent:  "flex-end",
@@ -883,10 +981,65 @@ const m = StyleSheet.create({
   submitText: { color: "#fff", fontSize: 17, fontWeight: "800" },
   cancelBtn:  { alignItems: "center", paddingVertical: 12 },
   cancelText: { color: C.danger, fontSize: 16, fontWeight: "700" },
+
+  // Step-by-step request form
+  stepText: { fontSize: 16, fontWeight: "700", color: C.textSub, textAlign: "center", marginBottom: 8 },
+  track: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: C.border,
+    overflow: "hidden",
+    marginBottom: 18,
+  },
+  fill: { height: "100%", backgroundColor: C.primary },
+  navRow: { flexDirection: "row", gap: 12, marginBottom: 4 },
+  navBack: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: C.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navBackText: { color: C.primary, fontSize: 18, fontWeight: "800" },
+  navNext: {
+    flex: 2,
+    minHeight: 56,
+    borderRadius: 14,
+    backgroundColor: C.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navNextText: { color: "#fff", fontSize: 18, fontWeight: "800" },
+  reviewTitle: { fontSize: 22, fontWeight: "800", color: C.text, marginBottom: 6 },
+  reviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: C.border,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  reviewLabel: { fontSize: 14, fontWeight: "700", color: C.textMuted, marginBottom: 2 },
+  reviewValue: { fontSize: 18, fontWeight: "700", color: C.text, lineHeight: 24 },
+  reviewEdit: {
+    minHeight: 48,
+    minWidth: 84,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: C.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  reviewEditText: { fontSize: 16, fontWeight: "800", color: C.primary },
 });
 
 // Notification panel styles
-const n = StyleSheet.create({
+const makeN = (C: Colors) => StyleSheet.create({
   backdrop: {
     position:        "absolute",
     top: 0, left: 0, right: 0, bottom: 0,

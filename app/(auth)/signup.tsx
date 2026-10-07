@@ -1,3 +1,4 @@
+import { Palette } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import {
@@ -22,10 +23,11 @@ import {
   validatePassword,
 } from "@/lib/validators";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Image,
   Linking,
   Platform,
@@ -39,6 +41,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function Signup() {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
   const { user, refreshUser } = useAuth();
   const { t } = useSettings();
@@ -73,6 +77,9 @@ export default function Signup() {
   // Field-level errors shown under each input (and a red border).
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  // One question per screen: the form is split into steps (see STEP_COUNT).
+  const [step, setStep] = useState(0);
+  const scrollRef = useRef<ScrollView>(null);
   const [showDobPicker, setShowDobPicker] = useState(false);
   // Typing a birthday is easier than a spinner for many seniors (NN/g: "why won't they just let me type the time").
   const [dobText, setDobText] = useState("");
@@ -191,12 +198,119 @@ export default function Signup() {
 
   const formatStoredDate = (date: Date) => date.toLocaleDateString();
 
+  // Steps: 0 ID question, 1 name, 2 birthday + gender, 3 phone, 4 address,
+  // 5 guardian, 6 password (+ ID number and photo), 7 review.
+  const STEP_COUNT = 8;
+  const LAST_STEP = STEP_COUNT - 1;
+
+  const STEP_FIELDS: Record<number, string[]> = {
+    1: ["firstName", "midName", "lastName"],
+    2: ["dob", "gender"],
+    3: ["conNumber"],
+    4: ["district", "barangay", "street"],
+    5: ["guardianName", "guardianPhone", "guardianRelation"],
+    6: ["idNumber", "password"],
+  };
+
+  // Checks one step with the same validators as before. Sets the inline
+  // field errors and returns an alert (title + message) or null when fine.
+  const validateStep = (n: number): { title: string; msg: string } | null => {
+    if (n === 0) {
+      return hasSciaId === null ? { title: t("suStatusTitle"), msg: t("suStatusBody") } : null;
+    }
+    const fields = STEP_FIELDS[n];
+    if (!fields) return null;
+    const e: Record<string, string> = {};
+    const add = (field: string, msg: string) => {
+      if (msg) e[field] = msg;
+    };
+    if (n === 1) {
+      add("firstName", validate("name", firstName));
+      add("midName", validate("name", midName));
+      add("lastName", validate("name", lastName));
+    } else if (n === 2) {
+      add("gender", validateGender(gender));
+    } else if (n === 3) {
+      add("conNumber", validate("phone", conNumber));
+    } else if (n === 4) {
+      add("district", validateOption(district, DISTRICTS, "district"));
+      add("barangay", validateOption(barangay, barangayOptions, "barangay"));
+      add("street", validate("address", street));
+    } else if (n === 5) {
+      add("guardianName", validate("name", guardianName));
+      add("guardianPhone", validate("phone", guardianPhone));
+      add("guardianRelation", validate("relation", guardianRelation, { required: false }));
+    } else if (n === 6) {
+      add("idNumber", validate("idNumber", idNumber, { required: hasSciaId === true }));
+      add("password", validatePassword(password));
+    }
+    setErrors((prev) => {
+      const next = { ...prev };
+      fields.forEach((f) => delete next[f]);
+      return { ...next, ...e };
+    });
+    if (n === 2 && !dob) {
+      setDobTextError(t("suDobBad"));
+      return { title: t("suCheckEntries"), msg: t("suDobBad") };
+    }
+    const first = Object.values(e)[0];
+    if (first) return { title: t("suCheckEntries"), msg: first };
+    if (n === 5 && !isPhMobile(guardianPhone.trim())) {
+      return { title: t("suCheckNumberTitle"), msg: t("suCheckNumberBody") };
+    }
+    if (n === 6 && hasSciaId === true && !idImage) {
+      return { title: t("suIdPhotoTitle"), msg: t("suIdPhotoBody") };
+    }
+    return null;
+  };
+
+  const goNext = () => {
+    const problem = validateStep(step);
+    if (problem) {
+      Alert.alert(problem.title, problem.msg);
+      return;
+    }
+    setStep((n) => Math.min(n + 1, LAST_STEP));
+  };
+
+  const goBack = () => setStep((n) => Math.max(n - 1, 0));
+
+  // First step that still has a problem, so the final check can jump to it.
+  const firstInvalidStep = (): number | null => {
+    for (let n = 0; n < LAST_STEP; n++) {
+      if (validateStep(n)) return n;
+    }
+    return null;
+  };
+
+  // Scroll back to the top whenever the step changes.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
+  // Phone back button goes to the previous step instead of leaving sign-up.
+  useEffect(() => {
+    if (step === 0) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setStep((n) => Math.max(n - 1, 0));
+      return true;
+    });
+    return () => sub.remove();
+  }, [step]);
+
   const handleSignup = async () => {
     if (user) {
       Alert.alert(
         t("alreadySignedInTitle"),
         `${t("alreadySignedInPrefix")} ${`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.idNumber}. ${t("pleaseLogOutFirst")}`,
       );
+      return;
+    }
+    const badStep = firstInvalidStep();
+    if (badStep !== null) {
+      setStep(badStep);
+      const problem = validateStep(badStep);
+      if (problem) Alert.alert(problem.title, problem.msg);
       return;
     }
     if (
@@ -310,11 +424,23 @@ export default function Signup() {
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
       <ScrollView
+        ref={scrollRef}
         style={styles.scrollView}
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {step > 0 && (
+          <View style={styles.progressWrap}>
+            <Text style={styles.progressText}>{t("suStepOf", { n: step + 1, total: STEP_COUNT })}</Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${((step + 1) / STEP_COUNT) * 100}%` }]} />
+            </View>
+          </View>
+        )}
+
+        {step === 0 && (
+        <>
         <View style={styles.headerSection}>
           <View style={styles.headerAccent} />
           <Text style={styles.title}>{t("suTitle")}</Text>
@@ -417,11 +543,16 @@ export default function Signup() {
           )}
         </View>
 
-        <Text style={styles.sectionLabel}>{t("suPersonalInfo")}</Text>
+        </>
+        )}
+
+        {step === 1 && (
+        <>
+        <Text style={styles.stepTitle}>{t("suStepNameTitle")}</Text>
         <View style={styles.inputGroup}>
           <TextInput
             placeholder={t("suFirstName")}
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={c.textMuted}
             style={inputStyle("firstName")}
             value={firstName}
             onChangeText={(v) => onText("firstName", "name", v, setFirstName)}
@@ -429,7 +560,7 @@ export default function Signup() {
           {fieldError("firstName")}
           <TextInput
             placeholder={t("suMiddleName")}
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={c.textMuted}
             style={inputStyle("midName")}
             value={midName}
             onChangeText={(v) => onText("midName", "name", v, setMidName)}
@@ -437,96 +568,23 @@ export default function Signup() {
           {fieldError("midName")}
           <TextInput
             placeholder={t("suLastName")}
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={c.textMuted}
             style={inputStyle("lastName")}
             value={lastName}
             onChangeText={(v) => onText("lastName", "name", v, setLastName)}
           />
           {fieldError("lastName")}
-          <TextInput
-            placeholder={t("suContact")}
-            placeholderTextColor="#6B7280"
-            style={inputStyle("conNumber")}
-            value={conNumber}
-            onChangeText={(v) => onText("conNumber", "phone", v, setConNumber)}
-            keyboardType="phone-pad"
-          />
-          {fieldError("conNumber")}
         </View>
+        </>
+        )}
 
-        <Text style={styles.sectionLabel}>{t("suGuardianSection")}</Text>
-        <Text style={styles.sectionHint}>
-          {t("suGuardianHint")}
-        </Text>
-        <View style={styles.inputGroup}>
-          <TextInput
-            placeholder={t("suGuardianName")}
-            placeholderTextColor="#6B7280"
-            style={inputStyle("guardianName")}
-            value={guardianName}
-            onChangeText={(v) => onText("guardianName", "name", v, setGuardianName)}
-          />
-          {fieldError("guardianName")}
-          <TextInput
-            placeholder={t("suGuardianPhone")}
-            placeholderTextColor="#6B7280"
-            style={inputStyle("guardianPhone")}
-            value={guardianPhone}
-            onChangeText={(v) => onText("guardianPhone", "phone", v, setGuardianPhone)}
-            keyboardType="phone-pad"
-          />
-          {fieldError("guardianPhone")}
-          <TextInput
-            placeholder={t("suGuardianRelation")}
-            placeholderTextColor="#6B7280"
-            style={inputStyle("guardianRelation")}
-            value={guardianRelation}
-            onChangeText={(v) => onText("guardianRelation", "relation", v, setGuardianRelation)}
-          />
-          {fieldError("guardianRelation")}
-        </View>
-
-        <Text style={styles.sectionLabel}>{t("suDistrict")}</Text>
-        <View style={styles.genderRow}>
-          {["District 1", "District 2"].map((d) => (
-            <TouchableOpacity
-              key={d}
-              style={[styles.genderOption, district === d && styles.genderOptionActive]}
-              onPress={() => { setDistrict(d); setBarangay(""); }}
-            >
-              <Text style={[styles.genderText, district === d && styles.genderTextActive]}>
-                {d === "District 1" ? t("suDistrict1") : t("suDistrict2")}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={styles.sectionLabel}>{t("suBarangay")}</Text>
-        <BarangayPickerField
-          value={barangay}
-          options={barangayOptions}
-          disabled={district.length === 0}
-          placeholder={district ? t("suSelectBarangay") : t("suSelectDistrictFirst")}
-          title={t("suPickBarangay")}
-          hasError={!!errors.barangay}
-          onSelect={setBarangay}
-        />
-        {fieldError("barangay")}
-
-        <Text style={styles.sectionLabel}>{t("suStreet")}</Text>
-        <TextInput
-          placeholder={t("suStreetPh")}
-          placeholderTextColor="#6B7280"
-          style={inputStyle("street")}
-          value={street}
-          onChangeText={(v) => onText("street", "address", v, setStreet)}
-        />
-        {fieldError("street")}
-
+        {step === 2 && (
+        <>
+        <Text style={styles.stepTitle}>{t("suStepBirthTitle")}</Text>
         <Text style={styles.sectionLabel}>{t("suDob")}</Text>
         <TextInput
           placeholder={t("suDobTypePh")}
-          placeholderTextColor="#4B5563"
+          placeholderTextColor={c.textSecondary}
           accessibilityLabel={t("suDobType")}
           style={[styles.input, dobTextError ? styles.inputError : null]}
           value={dobText}
@@ -599,7 +657,110 @@ export default function Signup() {
           ))}
         </View>
 
-        <Text style={styles.sectionLabel}>{t("suAccountDetails")}</Text>
+        </>
+        )}
+
+        {step === 3 && (
+        <>
+        <Text style={styles.stepTitle}>{t("suStepPhoneTitle")}</Text>
+        <View style={styles.inputGroup}>
+          <TextInput
+            placeholder={t("suContact")}
+            placeholderTextColor={c.textMuted}
+            style={inputStyle("conNumber")}
+            value={conNumber}
+            onChangeText={(v) => onText("conNumber", "phone", v, setConNumber)}
+            keyboardType="phone-pad"
+          />
+          {fieldError("conNumber")}
+        </View>
+
+        </>
+        )}
+
+        {step === 4 && (
+        <>
+        <Text style={styles.stepTitle}>{t("suStepAddressTitle")}</Text>
+        <Text style={styles.sectionLabel}>{t("suDistrict")}</Text>
+        <View style={styles.genderRow}>
+          {["District 1", "District 2"].map((d) => (
+            <TouchableOpacity
+              key={d}
+              style={[styles.genderOption, district === d && styles.genderOptionActive]}
+              onPress={() => { setDistrict(d); setBarangay(""); }}
+            >
+              <Text style={[styles.genderText, district === d && styles.genderTextActive]}>
+                {d === "District 1" ? t("suDistrict1") : t("suDistrict2")}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.sectionLabel}>{t("suBarangay")}</Text>
+        <BarangayPickerField
+          value={barangay}
+          options={barangayOptions}
+          disabled={district.length === 0}
+          placeholder={district ? t("suSelectBarangay") : t("suSelectDistrictFirst")}
+          title={t("suPickBarangay")}
+          hasError={!!errors.barangay}
+          onSelect={setBarangay}
+        />
+        {fieldError("barangay")}
+
+        <Text style={styles.sectionLabel}>{t("suStreet")}</Text>
+        <TextInput
+          placeholder={t("suStreetPh")}
+          placeholderTextColor={c.textMuted}
+          style={inputStyle("street")}
+          value={street}
+          onChangeText={(v) => onText("street", "address", v, setStreet)}
+        />
+        {fieldError("street")}
+
+        </>
+        )}
+
+        {step === 5 && (
+        <>
+        <Text style={styles.stepTitle}>{t("suStepGuardianTitle")}</Text>
+        <Text style={styles.sectionHint}>
+          {t("suGuardianHint")}
+        </Text>
+        <View style={styles.inputGroup}>
+          <TextInput
+            placeholder={t("suGuardianName")}
+            placeholderTextColor={c.textMuted}
+            style={inputStyle("guardianName")}
+            value={guardianName}
+            onChangeText={(v) => onText("guardianName", "name", v, setGuardianName)}
+          />
+          {fieldError("guardianName")}
+          <TextInput
+            placeholder={t("suGuardianPhone")}
+            placeholderTextColor={c.textMuted}
+            style={inputStyle("guardianPhone")}
+            value={guardianPhone}
+            onChangeText={(v) => onText("guardianPhone", "phone", v, setGuardianPhone)}
+            keyboardType="phone-pad"
+          />
+          {fieldError("guardianPhone")}
+          <TextInput
+            placeholder={t("suGuardianRelation")}
+            placeholderTextColor={c.textMuted}
+            style={inputStyle("guardianRelation")}
+            value={guardianRelation}
+            onChangeText={(v) => onText("guardianRelation", "relation", v, setGuardianRelation)}
+          />
+          {fieldError("guardianRelation")}
+        </View>
+
+        </>
+        )}
+
+        {step === 6 && (
+        <>
+        <Text style={styles.stepTitle}>{t("suStepAccountTitle")}</Text>
         <View style={styles.inputGroup}>
           <View style={styles.optionalWrapper}>
             <TextInput
@@ -608,7 +769,7 @@ export default function Signup() {
                   ? t("suIdNumberReq")
                   : t("suIdNumberOpt")
               }
-              placeholderTextColor="#6B7280"
+              placeholderTextColor={c.textMuted}
               style={inputStyle("idNumber", { paddingRight: 90 })}
               value={idNumber}
               onChangeText={(v) => onText("idNumber", "idNumber", v, setIdNumber)}
@@ -624,7 +785,7 @@ export default function Signup() {
           {fieldError("idNumber")}
           <TextInput
             placeholder={t("suPassword")}
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={c.textMuted}
             secureTextEntry
             style={inputStyle("password")}
             value={password}
@@ -669,6 +830,42 @@ export default function Signup() {
         </>
         )}
 
+        </>
+        )}
+
+        {step === LAST_STEP && (
+        <>
+        <Text style={styles.stepTitle}>{t("suReviewTitle")}</Text>
+        <Text style={styles.sectionHint}>{t("suReviewHint")}</Text>
+        {[
+          { label: t("suRvName"), value: `${firstName} ${midName} ${lastName}`.replace(/\s+/g, " ").trim(), to: 1 },
+          { label: t("suDob"), value: dob ? formatDisplayDate(dobDate) : "", to: 2 },
+          { label: t("suGender"), value: gender === "Male" ? t("genderMale") : gender === "Female" ? t("genderFemale") : "", to: 2 },
+          { label: t("suContact"), value: conNumber, to: 3 },
+          { label: t("suRvAddress"), value: fullAddress, to: 4 },
+          {
+            label: t("suGuardianSection"),
+            value: [guardianName, guardianPhone, guardianRelation].filter((v) => v.trim()).join(" - "),
+            to: 5,
+          },
+          ...(idNumber.trim() ? [{ label: t("suRvId"), value: idNumber.trim(), to: 6 }] : []),
+          ...(hasSciaId === true && idImage ? [{ label: t("suRvIdPhoto"), value: t("suRvAttached"), to: 6 }] : []),
+        ].map((row) => (
+          <View key={row.label} style={styles.reviewRow}>
+            <View style={styles.reviewText}>
+              <Text style={styles.reviewLabel}>{row.label}</Text>
+              <Text style={styles.reviewValue}>{row.value}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.reviewEdit}
+              onPress={() => setStep(row.to)}
+              accessibilityRole="button"
+              accessibilityLabel={`${t("suEdit")}: ${row.label}`}
+            >
+              <Text style={styles.reviewEditText}>{t("suEdit")}</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
         <TouchableOpacity
           style={[styles.createButton, loading && styles.createButtonDisabled]}
           onPress={handleSignup}
@@ -676,11 +873,30 @@ export default function Signup() {
           activeOpacity={0.8}
         >
           {loading ? (
-            <ActivityIndicator color="white" size="small" />
+            <ActivityIndicator color={c.onColor} size="small" />
           ) : (
             <Text style={styles.createButtonText}>{t("suCreate")}</Text>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity style={styles.navBackFull} onPress={goBack} accessibilityRole="button" disabled={loading}>
+          <Text style={styles.navBackText}>{t("backBtn")}</Text>
+        </TouchableOpacity>
+        </>
+        )}
+
+        {step < LAST_STEP && (
+          <View style={styles.navRow}>
+            {step > 0 && (
+              <TouchableOpacity style={styles.navBack} onPress={goBack} accessibilityRole="button">
+                <Text style={styles.navBackText}>{t("backBtn")}</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.navNext} onPress={goNext} accessibilityRole="button">
+              <Text style={styles.navNextText}>{t("suNext")}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -688,66 +904,66 @@ export default function Signup() {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F3F4F6" },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: c.surfaceAlt },
   scrollView: { flex: 1 },
   container: { padding: 20, paddingBottom: 40 },
   headerSection: { alignItems: "center", marginBottom: 24, paddingTop: 8 },
   headerAccent: {
     width: 50,
     height: 5,
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
     borderRadius: 3,
     marginBottom: 14,
   },
   title: {
     fontSize: 30,
     fontWeight: "800",
-    color: "#111827",
+    color: c.text,
     letterSpacing: 0.3,
   },
-  subtitle: { fontSize: 16, color: "#4B5563", marginTop: 4 },
+  subtitle: { fontSize: 16, color: c.textSecondary, marginTop: 4 },
   pendingNotice: {
-    backgroundColor: "#FEF3C7",
+    backgroundColor: c.warningSoft,
     borderRadius: 10,
     padding: 14,
     marginTop: 14,
     borderWidth: 1,
-    borderColor: "#F59E0B",
+    borderColor: c.warning,
   },
   pendingNoticeText: {
     fontSize: 15,
-    color: "#7A3B00",
+    color: c.warningText,
     textAlign: "center",
     lineHeight: 21,
   },
   sectionLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#1D4ED8",
+    color: c.primaryStrong,
     letterSpacing: 0.5,
     marginBottom: 10,
     marginTop: 22,
   },
-  sectionHint: { fontSize: 14, color: "#4B5563", marginBottom: 10, lineHeight: 20 },
+  sectionHint: { fontSize: 14, color: c.textSecondary, marginBottom: 10, lineHeight: 20 },
   inputGroup: { gap: 12 },
-  inputError: { borderColor: "#DC2626", backgroundColor: "#FEF2F2" },
-  errorText: { color: "#B91C1C", fontSize: 14, lineHeight: 20, marginTop: -4 },
+  inputError: { borderColor: c.danger, backgroundColor: c.dangerSoft },
+  errorText: { color: c.danger, fontSize: 14, lineHeight: 20, marginTop: -4 },
   input: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderRadius: 12,
     fontSize: 17,
-    color: "#111827",
+    color: c.text,
     minHeight: 52,
   },
   pickerBox: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     borderRadius: 12,
     overflow: "hidden",
     marginBottom: 4,
@@ -760,12 +976,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: "center",
   },
-  optionalBadgeText: { fontSize: 14, color: "#6B7280", fontStyle: "italic" },
-  dobOr: { fontSize: 15, color: "#4B5563", marginTop: 10, marginBottom: 6 },
+  optionalBadgeText: { fontSize: 14, color: c.textMuted, fontStyle: "italic" },
+  dobOr: { fontSize: 15, color: c.textSecondary, marginTop: 10, marginBottom: 6 },
   dobButton: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     paddingHorizontal: 16,
     paddingVertical: 18,
     borderRadius: 12,
@@ -774,36 +990,36 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     minHeight: 56,
   },
-  dobButtonText: { fontSize: 17, color: "#111827" },
-  placeholder: { color: "#6B7280" },
-  dobChevron: { fontSize: 24, color: "#6B7280", lineHeight: 26 },
+  dobButtonText: { fontSize: 17, color: c.text },
+  placeholder: { color: c.textMuted },
+  dobChevron: { fontSize: 24, color: c.textMuted, lineHeight: 26 },
   dobConfirmButton: {
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: "center",
     marginTop: 8,
   },
-  dobConfirmText: { color: "white", fontWeight: "700", fontSize: 15 },
+  dobConfirmText: { color: c.onColor, fontWeight: "700", fontSize: 15 },
   genderRow: { flexDirection: "row", gap: 12 },
   genderOption: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
     minHeight: 52,
     justifyContent: "center",
   },
-  genderOptionActive: { borderColor: "#1D4ED8", backgroundColor: "#EEF2FF" },
-  genderText: { fontSize: 17, color: "#374151", fontWeight: "600" },
-  genderTextActive: { color: "#1D4ED8" },
+  genderOptionActive: { borderColor: c.primaryStrong, backgroundColor: c.surfaceSoft },
+  genderText: { fontSize: 17, color: c.textStrong, fontWeight: "600" },
+  genderTextActive: { color: c.primaryStrong },
   uploadCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderWidth: 2,
-    borderColor: "#9CA3AF",
+    borderColor: c.textMuted,
     borderRadius: 14,
     padding: 24,
     alignItems: "center",
@@ -814,7 +1030,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 8,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: c.surfaceSoft,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
@@ -822,16 +1038,16 @@ const styles = StyleSheet.create({
   uploadIconText: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#1D4ED8",
+    color: c.primaryStrong,
     letterSpacing: 1,
   },
   uploadTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#374151",
+    color: c.textStrong,
     marginBottom: 4,
   },
-  uploadHint: { fontSize: 15, color: "#6B7280", textAlign: "center" },
+  uploadHint: { fontSize: 15, color: c.textMuted, textAlign: "center" },
   idPreview: {
     width: "100%",
     height: 160,
@@ -840,38 +1056,38 @@ const styles = StyleSheet.create({
   },
   uploadChangeText: {
     fontSize: 15,
-    color: "#1D4ED8",
+    color: c.primaryStrong,
     marginTop: 8,
     fontWeight: "600",
   },
   noIdSection: {
     marginBottom: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     alignItems: "center",
   },
   noIdQuestion: {
     fontSize: 17,
     fontWeight: "800",
-    color: "#374151",
+    color: c.textStrong,
     textAlign: "center",
     marginBottom: 4,
   },
   noIdSubtitle: {
     fontSize: 15,
-    color: "#4B5563",
+    color: c.textSecondary,
     textAlign: "center",
     marginBottom: 16,
   },
   idAnswerRow: { flexDirection: "row", gap: 12, width: "100%" },
   idAnswerYes: {
     flex: 1,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: c.surfaceSoft,
     borderWidth: 1.5,
-    borderColor: "#1D4ED8",
+    borderColor: c.primaryStrong,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
@@ -880,38 +1096,38 @@ const styles = StyleSheet.create({
   },
   idAnswerNo: {
     flex: 1,
-    backgroundColor: "#FEF2F2",
+    backgroundColor: c.dangerSoft,
     borderWidth: 1.5,
-    borderColor: "#DC2626",
+    borderColor: c.danger,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
     minHeight: 52,
     justifyContent: "center",
   },
-  idAnswerYesText: { fontSize: 15, fontWeight: "700", color: "#1D4ED8" },
-  idAnswerNoText: { fontSize: 15, fontWeight: "700", color: "#DC2626" },
+  idAnswerYesText: { fontSize: 15, fontWeight: "700", color: c.primaryStrong },
+  idAnswerNoText: { fontSize: 15, fontWeight: "700", color: c.danger },
   idActionCard: { alignItems: "center", gap: 12, width: "100%" },
   idActionText: {
     fontSize: 15,
-    color: "#4B5563",
+    color: c.textSecondary,
     textAlign: "center",
     lineHeight: 21,
   },
   reasonInput: {
     width: "100%",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderWidth: 1.5,
-    borderColor: "#D1D5DB",
+    borderColor: c.border,
     paddingHorizontal: 14,
     paddingVertical: 14,
     borderRadius: 12,
     fontSize: 16,
-    color: "#111827",
+    color: c.text,
     minHeight: 90,
   },
   requestIdButton: {
-    backgroundColor: "#1D4ED8",
+    backgroundColor: c.primaryStrong,
     borderRadius: 12,
     paddingVertical: 16,
     width: "100%",
@@ -919,9 +1135,9 @@ const styles = StyleSheet.create({
     minHeight: 52,
     justifyContent: "center",
   },
-  requestIdButtonText: { color: "white", fontWeight: "700", fontSize: 17 },
+  requestIdButtonText: { color: c.onColor, fontWeight: "700", fontSize: 17 },
   oscaButton: {
-    backgroundColor: "#047857",
+    backgroundColor: c.success,
     borderRadius: 12,
     paddingVertical: 16,
     width: "100%",
@@ -929,14 +1145,14 @@ const styles = StyleSheet.create({
     minHeight: 52,
     justifyContent: "center",
   },
-  oscaButtonText: { color: "white", fontWeight: "700", fontSize: 17 },
+  oscaButtonText: { color: c.onColor, fontWeight: "700", fontSize: 17 },
   changeAnswerText: {
     fontSize: 14,
-    color: "#4B5563",
+    color: c.textSecondary,
     textDecorationLine: "underline",
   },
   createButton: {
-    backgroundColor: "#1D4ED8",
+    backgroundColor: c.primaryStrong,
     padding: 18,
     borderRadius: 14,
     alignItems: "center",
@@ -951,9 +1167,79 @@ const styles = StyleSheet.create({
   },
   createButtonDisabled: { opacity: 0.6 },
   createButtonText: {
-    color: "white",
+    color: c.onColor,
     fontWeight: "800",
     fontSize: 19,
     letterSpacing: 0.3,
   },
+
+  // Step-by-step form
+  progressWrap: { marginBottom: 20 },
+  progressText: { fontSize: 18, fontWeight: "700", color: c.textStrong, marginBottom: 8 },
+  progressTrack: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: c.surfaceAlt,
+    borderWidth: 1,
+    borderColor: c.border,
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%", backgroundColor: c.primary },
+  stepTitle: { fontSize: 26, fontWeight: "800", color: c.text, marginBottom: 16, lineHeight: 34 },
+  navRow: { flexDirection: "row", gap: 12, marginTop: 28 },
+  navBack: {
+    flex: 1,
+    minHeight: 60,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: c.primary,
+    backgroundColor: c.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navBackFull: {
+    minHeight: 60,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: c.primary,
+    backgroundColor: c.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+  },
+  navBackText: { fontSize: 20, fontWeight: "800", color: c.primary },
+  navNext: {
+    flex: 2,
+    minHeight: 60,
+    borderRadius: 16,
+    backgroundColor: c.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navNextText: { fontSize: 20, fontWeight: "800", color: c.onColor },
+  reviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: c.surface,
+    borderWidth: 1.5,
+    borderColor: c.border,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  reviewText: { flex: 1 },
+  reviewLabel: { fontSize: 15, fontWeight: "700", color: c.textMuted, marginBottom: 2 },
+  reviewValue: { fontSize: 19, fontWeight: "700", color: c.text, lineHeight: 26 },
+  reviewEdit: {
+    minHeight: 48,
+    minWidth: 84,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: c.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  reviewEditText: { fontSize: 17, fontWeight: "800", color: c.primary },
 });

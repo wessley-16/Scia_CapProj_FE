@@ -151,7 +151,7 @@ export default function ChatHistoryDrawer({
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   accessibilityLabel={t("a11yDeleteChat")}
                 >
-                  <Ionicons name="trash-outline" size={18} color="#9CA3AF" />
+                  <Ionicons name="trash-outline" size={24} color="#6B7280" />
                 </TouchableOpacity>
               </TouchableOpacity>
             );
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   headerTitle: { fontWeight: "800", color: "#111827" },
-  closeBtn: { padding: 10 },
+  closeBtn: { padding: 10, minWidth: 52, minHeight: 52, alignItems: "center", justifyContent: "center" },
   newChatBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -219,5 +219,5 @@ const styles = StyleSheet.create({
   sessionTitle: { color: "#374151", fontWeight: "500" },
   sessionTitleActive: { color: "#111827", fontWeight: "700" },
   sessionTime: { color: "#6B7280", marginTop: 2 },
-  deleteBtn: { padding: 10, marginLeft: 8 },
+  deleteBtn: { padding: 10, marginLeft: 8, minWidth: 52, minHeight: 52, alignItems: "center", justifyContent: "center" },
 });

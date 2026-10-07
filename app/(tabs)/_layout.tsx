@@ -1,10 +1,11 @@
 import { useAuth } from "@/context/AuthContext";
+import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 import { usePresence } from "@/hooks/usePresence";
 import { Ionicons } from "@expo/vector-icons";
 import Entypo from "@expo/vector-icons/Entypo";
 import { Tabs, useRouter } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
@@ -22,7 +23,8 @@ const CustomTabBar = ({
   onScanPress,
 }: any) => {
   const insets = useSafeAreaInsets();
-  const { t } = useSettings();
+  const { t, colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const paddingBottom = insets.bottom > 0 ? insets.bottom : 15;
 
   const currentRouteName = state.routes[state.index].name;
@@ -61,7 +63,7 @@ const CustomTabBar = ({
           accessibilityLabel={t("sosTabA11y")}
         >
           <View style={[styles.sosTab, isFocused && styles.sosTabActive]}>
-            <Ionicons name="alert-circle" size={26} color="white" />
+            <Ionicons name="alert-circle" size={26} color={c.onColor} />
             <Text style={styles.sosText}>{item.label}</Text>
           </View>
         </TouchableOpacity>
@@ -79,9 +81,9 @@ const CustomTabBar = ({
         <Ionicons
           name={isFocused ? item.active : item.icon}
           size={28}
-          color={isFocused ? "white" : "#E5E7EB"}
+          color={isFocused ? c.onColor : c.onColorMuted}
         />
-        <Text style={[styles.label, { color: isFocused ? "white" : "#E5E7EB" }]}>
+        <Text style={[styles.label, { color: isFocused ? c.onColor : c.onColorMuted }]}>
           {item.label}
         </Text>
       </TouchableOpacity>
@@ -112,7 +114,7 @@ const CustomTabBar = ({
         style={styles.scanButton}
         hitSlop={6}
       >
-        <Entypo name="mic" size={34} color="#2356E1" />
+        <Entypo name="mic" size={34} color={c.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -125,7 +127,8 @@ const CustomTabBar = ({
 // notice on the signup screen was never actually enforced anywhere.
 const PendingVerificationScreen = ({ onLogout }: { onLogout: () => void }) => {
   const insets = useSafeAreaInsets();
-  const { t } = useSettings();
+  const { t, colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <View style={[styles.pendingWrapper, { paddingTop: insets.top + 24 }]}>
       <View style={styles.pendingCard}>
@@ -148,6 +151,8 @@ const PendingVerificationScreen = ({ onLogout }: { onLogout: () => void }) => {
 export default function Layout() {
   const router = useRouter();
   const { user, loading, isGuest, clearUser } = useAuth();
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   usePresence(); // Safety Monitoring heartbeat + "Are you safe?" prompt
 
   const onScanPress = () => {
@@ -164,7 +169,7 @@ export default function Layout() {
   if (loading) {
     return (
       <View style={styles.loadingWrapper}>
-        <ActivityIndicator size="large" color="#2356E1" />
+        <ActivityIndicator size="large" color={c.primary} />
       </View>
     );
   }
@@ -213,6 +218,7 @@ export default function Layout() {
           {/* Hidden legacy screens, kept so existing links don't break */}
           <Tabs.Screen name="govdocs" options={{ href: null }} />
           <Tabs.Screen name="emergency" options={{ href: null }} />
+          <Tabs.Screen name="help" options={{ href: null }} />
 
           <Tabs.Screen name="account" />
         </Tabs>
@@ -221,13 +227,13 @@ export default function Layout() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   wrapper: {
     position: "absolute",
     bottom: 0,
     width: "100%",
     alignItems: "center",
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
   },
   tabBar: {
     flexDirection: "row",
@@ -235,8 +241,8 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     borderTopWidth: 3,
-    borderColor: "white",
-    backgroundColor: "#2356E1",
+    borderColor: c.surface,
+    backgroundColor: c.primary,
   },
   tabItem: {
     flex: 1,
@@ -254,14 +260,14 @@ const styles = StyleSheet.create({
     minHeight: 58,
     paddingHorizontal: 6,
     borderRadius: 16,
-    backgroundColor: "#DC2626",
+    backgroundColor: c.danger,
     borderWidth: 2,
-    borderColor: "#FFFFFF",
+    borderColor: c.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  sosTabActive: { backgroundColor: "#B91C1C" },
-  sosText: { color: "#FFFFFF", fontSize: 15, fontWeight: "900", letterSpacing: 0.5, marginTop: -2 },
+  sosTabActive: { backgroundColor: c.danger },
+  sosText: { color: c.onColor, fontSize: 15, fontWeight: "900", letterSpacing: 0.5, marginTop: -2 },
   centerSlot: {
     width: 80,
     height: "100%",
@@ -271,7 +277,7 @@ const styles = StyleSheet.create({
   },
   scanLabel: {
     fontSize: 15,
-    color: "#E5E7EB",
+    color: c.onColorMuted,
     fontWeight: "600",
     textAlign: "center",
     width: "100%",
@@ -283,8 +289,8 @@ const styles = StyleSheet.create({
     height: 68,
     borderRadius: 34,
     borderWidth: 4,
-    borderColor: "#2356E1",
-    backgroundColor: "white",
+    borderColor: c.primary,
+    backgroundColor: c.surface,
     alignItems: "center",
     justifyContent: "center",
     elevation: 8,
@@ -297,45 +303,44 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.surfaceAlt,
   },
   pendingWrapper: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.surfaceAlt,
     paddingHorizontal: 24,
   },
   pendingCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: c.surface,
     borderRadius: 16,
     padding: 24,
     borderWidth: 1,
-    borderColor: "#F59E0B",
+    borderColor: c.warning,
     alignItems: "center",
   },
   pendingTitle: {
     fontSize: 20,
     fontWeight: "800",
-    color: "#111827",
+    color: c.text,
     textAlign: "center",
     marginBottom: 12,
   },
   pendingBody: {
     fontSize: 15,
-    color: "#4B5563",
+    color: c.textSecondary,
     textAlign: "center",
     lineHeight: 21,
     marginBottom: 20,
   },
   pendingButton: {
-    backgroundColor: "#1D4ED8",
+    backgroundColor: c.primaryStrong,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 32,
   },
   pendingButtonText: {
-    color: "white",
+    color: c.onColor,
     fontWeight: "700",
     fontSize: 16,
   },
 });
-  

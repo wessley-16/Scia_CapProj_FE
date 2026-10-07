@@ -4,6 +4,8 @@ import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import SpeakButton from "@/components/SpeakButton";
+import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — events, join/check-in, and everything else now go through
 // Firestore directly (previously joining hit a hardcoded local dev backend
@@ -19,6 +21,8 @@ import DigitalIDCard from "@/components/DigitalIDCard";
 const background = require("../../assets/images/Foreground.png");
 
 export default function Home() {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
   const { user, isGuest, clearUser } = useAuth();
   const { fontScale, t } = useSettings();
@@ -62,6 +66,7 @@ export default function Home() {
   const goToAppointment = () => router.push("/(tabs)/healthcare");
   const goToEmergency = () => router.push("/(tabs)/emergency");
   const goToDocs = () => router.push("/(tabs)/govdocs");
+  const goToHelp = () => router.push("/(tabs)/help" as any);
 
   /* ---------------- FETCH EVENTS ---------------- */
   const fetchEvents = async () => {
@@ -459,7 +464,7 @@ export default function Home() {
               <Ionicons
                 name="shield-checkmark"
                 size={18}
-                color="#B45309"
+                color={c.warning}
               />
               <Text style={[styles.idText, { fontSize: 16 * fontScale }]}>
                 {idNumber}
@@ -476,7 +481,7 @@ export default function Home() {
             <Ionicons
               name={showNotif ? "close" : "notifications"}
               size={32}
-              color="#2356E1"
+              color={c.primary}
             />
             {!showNotif && unreadCount > 0 && (
               <View style={styles.notifBadge}>
@@ -491,19 +496,21 @@ export default function Home() {
         <View style={styles.tilesWrap}>
           <Text style={[styles.tilesTitle, { fontSize: 22 * fontScale }]}>{t("tileQuickTitle")}</Text>
 
-          <Tile wide title={t("tileSos")} subtitle={t("callForHelp")} icon="alarm-light" color="#C81E1E" onPress={goToEmergency} fontScale={fontScale} />
+          <Tile wide title={t("tileSos")} subtitle={t("callForHelp")} icon="alarm-light" color={c.danger} onPress={goToEmergency} fontScale={fontScale} />
 
           <View style={styles.tileRow}>
-            <Tile title={t("tileHealth")} icon="medical-bag" color="#0F766E" onPress={() => router.push("/(tabs)/healthcare")} fontScale={fontScale} />
-            <Tile title={t("tileMeds")} icon="pill" color="#0F766E" onPress={goToMedicine} fontScale={fontScale} />
+            <Tile title={t("tileHealth")} icon="medical-bag" color={c.tileHealth} onPress={() => router.push("/(tabs)/healthcare")} fontScale={fontScale} />
+            <Tile title={t("tileMeds")} icon="pill" color={c.tileHealth} onPress={goToMedicine} fontScale={fontScale} />
           </View>
 
           <View style={styles.tileRow}>
-            <Tile title={t("tileChat")} icon="chat-processing-outline" color="#1A56C4" onPress={goToChat} fontScale={fontScale} />
-            <Tile title={t("tileVoice")} icon="microphone-outline" color="#1A56C4" onPress={goToVoice} fontScale={fontScale} />
+            <Tile title={t("tileChat")} icon="chat-processing-outline" color={c.info} onPress={goToChat} fontScale={fontScale} />
+            <Tile title={t("tileVoice")} icon="microphone-outline" color={c.info} onPress={goToVoice} fontScale={fontScale} />
           </View>
 
-          <Tile wide title={t("tileGov")} icon="file-document" color="#374151" onPress={goToDocs} fontScale={fontScale} />
+          <Tile wide title={t("tileGov")} icon="file-document" color={c.textStrong} onPress={goToDocs} fontScale={fontScale} />
+
+          <Tile wide title={t("tileHelp")} subtitle={t("tileHelpSub")} icon="phone-in-talk" color={c.tileInfo} onPress={goToHelp} fontScale={fontScale} />
         </View>
 
         {/* NEXT MEDICINE — tap to see every medicine in a scrollable pop-up */}
@@ -546,7 +553,7 @@ export default function Home() {
             <MaterialCommunityIcons
               name={nextMedicine ? "pill" : "heart-outline"}
               size={50}
-              color="#2356E1"
+              color={c.primary}
             />
           </TouchableOpacity>
         </View>
@@ -562,7 +569,7 @@ export default function Home() {
             important details straight away */}
         <View style={styles.programContainer}>
           <View style={styles.programHeader}>
-            <MaterialCommunityIcons name="bullhorn-outline" size={32} color="#12307A" />
+            <MaterialCommunityIcons name="bullhorn-outline" size={32} color={c.primaryDark} />
             <Text style={[styles.programTitle, { fontSize: 24 * fontScale }]}>
               {t("programUpdates")}
             </Text>
@@ -601,7 +608,7 @@ export default function Home() {
                 onPress={() => setShowMedicines(false)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Ionicons name="close" size={28} color="#374151" />
+                <Ionicons name="close" size={28} color={c.textStrong} />
               </TouchableOpacity>
             </View>
 
@@ -613,7 +620,7 @@ export default function Home() {
               {sortedMedicines.map(({ med, next }, index) => (
                 <View key={med.id ?? String(index)} style={styles.medItem}>
                   <View style={styles.medItemIcon}>
-                    <MaterialCommunityIcons name="pill" size={28} color="#2356E1" />
+                    <MaterialCommunityIcons name="pill" size={28} color={c.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.medName, { fontSize: 18 * fontScale }]}>{med.name}</Text>
@@ -673,7 +680,7 @@ export default function Home() {
               style={styles.notifBtn}
               onPress={toggleNotification}
             >
-              <Ionicons name="close" size={28} color="#2356E1" />
+              <Ionicons name="close" size={28} color={c.primary} />
             </TouchableOpacity>
 
             <View style={{ marginTop: 50 }}>
@@ -682,7 +689,7 @@ export default function Home() {
               </Text>
 
               {/* EVENTS NOTIFICATIONS */}
-              <Text style={{ color: "#6B7280", marginBottom: 5 }}>
+              <Text style={{ color: c.textMuted, marginBottom: 5 }}>
                 {t("homeJoinedEvents")}
               </Text>
 
@@ -693,7 +700,7 @@ export default function Home() {
                   <View
                     key={event.id}
                     style={{
-                      backgroundColor: "#F3F4F6",
+                      backgroundColor: c.surfaceAlt,
                       padding: 12,
                       borderRadius: 12,
                       marginBottom: 10,
@@ -716,7 +723,7 @@ export default function Home() {
 
               {/* SYSTEM NOTIFICATIONS */}
               <View style={styles.notifHeaderRow}>
-                <Text style={{ color: "#6B7280" }}>{t("homeSystemAlerts")}</Text>
+                <Text style={{ color: c.textMuted }}>{t("homeSystemAlerts")}</Text>
                 {unreadCount > 0 && (
                   <TouchableOpacity onPress={markAllNotifsRead}>
                     <Text style={styles.notifActionText}>{t("homeMarkAllRead")}</Text>
@@ -734,26 +741,28 @@ export default function Home() {
                       key={n.id}
                       style={[
                         styles.notifCard,
-                        { backgroundColor: n.type === "SOS" ? "#FEE2E2" : "#E0F2FE" },
+                        { backgroundColor: n.type === "SOS" ? c.dangerSoft : c.infoSoft },
                         read && styles.notifCardRead,
                       ]}
                     >
                       <View style={styles.notifTitleRow}>
                         {!read && <View style={styles.notifDot} />}
-                        <Text style={{ fontWeight: read ? "600" : "800", flex: 1 }}>{n.title}</Text>
+                        <Text style={{ fontWeight: read ? "600" : "800", flex: 1, fontSize: 18 * fontScale, color: c.text }}>{n.title}</Text>
                         <TouchableOpacity
                           onPress={() => closeNotif(n)}
-                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          style={styles.notifClose}
+                          accessibilityRole="button"
                           accessibilityLabel={t("homeCloseNotif")}
                         >
-                          <Ionicons name="close" size={20} color="#4B5563" />
+                          <Ionicons name="close" size={28} color={c.textSecondary} />
                         </TouchableOpacity>
                       </View>
 
-                      {!!n.body && <Text>{n.body}</Text>}
+                      {!!n.body && <Text style={{ fontSize: 17 * fontScale, color: c.text, lineHeight: 25 * fontScale }}>{n.body}</Text>}
+                      <SpeakButton text={`${n.title}. ${n.body || ""}`} style={{ marginTop: 6 }} />
 
                       {n.ts > 0 && (
-                        <Text style={{ fontSize: 14, color: "gray" }}>
+                        <Text style={{ fontSize: 15 * fontScale, color: c.textMuted }}>
                           {new Date(n.ts).toLocaleString()}
                         </Text>
                       )}
@@ -785,6 +794,8 @@ export default function Home() {
 
 /* BUTTON COMPONENT */
 function Tile({ title, subtitle, icon, color, onPress, fontScale, wide }: any) {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <TouchableOpacity
       style={[styles.tile, wide && styles.tileWide, { backgroundColor: color }]}
@@ -793,12 +804,12 @@ function Tile({ title, subtitle, icon, color, onPress, fontScale, wide }: any) {
       accessibilityRole="button"
       accessibilityLabel={subtitle ? `${title}. ${subtitle}` : title}
     >
-      <MaterialCommunityIcons name={icon} size={wide ? 48 : 44} color="#fff" />
+      <MaterialCommunityIcons name={icon} size={wide ? 48 : 44} color={c.onColor} />
       <View style={wide ? { flex: 1 } : undefined}>
         <Text style={[styles.tileText, wide && { textAlign: "left" }, { fontSize: (wide ? 24 : 20) * fontScale }]}>{title}</Text>
         {!!subtitle && <Text style={[styles.tileSub, { fontSize: 16 * fontScale }]}>{subtitle}</Text>}
       </View>
-      {wide && <Ionicons name="chevron-forward" size={30} color="#fff" />}
+      {wide && <Ionicons name="chevron-forward" size={30} color={c.onColor} />}
     </TouchableOpacity>
   );
 }
@@ -811,31 +822,33 @@ function ActionButton({
   onPress,
   fontScale,
 }: any) {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   return (
     <TouchableOpacity
       style={[styles.button, { backgroundColor: color }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <MaterialCommunityIcons name={icon} size={28} color="#fff" />
+      <MaterialCommunityIcons name={icon} size={28} color={c.onColor} />
 
       <View style={{ flex: 1, marginLeft: 14 }}>
         <Text style={[styles.buttonTitle, { fontSize: 18 * fontScale }]}>{title}</Text>
         <Text style={[styles.buttonSub, { fontSize: 14 * fontScale }]}>{subtitle}</Text>
       </View>
 
-      <Ionicons name="chevron-forward" size={28} color="#fff" />
+      <Ionicons name="chevron-forward" size={28} color={c.onColor} />
     </TouchableOpacity>
   );
 }
 
 /* STYLES */
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: "#F4F6F9" },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: c.bg },
 
   // Calm light-blue wash; the 3S Center illustration stays only as a faint
   // watermark so all text sits on a plain, high-contrast surface.
-  backgroundImage: { flex: 1, backgroundColor: "#EAF1FF" },
+  backgroundImage: { flex: 1, backgroundColor: c.surfaceSoft },
   backgroundImageFaded: { opacity: 0.12 },
 
   container: { padding: 0},
@@ -843,7 +856,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "white",
+    backgroundColor: c.surface,
     padding: 5,
     borderRadius: 40,
     marginHorizontal: 10,
@@ -854,7 +867,7 @@ const styles = StyleSheet.create({
     width: 66,
     height: 66,
     borderRadius: 33,
-    backgroundColor: "#cfcfcf",
+    backgroundColor: c.border,
   },
 
   headerText: {
@@ -862,12 +875,12 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
 
-  greeting: { fontSize: 18, color: "#000" },
+  greeting: { fontSize: 18, color: c.text },
 
   name: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#111827",
+    color: c.text,
   },
 
   idRow: {
@@ -879,7 +892,7 @@ const styles = StyleSheet.create({
   idText: {
     fontSize: 16,
     marginLeft: 4,
-    color: "#111827",
+    color: c.text,
     fontWeight: "600",
   },
 
@@ -897,7 +910,7 @@ const styles = StyleSheet.create({
   },
 
   tilesWrap: { marginHorizontal: 12, marginTop: 16 },
-  tilesTitle: { fontWeight: "800", color: "#111827", marginBottom: 12 },
+  tilesTitle: { fontWeight: "800", color: c.text, marginBottom: 12 },
   tileRow: { flexDirection: "row", gap: 12, marginTop: 12 },
   tile: {
     flex: 1,
@@ -911,8 +924,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   tileWide: { flex: undefined, flexDirection: "row", minHeight: 110, marginTop: 12, gap: 16, paddingHorizontal: 20 },
-  tileText: { color: "#FFFFFF", fontWeight: "800", textAlign: "center" },
-  tileSub: { color: "#FFFFFF", marginTop: 2 },
+  tileText: { color: c.onColor, fontWeight: "800", textAlign: "center" },
+  tileSub: { color: c.onColor, marginTop: 2 },
   reminderWrap: { marginHorizontal: 12, marginTop: 8 },
 
   assistantContainer: {
@@ -929,7 +942,7 @@ const styles = StyleSheet.create({
   },
 
   moduleContainer: {
-    backgroundColor: "white",
+    backgroundColor: c.surface,
     borderRadius: 30,
     marginTop: 20,
     padding: 12,
@@ -951,11 +964,11 @@ const styles = StyleSheet.create({
 
   reminderTime: { fontSize: 16 },
 
-  reminderMore: { fontWeight: "700", color: "#1D4ED8", marginTop: 4 },
+  reminderMore: { fontWeight: "700", color: c.primaryStrong, marginTop: 4 },
 
   medOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "flex-end" },
   medSheet: {
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
@@ -968,7 +981,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#D1D5DB",
+    backgroundColor: c.border,
     marginBottom: 12,
   },
   medHeader: {
@@ -977,13 +990,15 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: 12,
   },
-  medTitle: { fontWeight: "800", color: "#111827", flex: 1, paddingRight: 12 },
+  medTitle: { fontWeight: "800", color: c.text, flex: 1, paddingRight: 12 },
   medList: { flexGrow: 0 },
   medItem: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    backgroundColor: "#F3F6FF",
+    backgroundColor: c.surfaceSoft,
+    borderWidth: 1.5,
+    borderColor: c.border,
     borderRadius: 14,
     padding: 14,
     marginBottom: 10,
@@ -992,26 +1007,26 @@ const styles = StyleSheet.create({
     width: 46,
     height: 46,
     borderRadius: 23,
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
     alignItems: "center",
     justifyContent: "center",
   },
-  medName: { fontWeight: "800", color: "#111827" },
-  medLine: { color: "#4B5563", marginTop: 2, lineHeight: 21 },
+  medName: { fontWeight: "800", color: c.text },
+  medLine: { color: c.textSecondary, marginTop: 2, lineHeight: 21 },
   medManageBtn: {
-    backgroundColor: "#1D4ED8",
+    backgroundColor: c.primaryStrong,
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: "center",
     marginTop: 8,
   },
-  medManageText: { color: "#fff", fontWeight: "800" },
+  medManageText: { color: c.onColor, fontWeight: "800" },
 
   assistant: {
     flex: 1,
     flexDirection: "column",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
     padding: 16,
     minHeight: 150,
     justifyContent: "center",
@@ -1020,21 +1035,21 @@ const styles = StyleSheet.create({
     // A visible border makes the card read as a button (older users often can't
     // tell whether a plain white card is tappable).
     borderWidth: 2,
-    borderColor: "#1A56C4",
+    borderColor: c.info,
   },
-  assistantHint: { marginTop: 8, color: "#1A56C4", fontWeight: "800", textAlign: "center" },
+  assistantHint: { marginTop: 8, color: c.info, fontWeight: "800", textAlign: "center" },
 
   assistantTitle: {
     fontSize: 19,
     fontWeight: "bold",
-    color: "#111827",
+    color: c.text,
     textAlign: "center",
     marginTop: 6,
   },
 
   assistantSub: {
     fontSize: 15,
-    color: "#374151",
+    color: c.textStrong,
     textAlign: "center",
     marginTop: 2,
   },
@@ -1048,13 +1063,13 @@ const styles = StyleSheet.create({
   },
 
   buttonTitle: {
-    color: "#fff",
+    color: c.onColor,
     fontSize: 18,
     fontWeight: "bold",
   },
 
   buttonSub: {
-    color: "#E5E7EB",
+    color: c.border,
     fontSize: 14,
   },
 
@@ -1062,8 +1077,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 20,
     borderWidth: 3,
-    borderColor: "white",
-    backgroundColor: "#2356E1",
+    borderColor: c.surface,
+    backgroundColor: c.primary,
     padding: 15,
     borderRadius: 30,
   },
@@ -1083,7 +1098,7 @@ const styles = StyleSheet.create({
     right: 0,
     height: "100%",
     width: "80%",
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
     borderTopLeftRadius: 30,
     padding: 20,
     elevation: 10,
@@ -1098,11 +1113,11 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     paddingHorizontal: 4,
-    backgroundColor: "#DC2626",
+    backgroundColor: c.danger,
     alignItems: "center",
     justifyContent: "center",
   },
-  notifBadgeText: { color: "white", fontSize: 14, fontWeight: "800" },
+  notifBadgeText: { color: c.onColor, fontSize: 14, fontWeight: "800" },
   notifHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1111,11 +1126,12 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   notifCard: { padding: 12, borderRadius: 12, marginBottom: 10, gap: 4 },
-  notifCardRead: { opacity: 0.65 },
+  notifCardRead: { opacity: 0.8 },
+  notifClose: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   notifTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  notifDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#2356E1" },
+  notifDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: c.primary },
   notifActions: { flexDirection: "row", gap: 18, marginTop: 6 },
-  notifActionText: { color: "#1D4ED8", fontWeight: "700", textDecorationLine: "underline" },
+  notifActionText: { color: c.primaryStrong, fontWeight: "800", fontSize: 17, textDecorationLine: "underline", paddingVertical: 14, paddingHorizontal: 6 },
   notifBtn: {
     position: "absolute",
     top: 20,
@@ -1135,12 +1151,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 24,
     fontWeight: "800",
-    color: "#12307A",
+    color: c.primaryDark,
   },
 
   programLabel: {
     fontSize: 20,
-    color: "#ffffff",
+    color: c.onColor,
     marginBottom: 6,
     // subtle glow for readability
     textShadowColor: "rgba(0,0,0,0.4)",
@@ -1154,7 +1170,7 @@ const styles = StyleSheet.create({
   },
 
   joinButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: c.primary,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 12,

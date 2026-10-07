@@ -1,8 +1,9 @@
 import BackBar from "@/components/BackBar";
 import { useFocusEffect, useRouter } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { logoutUser } from "@/lib/firebase";
@@ -16,14 +17,21 @@ const fontOptions = [
   { labelKey: "extraLarge", value: 1.5 },
 ];
 
+const contrastOptions = [
+  { labelKey: "contrastStandard", value: "standard" },
+  { labelKey: "contrastHigh", value: "high" },
+] as const;
+
 const languageOptions = [
   { labelKey: "english", value: "en" },
   { labelKey: "tagalog", value: "tl" },
 ];
 
 export default function SettingsScreen() {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
-  const { fontScale, language, setFontScale, setLanguage, t } = useSettings();
+  const { fontScale, language, contrast, setFontScale, setLanguage, setContrast, t } = useSettings();
   const { user, clearUser, refreshUser } = useAuth();
   const insets = useSafeAreaInsets();
   const tabBarHeight = insets.bottom + 60; // 60 ≈ typical tab bar height, adjust if yours differs
@@ -104,6 +112,35 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>{t("contrast")}</Text>
+          <Text style={[styles.sectionDescription, { fontSize: 15 * fontScale }]}>
+            {t("contrastDescription")}
+          </Text>
+          <View style={styles.optionsRow}>
+            {contrastOptions.map((option) => {
+              const selected = contrast === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.optionCard,
+                    selected && styles.selectedOption,
+                  ]}
+                  onPress={() => setContrast(option.value)}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                >
+                  <Text style={[styles.optionLabel, selected && styles.selectedOptionLabel, { fontSize: 17 * fontScale }]}>
+                    {t(option.labelKey)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>{t("language")}</Text>
           <Text style={[styles.sectionDescription, { fontSize: 15 * fontScale }]}>
             {t("changeLanguage")}
@@ -149,21 +186,23 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#F4F6F9",
+    backgroundColor: c.bg,
   },
   container: {
     padding: 20,
   },
   title: {
     fontWeight: "700",
-    color: "#1F2937",
+    color: c.text,
     marginBottom: 24,
   },
   section: {
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
+    borderWidth: 1.5,
+    borderColor: c.cardBorder,
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
@@ -174,11 +213,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontWeight: "700",
-    color: "#111827",
+    color: c.text,
     marginBottom: 8,
   },
   sectionDescription: {
-    color: "#4B5563",
+    color: c.textSecondary,
     lineHeight: 22,
     marginBottom: 16,
   },
@@ -188,7 +227,9 @@ const styles = StyleSheet.create({
     marginHorizontal: -5,
   },
   optionCard: {
-    backgroundColor: "#EEF2FF",
+    backgroundColor: c.surfaceSoft,
+    borderWidth: 2,
+    borderColor: c.border,
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -200,17 +241,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   selectedOption: {
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
+    borderColor: c.primary,
   },
   optionLabel: {
-    color: "#1F2937",
+    color: c.text,
     fontWeight: "600",
   },
   selectedOptionLabel: {
-    color: "#fff",
+    color: c.onColor,
   },
   previewBox: {
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
+    borderWidth: 1.5,
+    borderColor: c.cardBorder,
     borderRadius: 20,
     padding: 20,
     shadowColor: "#000",
@@ -219,11 +263,11 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   previewText: {
-    color: "#111827",
+    color: c.text,
     marginBottom: 12,
   },
   saveButton: {
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
     borderRadius: 16,
     paddingVertical: 16,
     marginTop: 24,
@@ -235,12 +279,12 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   saveButtonText: {
-    color: "#fff",
+    color: c.onColor,
     fontWeight: "700",
   },
 
   logoutButton: {
-    backgroundColor: "#CE2029",
+    backgroundColor: c.danger,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: "center",

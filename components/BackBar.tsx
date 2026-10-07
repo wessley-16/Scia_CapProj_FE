@@ -6,13 +6,16 @@
 // GrandPad both keep a large, labeled way back on every screen.
 //
 // Goes back to the previous screen, or to Home if there is nothing to go back to.
+import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function BackBar({ onPress }: { onPress?: () => void }) {
+  const { colors: c } = useSettings();
+  const s = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
   const { t, fontScale } = useSettings();
 
@@ -31,14 +34,14 @@ export default function BackBar({ onPress }: { onPress?: () => void }) {
         accessibilityRole="button"
         accessibilityLabel={t("backA11y")}
       >
-        <Ionicons name="chevron-back" size={30} color="#1A56C4" />
+        <Ionicons name="chevron-back" size={30} color={c.info} />
         <Text style={[s.text, { fontSize: 20 * fontScale }]}>{t("backBtn")}</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   wrap: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, backgroundColor: "transparent" },
   btn: {
     alignSelf: "flex-start",
@@ -49,8 +52,8 @@ const s = StyleSheet.create({
     paddingRight: 20,
     borderRadius: 28,
     borderWidth: 2,
-    borderColor: "#1A56C4",
-    backgroundColor: "#FFFFFF",
+    borderColor: c.info,
+    backgroundColor: c.surface,
   },
-  text: { color: "#1A56C4", fontWeight: "800", marginLeft: 2 },
+  text: { color: c.info, fontWeight: "800", marginLeft: 2 },
 });

@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 15,
   },
-  closeBtn: { position: "absolute", top: 8, right: 10, zIndex: 1 },
+  closeBtn: { position: "absolute", top: 4, right: 6, zIndex: 1, width: 52, height: 52, alignItems: "center", justifyContent: "center" },
   input: {
     backgroundColor: "#F7F9FC",
     padding: 12,
@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingTop: 40,
   },
-  modalCloseBtn: { position: "absolute", top: 12, right: 14 },
+  modalCloseBtn: { position: "absolute", top: 8, right: 8, width: 52, height: 52, alignItems: "center", justifyContent: "center" },
   modalTitle: { fontWeight: "700", color: "#111827", marginBottom: 10 },
   optionsRow: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5 },
   optionCard: {

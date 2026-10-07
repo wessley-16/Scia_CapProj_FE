@@ -1,3 +1,4 @@
+import { Palette } from "@/constants/theme";
 // components/PickupPicker.tsx
 //
 // Two pieces used by the physical-ID flow:
@@ -7,7 +8,7 @@
 //                          shows how many seats are left (live). Full or past times are
 //                          greyed out. The server checks the capacity again on booking.
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSettings } from "@/context/SettingsContext";
 import {
@@ -24,27 +25,30 @@ import {
   subscribeToPickupCounts,
 } from "@/lib/pickup";
 
-const C = {
-  primary: "#1A56C4",
-  primaryLight: "#EBF2FF",
-  text: "#111827",
-  textSub: "#4B5563",
-  textMuted: "#6B7280",
-  border: "#D1D5DB",
-  card: "#FFFFFF",
-};
+const makeColors = (p: Palette) => ({
+  primary: p.info,
+  primaryLight: p.surfaceSoft,
+  text: p.text,
+  textSub: p.textSecondary,
+  textMuted: p.textMuted,
+  border: p.border,
+  card: p.surface,
+});
+type Colors = ReturnType<typeof makeColors>;
 
-const STATE_STYLE = {
-  open: { bg: "#ECFDF5", fg: "#047857", icon: "checkmark-circle" },
-  break: { bg: "#FFFBEB", fg: "#B45309", icon: "cafe" },
-  closed: { bg: "#FEF2F2", fg: "#B91C1C", icon: "close-circle" },
-  outside: { bg: "#F3F4F6", fg: "#4B5563", icon: "time" },
-} as const;
+const stateStyles = (p: Palette) => ({
+  open: { bg: p.successSoft, fg: p.success, icon: "checkmark-circle" },
+  break: { bg: p.warningSoft, fg: p.warning, icon: "cafe" },
+  closed: { bg: p.dangerSoft, fg: p.danger, icon: "close-circle" },
+  outside: { bg: p.surfaceAlt, fg: p.textSecondary, icon: "time" },
+} as const);
 
 export function OfficeStatusBanner({ office, fontScale = 1 }: { office: OfficeSettings; fontScale?: number }) {
-  const { t } = useSettings();
+  const { t, colors: palette } = useSettings();
+  const C = useMemo(() => makeColors(palette), [palette]);
+  const s = useMemo(() => makeS(C), [C]);
   const { state, note } = effectiveOfficeStatus(office);
-  const st = STATE_STYLE[state];
+  const st = stateStyles(palette)[state];
   const label =
     state === "open" ? t("pkOpen") : state === "break" ? t("pkBreak") : state === "closed" ? t("pkClosed") : t("pkOutside");
 
@@ -77,6 +81,9 @@ export default function PickupPicker({
   ownSlot?: Pickup | null;
   fontScale?: number;
 }) {
+  const { colors: palette } = useSettings();
+  const C = useMemo(() => makeColors(palette), [palette]);
+  const s = useMemo(() => makeS(C), [C]);
   const { t } = useSettings();
   const dates = bookableDates(office, 14);
   const times = slotTimes(office.schedule);
@@ -165,7 +172,7 @@ export default function PickupPicker({
   );
 }
 
-const s = StyleSheet.create({
+const makeS = (C: Colors) => StyleSheet.create({
   banner: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 14, borderRadius: 14, marginBottom: 14 },
   bannerText: { flex: 1 },
   bannerTitle: { fontWeight: "800" },

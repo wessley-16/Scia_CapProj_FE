@@ -1,3 +1,4 @@
+import { Palette } from "@/constants/theme";
 /**
  * app/(tabs)/voice.tsx
  *
@@ -21,7 +22,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import {
   Animated,
   ScrollView,
@@ -35,6 +36,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 type Turn = { id: string; question: string; answer: string };
 
 function PulseRing({ active, color }: { active: boolean; color: string }) {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -72,6 +75,8 @@ function PulseRing({ active, color }: { active: boolean; color: string }) {
 }
 
 export default function VoiceScreen() {
+  const { colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
   const { fontScale, t } = useSettings();
 
@@ -177,7 +182,7 @@ export default function VoiceScreen() {
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityLabel={t("voiceA11yClose")}
         >
-          <Ionicons name="close" size={30} color="#111827" />
+          <Ionicons name="close" size={30} color={c.text} />
         </TouchableOpacity>
 
         <Text style={[styles.headerTitle, { fontSize: fs(20) }]}>{t("voiceTitle")}</Text>
@@ -244,7 +249,7 @@ export default function VoiceScreen() {
 
         {!!errorMessage && (
           <View style={styles.errorCard}>
-            <Ionicons name="alert-circle" size={fs(24)} color="#B91C1C" />
+            <Ionicons name="alert-circle" size={fs(24)} color={c.danger} />
             <Text style={[styles.errorText, { fontSize: fs(17) }]}>{errorMessage}</Text>
           </View>
         )}
@@ -255,7 +260,7 @@ export default function VoiceScreen() {
         <Text style={[styles.statusText, { fontSize: fs(19) }]}>{statusText}</Text>
 
         <View style={styles.micWrap}>
-          <PulseRing active={isRecording} color="#DC2626" />
+          <PulseRing active={isRecording} color={c.danger} />
           <PulseRing active={isSpeaking} color="#7C3AED" />
           <TouchableOpacity
             onPress={toggleRecording}
@@ -264,7 +269,7 @@ export default function VoiceScreen() {
             style={[styles.micButton, { backgroundColor: buttonColor }]}
             accessibilityLabel={isRecording ? t("voiceA11yStopRecording") : t("voiceA11ySpeak")}
           >
-            <MaterialCommunityIcons name={buttonIcon as any} size={58} color="#fff" />
+            <MaterialCommunityIcons name={buttonIcon as any} size={58} color={c.onColor} />
           </TouchableOpacity>
         </View>
 
@@ -277,7 +282,7 @@ export default function VoiceScreen() {
               style={[styles.secondaryBtn, styles.cancelBtn]}
               accessibilityLabel={t("voiceCancel")}
             >
-              <Ionicons name="close-circle-outline" size={fs(22)} color="#B91C1C" />
+              <Ionicons name="close-circle-outline" size={fs(22)} color={c.danger} />
               <Text style={[styles.cancelLabel, { fontSize: fs(16) }]}>{t("voiceCancel")}</Text>
             </TouchableOpacity>
           ) : (
@@ -299,7 +304,7 @@ export default function VoiceScreen() {
                 style={[
                   styles.secondaryLabel,
                   { fontSize: fs(16) },
-                  (!lastTurn || isBusy) && { color: "#6B7280" },
+                  (!lastTurn || isBusy) && { color: c.textMuted },
                 ]}
               >
                 {t("voiceReplay")}
@@ -312,8 +317,8 @@ export default function VoiceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F9FAFB" },
+const makeStyles = (c: Palette) => StyleSheet.create({
+  safe: { flex: 1, backgroundColor: c.surfaceAlt },
 
   header: {
     flexDirection: "row",
@@ -322,71 +327,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-    backgroundColor: "#fff",
+    borderBottomColor: c.border,
+    backgroundColor: c.surface,
   },
-  headerTitle: { fontWeight: "700", color: "#111827" },
-  iconBtn: { padding: 8, minWidth: 46, minHeight: 46, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontWeight: "700", color: c.text },
+  iconBtn: { padding: 8, minWidth: 52, minHeight: 52, alignItems: "center", justifyContent: "center" },
 
   body: { flex: 1 },
   bodyContent: { padding: 16, paddingBottom: 24 },
 
   emptyCard: {
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: c.border,
     gap: 10,
   },
-  emptyTitle: { fontWeight: "700", color: "#111827" },
-  emptyBody: { color: "#374151", lineHeight: 26 },
-  emptyHint: { color: "#6B7280", fontStyle: "italic", lineHeight: 22 },
+  emptyTitle: { fontWeight: "700", color: c.text },
+  emptyBody: { color: c.textStrong, lineHeight: 26 },
+  emptyHint: { color: c.textMuted, fontStyle: "italic", lineHeight: 22 },
 
   turnBlock: { marginBottom: 20, gap: 6 },
-  label: { fontWeight: "700", color: "#6B7280", letterSpacing: 0.6, marginTop: 6 },
+  label: { fontWeight: "700", color: c.textMuted, letterSpacing: 0.6, marginTop: 6 },
 
   questionCard: {
-    backgroundColor: "#EFF6FF",
+    backgroundColor: c.surfaceSoft,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#BFDBFE",
+    borderColor: c.border,
   },
-  questionText: { color: "#1E3A8A", lineHeight: 26 },
+  questionText: { color: c.primaryDark, lineHeight: 26 },
 
   answerCard: {
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: c.border,
   },
-  answerText: { color: "#111827", lineHeight: 30 },
+  answerText: { color: c.text, lineHeight: 30 },
 
   errorCard: {
     flexDirection: "row",
     gap: 10,
     alignItems: "flex-start",
-    backgroundColor: "#FEF2F2",
+    backgroundColor: c.dangerSoft,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#FECACA",
+    borderColor: c.danger,
   },
-  errorText: { color: "#991B1B", flex: 1, lineHeight: 24 },
+  errorText: { color: c.danger, flex: 1, lineHeight: 24 },
 
   controls: {
     alignItems: "center",
     paddingTop: 14,
     paddingBottom: 22,
     paddingHorizontal: 16,
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
     borderTopWidth: 1,
-    borderTopColor: "#E5E7EB",
+    borderTopColor: c.border,
     gap: 10,
   },
-  statusText: { fontWeight: "700", color: "#111827" },
+  statusText: { fontWeight: "700", color: c.text },
 
   micWrap: { alignItems: "center", justifyContent: "center", height: 150, width: 150 },
   micButton: {
@@ -409,7 +414,7 @@ const styles = StyleSheet.create({
     borderWidth: 4,
   },
 
-  hintText: { color: "#4B5563", textAlign: "center" },
+  hintText: { color: c.textSecondary, textAlign: "center" },
 
   secondaryRow: { flexDirection: "row", justifyContent: "center", marginTop: 4 },
   secondaryBtn: {
@@ -419,11 +424,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
-    backgroundColor: "#EFF6FF",
+    backgroundColor: c.surfaceSoft,
     minHeight: 52,
   },
-  secondaryBtnDisabled: { backgroundColor: "#F3F4F6" },
-  secondaryLabel: { color: "#1D4ED8", fontWeight: "600" },
-  cancelBtn: { backgroundColor: "#FEF2F2" },
-  cancelLabel: { color: "#B91C1C", fontWeight: "600" },
+  secondaryBtnDisabled: { backgroundColor: c.surfaceAlt },
+  secondaryLabel: { color: c.primaryStrong, fontWeight: "600" },
+  cancelBtn: { backgroundColor: c.dangerSoft },
+  cancelLabel: { color: c.danger, fontWeight: "600" },
 });

@@ -1,6 +1,7 @@
+import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 // Large-button replacement for the native dropdown (Picker).
@@ -19,6 +20,8 @@ type Props = {
 };
 
 export default function BarangayPickerField({ value, options, disabled, placeholder, title, hasError, onSelect }: Props) {
+  const { colors: c } = useSettings();
+  const s = useMemo(() => makeStyles(c), [c]);
   const { fontScale, t } = useSettings();
   const [open, setOpen] = useState(false);
 
@@ -35,7 +38,7 @@ export default function BarangayPickerField({ value, options, disabled, placehol
         <Text style={[s.fieldText, { fontSize: 18 * fontScale }, !value && s.placeholder]} numberOfLines={1}>
           {value || placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={24} color="#374151" />
+        <Ionicons name="chevron-down" size={24} color={c.textStrong} />
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -45,7 +48,7 @@ export default function BarangayPickerField({ value, options, disabled, placehol
             <View style={s.header}>
               <Text style={[s.title, { fontSize: 22 * fontScale }]}>{title}</Text>
               <TouchableOpacity onPress={() => setOpen(false)} style={s.closeBtn} accessibilityLabel={t("close")}>
-                <Ionicons name="close" size={30} color="#111827" />
+                <Ionicons name="close" size={30} color={c.text} />
               </TouchableOpacity>
             </View>
             <ScrollView showsVerticalScrollIndicator>
@@ -59,7 +62,7 @@ export default function BarangayPickerField({ value, options, disabled, placehol
                     onPress={() => { onSelect(b); setOpen(false); }}
                   >
                     <Text style={[s.rowText, { fontSize: 19 * fontScale }, selected && s.rowTextSelected]}>{b}</Text>
-                    {selected && <Ionicons name="checkmark-circle" size={28} color="#1D4ED8" />}
+                    {selected && <Ionicons name="checkmark-circle" size={28} color={c.primaryStrong} />}
                   </TouchableOpacity>
                 );
               })}
@@ -71,25 +74,25 @@ export default function BarangayPickerField({ value, options, disabled, placehol
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   field: {
     minHeight: 60, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    borderWidth: 1.5, borderColor: "#9CA3AF", borderRadius: 12, paddingHorizontal: 16, backgroundColor: "#fff",
+    borderWidth: 1.5, borderColor: c.textMuted, borderRadius: 12, paddingHorizontal: 16, backgroundColor: c.surface,
   },
-  fieldDisabled: { backgroundColor: "#F3F4F6", opacity: 0.7 },
-  fieldError: { borderColor: "#DC2626" },
-  fieldText: { flex: 1, color: "#111827", fontWeight: "600", marginRight: 8 },
-  placeholder: { color: "#4B5563", fontWeight: "400" },
+  fieldDisabled: { backgroundColor: c.surfaceAlt, opacity: 0.7 },
+  fieldError: { borderColor: c.danger },
+  fieldText: { flex: 1, color: c.text, fontWeight: "600", marginRight: 8 },
+  placeholder: { color: c.textSecondary, fontWeight: "400" },
   overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  sheet: { backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, maxHeight: "85%" },
+  sheet: { backgroundColor: c.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 24, maxHeight: "85%" },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  title: { flex: 1, fontWeight: "800", color: "#111827", paddingRight: 8 },
+  title: { flex: 1, fontWeight: "800", color: c.text, paddingRight: 8 },
   closeBtn: { width: 48, height: 48, alignItems: "center", justifyContent: "center" },
   row: {
     minHeight: 60, flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#E5E7EB",
+    paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: c.border,
   },
-  rowSelected: { backgroundColor: "#EBF2FF", borderRadius: 12 },
-  rowText: { color: "#111827", flex: 1 },
-  rowTextSelected: { fontWeight: "800", color: "#1D4ED8" },
+  rowSelected: { backgroundColor: c.surfaceSoft, borderRadius: 12 },
+  rowText: { color: c.text, flex: 1 },
+  rowTextSelected: { fontWeight: "800", color: c.primaryStrong },
 });

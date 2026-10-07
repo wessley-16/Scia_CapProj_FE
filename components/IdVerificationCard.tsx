@@ -1,5 +1,6 @@
+import { Palette } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,18 +21,19 @@ import {
 } from "@/lib/firebase";
 import { pickIdImage, PickedIdImage } from "@/lib/idImage";
 
-const C = {
-  primary: "#1A56C4",
-  primaryLight: "#EBF2FF",
-  danger: "#DC2626",
-  dangerLight: "#FEF2F2",
-  warning: "#D97706",
-  warningLight: "#FFFBEB",
-  card: "#FFFFFF",
-  text: "#111827",
-  textSub: "#4B5563",
-  border: "#9CA3AF",
-};
+const makeColors = (p: Palette) => ({
+  primary: p.info,
+  primaryLight: p.surfaceSoft,
+  danger: p.danger,
+  dangerLight: p.dangerSoft,
+  warning: p.warning,
+  warningLight: p.warningSoft,
+  card: p.surface,
+  text: p.text,
+  textSub: p.textSecondary,
+  border: p.border,
+});
+type Colors = ReturnType<typeof makeColors>;
 
 function formatDate(value: any): string {
   const date: Date | null =
@@ -47,6 +49,9 @@ function formatDate(value: any): string {
  * so this card disappears once the account is verified with a real ID number.
  */
 export default function IdVerificationCard() {
+  const { colors: palette } = useSettings();
+  const C = useMemo(() => makeColors(palette), [palette]);
+  const s = useMemo(() => makeS(C), [C]);
   const { user, refreshUser } = useAuth();
   const { fontScale, t } = useSettings();
 
@@ -148,7 +153,7 @@ export default function IdVerificationCard() {
 
           <TextInput
             placeholder={t("ivIdPh")}
-            placeholderTextColor="#6B7280"
+            placeholderTextColor={C.textSub}
             style={[s.input, { fontSize: 16 * fontScale }]}
             value={idNumber}
             onChangeText={setTypedId}
@@ -187,7 +192,7 @@ export default function IdVerificationCard() {
   );
 }
 
-const s = StyleSheet.create({
+const makeS = (C: Colors) => StyleSheet.create({
   card: {
     backgroundColor: C.card,
     borderRadius: 20,
