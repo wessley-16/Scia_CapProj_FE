@@ -24,6 +24,7 @@ import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
+import GuestAccount from "@/components/GuestAccount";
 import IdVerificationCard from "@/components/IdVerificationCard";
 import IdRequestTracker, { isFinishedIdRequest } from "@/components/IdRequestTracker";
 import PickupModal from "@/components/PickupModal";
@@ -104,7 +105,7 @@ const makeRow = (C: Colors) => StyleSheet.create({
 });
 
 // Main screen
-export default function Account() {
+function AccountInner() {
   const { colors: palette } = useSettings();
   const C = useMemo(() => makeColors(palette), [palette]);
   const s = useMemo(() => makeS(C), [C]);
@@ -1094,3 +1095,10 @@ const makeN = (C: Colors) => StyleSheet.create({
   notifCardSub:   { fontSize: 14, color: C.textSub,  marginBottom: 2 },
   notifCardTime:  { fontSize: 14, color: C.textMuted, marginTop: 4 },
 });
+
+// Guests ("Bisita") get a friendly login/sign-up card instead of an empty profile.
+export default function Account() {
+  const { user, isGuest } = useAuth();
+  if (!user || isGuest) return <GuestAccount />;
+  return <AccountInner />;
+}

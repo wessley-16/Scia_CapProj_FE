@@ -20,6 +20,7 @@ const fontOptions = [
 const contrastOptions = [
   { labelKey: "contrastStandard", value: "standard" },
   { labelKey: "contrastHigh", value: "high" },
+  { labelKey: "contrastColorblind", value: "colorblind" },
 ] as const;
 
 const languageOptions = [

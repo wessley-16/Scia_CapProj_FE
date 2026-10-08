@@ -9,6 +9,7 @@ import {
 } from "@/lib/firebase";
 import { DISTRICT_1_BARANGAYS, DISTRICT_2_BARANGAYS } from "@/constants/barangays";
 import BarangayPickerField from "@/components/BarangayPickerField";
+import PrivacyConsent from "@/components/PrivacyConsent";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { pickIdImage as pickIdPhoto, PickedIdImage } from "@/lib/idImage";
 import {
@@ -79,6 +80,8 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   // One question per screen: the form is split into steps (see STEP_COUNT).
   const [step, setStep] = useState(0);
+  const [agreed, setAgreed] = useState(false);
+  const [consentTried, setConsentTried] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const [showDobPicker, setShowDobPicker] = useState(false);
   // Typing a birthday is easier than a spinner for many seniors (NN/g: "why won't they just let me type the time").
@@ -304,6 +307,11 @@ export default function Signup() {
         t("alreadySignedInTitle"),
         `${t("alreadySignedInPrefix")} ${`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || user.idNumber}. ${t("pleaseLogOutFirst")}`,
       );
+      return;
+    }
+    if (!agreed) {
+      setConsentTried(true);
+      Alert.alert(t("consentNeededTitle"), t("consentNeededBody"));
       return;
     }
     const badStep = firstInvalidStep();
@@ -866,6 +874,7 @@ export default function Signup() {
             </TouchableOpacity>
           </View>
         ))}
+        <PrivacyConsent checked={agreed} onChange={(v) => { setAgreed(v); }} showError={consentTried} />
         <TouchableOpacity
           style={[styles.createButton, loading && styles.createButtonDisabled]}
           onPress={handleSignup}

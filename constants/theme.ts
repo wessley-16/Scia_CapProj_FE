@@ -5,7 +5,7 @@
 // Screens read the active palette from useSettings().colors and build their
 // styles from it, so switching in Settings updates every screen at once.
 
-export type ContrastMode = "standard" | "high";
+export type ContrastMode = "standard" | "high" | "colorblind";
 
 export interface Palette {
   // surfaces
@@ -107,5 +107,23 @@ export const highContrastPalette: Palette = {
   tileNeutral: "#1F2937",
 };
 
+// Colour-blind friendly: the standard look, but status colours no longer rely on red versus green.
+// Danger is a dark vermilion and "ok" is blue (the blue/orange axis stays visible with red-green and
+// most other colour-vision differences, after the Okabe-Ito palette). The health tile moves from
+// teal to purple. Meaning is also carried by icons and words, never by colour alone.
+// All pairs below keep at least 4.5:1 against white text/backgrounds.
+export const colorblindPalette: Palette = {
+  ...standardPalette,
+  danger: "#A33F00",
+  dangerStrong: "#8F3500",
+  dangerSoft: "#FFE8D6",
+  success: "#0072B2",
+  successSoft: "#DCEEFB",
+  warning: "#8A5A00",
+  warningSoft: "#FFF1C7",
+  warningText: "#5C3B00",
+  tileHealth: "#7A2E6B",
+};
+
 export const getPalette = (mode: ContrastMode): Palette =>
-  mode === "high" ? highContrastPalette : standardPalette;
+  mode === "high" ? highContrastPalette : mode === "colorblind" ? colorblindPalette : standardPalette;

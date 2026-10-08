@@ -52,7 +52,7 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         const storedFontScale = await AsyncStorage.getItem('fontScale');
         const storedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
         const storedContrast = await AsyncStorage.getItem(CONTRAST_KEY);
-        if (storedContrast === 'standard' || storedContrast === 'high') {
+        if (storedContrast === 'standard' || storedContrast === 'high' || storedContrast === 'colorblind') {
           setContrastState(storedContrast);
         }
         if (storedFontScale) {

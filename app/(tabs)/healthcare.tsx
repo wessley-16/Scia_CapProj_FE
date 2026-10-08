@@ -24,6 +24,7 @@ import { Calendar } from "react-native-calendars";
 import { useFocusEffect } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { Palette } from "@/constants/theme";
+import { useRequireLogin } from "@/context/LoginPromptContext";
 import { useSettings } from "@/context/SettingsContext";
 import { canonicalBarangay } from "@/constants/valenzuelaDistricts";
 import { Medicine } from "@/interfaces/interfaces";
@@ -60,6 +61,7 @@ export default function Healthcare() {
   const { colors: c } = useSettings();
   const styles = useMemo(() => makeStyles(c), [c]);
   const { fontScale, t } = useSettings();
+  const { requireLogin } = useRequireLogin();
   const { user } = useAuth();
   // Booked automatically at the 3S Center of the barangay filled in at sign-up.
   const myBarangay = canonicalBarangay(user?.barangay);
@@ -431,6 +433,7 @@ export default function Healthcare() {
   };
 
   const submitAppointmentHandler = async () => {
+    if (!requireLogin(t("featAppointment"))) return;
     if (!selectedDate || !apptHour || !apptMinute || !apptType) {
       setApptError(t("hcApptFillAll"));
       return;

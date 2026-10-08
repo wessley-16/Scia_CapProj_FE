@@ -5,8 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BlurView } from "expo-blur";
 import { Image as ExpoImage } from "expo-image";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -53,7 +53,9 @@ const FORGOT_PROMPT_AFTER = 3;
 export default function Index() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user, refreshUser, clearUser, enterGuestMode } = useAuth();
+  const { user, loading: authLoading, refreshUser, clearUser, enterGuestMode } = useAuth();
+  const { login: loginParam } = useLocalSearchParams<{ login?: string }>();
+  const autoGuestStarted = useRef(false);
   const { fontScale, language, setFontScale, setLanguage, t } = useSettings();
 
   const [showLogin, setShowLogin] = useState(false);
@@ -131,6 +133,17 @@ export default function Index() {
   }, [user]);
 
   const avatarSource = avatarUri ? { uri: avatarUri } : defaultAvatar;
+
+  // Guest ("Bisita") is the default landing: with nobody signed in, go straight to Home. The login form
+  // only shows when asked for (/?login=1, from a login prompt or the Account tab).
+  useEffect(() => {
+    if (authLoading || user || loginParam === "1" || autoGuestStarted.current) return;
+    autoGuestStarted.current = true;
+    (async () => {
+      await enterGuestMode();
+      router.replace("/(tabs)/home");
+    })();
+  }, [authLoading, user, loginParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prevents guest mode or signup from running while already signed in
   const blockIfSignedIn = () => {
@@ -650,3 +663,5 @@ const styles = StyleSheet.create({
   },
   modalDoneText: { color: "white", fontWeight: "700" },
 });
+
+

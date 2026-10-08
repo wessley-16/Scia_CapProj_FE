@@ -6,6 +6,7 @@ import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Modal
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import SpeakButton from "@/components/SpeakButton";
 import { Palette } from "@/constants/theme";
+import { useRequireLogin } from "@/context/LoginPromptContext";
 import { useSettings } from "@/context/SettingsContext";
 // 🔥 Firebase — events, join/check-in, and everything else now go through
 // Firestore directly (previously joining hit a hardcoded local dev backend
@@ -26,6 +27,7 @@ export default function Home() {
   const router = useRouter();
   const { user, isGuest, clearUser } = useAuth();
   const { fontScale, t } = useSettings();
+  const { requireLogin } = useRequireLogin();
   const name = user ? (`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || t("homeNoName")) : t("homeNoName");
   const idNumber = user?.idNumber ?? t("homeNoId");
   const insets = useSafeAreaInsets();
@@ -96,13 +98,7 @@ export default function Home() {
   // EventCarousel only ever calls this for items with isJoinable === true,
   // so plain announcements never reach here.
   const handleJoinPress = (event: FirebaseEvent) => {
-    if (!user || isGuest) {
-      Alert.alert(
-        t("homeLoginRequiredTitle"),
-        t("homeLoginRequiredBody"),
-      );
-      return;
-    }
+    if (!requireLogin(t("featJoinEvent"))) return;
 
     setJoinFormEvent(event);
   };
