@@ -35,6 +35,7 @@
 //    so lib/voiceAI.ts can reuse this exact same Vertex AI setup and base
 //    voice prompt instead of duplicating it.
 
+import { captureAppError } from "@/lib/monitoring";
 import { getCurrentLanguage, tr } from "@/lib/i18n";
 import "@/lib/polyfills";
 // Side-effect import: lib/firebase.ts calls initAppCheck() at load time.
@@ -153,6 +154,7 @@ export function readText(response: any): string {
 export function friendlyAIError(err: unknown): string {
   const msg = String((err as any)?.message ?? err ?? "").toLowerCase();
   console.error("[HealthAI]", err);
+  captureAppError(err, { area: "ai" });
 
   if (msg.includes("404") || msg.includes("not found") || msg.includes("no longer available")) {
     return tr("aiErrUpdating");

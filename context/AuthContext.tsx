@@ -1,6 +1,7 @@
 import { COLLECTIONS } from "@/lib/firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getAuth, onAuthStateChanged } from "@react-native-firebase/auth";
+import { setMonitoringUser } from "@/lib/monitoring";
 import { doc, getDoc, getFirestore } from "@react-native-firebase/firestore";
 import React, {
   createContext,
@@ -130,6 +131,7 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(authInstance, async (firebaseUser) => {
+      setMonitoringUser(firebaseUser ? firebaseUser.uid : null); // uid only, no name/phone
       if (firebaseUser) {
         // A real account is authenticated with Firebase. Guest mode can't
         // coexist with a signed-in session.
