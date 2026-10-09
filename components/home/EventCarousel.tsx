@@ -10,10 +10,10 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH - 20; // same 10px side margins as the ID card and other Home blocks

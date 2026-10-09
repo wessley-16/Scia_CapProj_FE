@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import SpeakButton from "@/components/SpeakButton";
 import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";

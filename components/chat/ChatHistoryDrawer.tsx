@@ -7,10 +7,11 @@ import {
   FlatList,
   Modal,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 interface Props {
@@ -74,6 +75,7 @@ export default function ChatHistoryDrawer({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
+<ReadAloudRoot>
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { fontSize: 20 * fontScale }]}>
@@ -158,7 +160,8 @@ export default function ChatHistoryDrawer({
           }}
         />
       </SafeAreaView>
-    </Modal>
+    </ReadAloudRoot>
+</Modal>
   );
 }
 

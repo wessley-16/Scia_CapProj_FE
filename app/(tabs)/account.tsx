@@ -14,12 +14,13 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
   StatusBar,
 } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 import QRCode from "react-native-qrcode-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
@@ -521,6 +522,7 @@ function AccountInner() {
 
       {/* ID Request modal */}
       <Modal visible={idModalVisible} animationType="slide" transparent>
+<ReadAloudRoot>
         <View style={m.overlay}>
           <View style={[m.box, { maxHeight: "92%" }]}>
             <View style={m.handle} />
@@ -633,7 +635,8 @@ function AccountInner() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </ReadAloudRoot>
+</Modal>
 
       {/* Change the City Hall pickup time of the current request */}
       {idRequest && (

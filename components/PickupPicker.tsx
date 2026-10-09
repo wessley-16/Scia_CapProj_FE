@@ -9,7 +9,8 @@ import { Palette } from "@/constants/theme";
 //                          greyed out. The server checks the capacity again on booking.
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useState, useMemo } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import { useSettings } from "@/context/SettingsContext";
 import {
   bookableDates,

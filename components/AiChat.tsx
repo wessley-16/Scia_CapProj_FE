@@ -13,9 +13,9 @@ import {
   NativeSyntheticEvent,
   Platform,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 
 // How close to the bottom (in px) still counts as "following along".
 const NEAR_BOTTOM_THRESHOLD = 120;

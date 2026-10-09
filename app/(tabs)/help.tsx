@@ -1,6 +1,6 @@
 // app/(tabs)/help.tsx
 //
-// "Tulong" screen: a big tap-to-call button for the OSCA office and a short,
+// "Gabay" (Guide) screen: a big tap-to-call button for the OSCA office and a short,
 // read-aloud guide for the five things seniors do most. One idea per card, big
 // type, and everything can be read aloud.
 import BackBar from "@/components/BackBar";
@@ -10,7 +10,8 @@ import { useSettings } from "@/context/SettingsContext";
 import { useOffice } from "@/hooks/useOffice";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const STEP_KEYS = ["helpS1", "helpS2", "helpS3", "helpS4", "helpS5"] as const;

@@ -2,7 +2,8 @@
 // Supports bold, italic, bullet lists, numbered lists, headings, inline code, and horizontal rules.
 
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 
 interface Props {
   text: string;

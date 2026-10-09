@@ -14,11 +14,12 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Calendar } from "react-native-calendars";
 import { useFocusEffect } from "expo-router";
@@ -756,6 +757,7 @@ export default function Healthcare() {
 
       {/* Add Medicine Modal */}
       <Modal visible={medicineModalVisible} animationType="slide" transparent>
+<ReadAloudRoot>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -861,10 +863,12 @@ export default function Healthcare() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </ReadAloudRoot>
+</Modal>
 
       {/* Medicine Details Modal */}
       <Modal visible={detailsModalVisible} animationType="fade" transparent>
+<ReadAloudRoot>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             {selectedMedicine && (
@@ -904,10 +908,12 @@ export default function Healthcare() {
             )}
           </View>
         </View>
-      </Modal>
+      </ReadAloudRoot>
+</Modal>
 
       {/* Book Appointment Modal */}
       <Modal visible={appointModalVisible} animationType="slide" transparent>
+<ReadAloudRoot>
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -1083,7 +1089,8 @@ export default function Healthcare() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </ReadAloudRoot>
+</Modal>
     </SafeAreaView>
   );
 }

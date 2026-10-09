@@ -5,11 +5,11 @@ import {
   ActivityIndicator,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 
 interface ChatInputAreaProps {
   onSend: (message: string) => void;

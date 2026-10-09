@@ -15,11 +15,12 @@ import {
   Platform,
   StyleSheet,
   Switch,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 
 const MAX_GUARDIANS = 3;
 
@@ -230,6 +231,7 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
       )}
 
       <Modal visible={editing} transparent animationType="fade" onRequestClose={() => setEditing(false)}>
+<ReadAloudRoot>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={s.overlay}>
           <View style={s.modal}>
             <Text style={[s.title, { fontSize: 20 * fontScale, marginBottom: 12 }]}>{t("smAddGuardian")}</Text>
@@ -260,7 +262,8 @@ export default function SafetyMonitoringCard({ fontScale = 1 }: { fontScale?: nu
             </View>
           </View>
         </KeyboardAvoidingView>
-      </Modal>
+      </ReadAloudRoot>
+</Modal>
     </View>
   );
 }

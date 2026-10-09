@@ -29,10 +29,10 @@ import {
   Animated,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type Turn = { id: string; question: string; answer: string };

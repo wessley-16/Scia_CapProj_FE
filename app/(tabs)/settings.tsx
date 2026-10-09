@@ -1,13 +1,16 @@
 import BackBar from "@/components/BackBar";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo } from "react";
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import { logoutUser } from "@/lib/firebase";
 import DigitalIDCard from "@/components/DigitalIDCard";
+import { speakNatural, stopNatural } from "@/lib/neuralVoice";
+import { READ_ALOUD_MESSAGES, type ReadAloudLang } from "@/lib/readAloud";
 
 
 
@@ -32,7 +35,20 @@ export default function SettingsScreen() {
   const { colors: c } = useSettings();
   const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
-  const { fontScale, language, contrast, setFontScale, setLanguage, setContrast, t } = useSettings();
+  const {
+    fontScale, language, contrast, setFontScale, setLanguage, setContrast, t,
+    readAloud, setReadAloud, readAloudLang, setReadAloudLang,
+  } = useSettings();
+
+  const onToggleReadAloud = (on: boolean) => {
+    setReadAloud(on);
+    if (on) speakNatural(READ_ALOUD_MESSAGES[readAloudLang].on, readAloudLang);
+    else stopNatural();
+  };
+  const onPickReadAloudLang = (lang: ReadAloudLang) => {
+    setReadAloudLang(lang);
+    speakNatural(READ_ALOUD_MESSAGES[lang].test, lang);
+  };
   const { user, clearUser, refreshUser } = useAuth();
   const insets = useSafeAreaInsets();
   const tabBarHeight = insets.bottom + 60; // 60 ≈ typical tab bar height, adjust if yours differs
@@ -168,6 +184,54 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>{t("raTitle")}</Text>
+          <Text style={[styles.sectionDescription, { fontSize: 15 * fontScale }]}>
+            {t("raDescription")}
+          </Text>
+          <View style={styles.raRow}>
+            <Text style={[styles.optionLabel, { fontSize: 17 * fontScale, flex: 1 }]}>{t("raToggleLabel")}</Text>
+            <Switch
+              value={readAloud}
+              onValueChange={onToggleReadAloud}
+              trackColor={{ false: c.cardBorder, true: c.primary }}
+              accessibilityLabel={t("raToggleLabel")}
+            />
+          </View>
+          {readAloud && (
+            <>
+              <Text style={[styles.sectionDescription, { fontSize: 15 * fontScale }]}>{t("raVoiceLanguage")}</Text>
+              <View style={styles.optionsRow}>
+                {([["tl", "tagalog"], ["en", "english"]] as const).map(([value, labelKey]) => {
+                  const selected = readAloudLang === value;
+                  return (
+                    <TouchableOpacity
+                      key={value}
+                      style={[styles.optionCard, selected && styles.selectedOption]}
+                      onPress={() => onPickReadAloudLang(value)}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                    >
+                      <Text style={[styles.optionLabel, selected && styles.selectedOptionLabel, { fontSize: 17 * fontScale }]}>
+                        {t(labelKey)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <TouchableOpacity
+                style={styles.testButton}
+                onPress={() => speakNatural(READ_ALOUD_MESSAGES[readAloudLang].test, readAloudLang)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.testButtonText, { fontSize: 17 * fontScale }]}>{t("raTest")}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
         <View style={styles.previewBox}>
           <Text style={[styles.previewText, { fontSize: 17 * fontScale }]}>{t("exampleTextPreview")}</Text>
           <Text style={[styles.previewText, { fontSize: 18 * fontScale, fontWeight: "bold" }]}>{t("preview")}</Text>
@@ -188,6 +252,21 @@ export default function SettingsScreen() {
 }
 
 const makeStyles = (c: Palette) => StyleSheet.create({
+  raRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 14,
+  },
+  testButton: {
+    marginTop: 12,
+    backgroundColor: c.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  testButtonText: { color: "#FFFFFF", fontWeight: "700" },
   safeArea: {
     flex: 1,
     backgroundColor: c.bg,

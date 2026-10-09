@@ -10,11 +10,12 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 
 const getTitle = (e: Event, fallback = "Untitled event") => e.title ?? e.Title ?? fallback;
 const getDescription = (e: Event) => e.description ?? e.Body ?? "";
@@ -77,6 +78,7 @@ export default function EventJoinFormModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+<ReadAloudRoot>
       <KeyboardAvoidingView
         style={styles.overlay}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -195,7 +197,8 @@ export default function EventJoinFormModal({
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </ReadAloudRoot>
+</Modal>
   );
 }
 

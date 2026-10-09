@@ -3,7 +3,9 @@
 // Bottom sheet where a senior picks or changes the City Hall pickup day + time
 // for a request that already exists (used from the ID tracker).
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 import { useSettings } from "@/context/SettingsContext";
 import PickupPicker, { OfficeStatusBanner } from "@/components/PickupPicker";
 import { bookIdPickup, formatPickup, OfficeSettings, Pickup, PickupError } from "@/lib/pickup";
@@ -56,6 +58,7 @@ export default function PickupModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+<ReadAloudRoot>
       <View style={s.overlay}>
         <View style={s.box}>
           <View style={s.handle} />
@@ -85,7 +88,8 @@ export default function PickupModal({
           </ScrollView>
         </View>
       </View>
-    </Modal>
+    </ReadAloudRoot>
+</Modal>
   );
 }
 

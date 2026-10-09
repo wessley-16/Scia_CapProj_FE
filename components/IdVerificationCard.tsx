@@ -6,11 +6,11 @@ import {
   Alert,
   Image,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import {

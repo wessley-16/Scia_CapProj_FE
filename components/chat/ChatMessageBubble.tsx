@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { memo } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import { ChatMessage } from "@/hooks/useChatbot";
 import MarkdownText from "@/components/chat/Markdowntext";
 

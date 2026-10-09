@@ -3,7 +3,9 @@ import { useSettings } from "@/context/SettingsContext";
 import { PRIVACY, TERMS } from "@/constants/privacyText";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 
 type Props = { checked: boolean; onChange: (v: boolean) => void; showError?: boolean };
 
@@ -38,6 +40,7 @@ export default function PrivacyConsent({ checked, onChange, showError }: Props) 
       ) : null}
 
       <Modal visible={doc !== null} transparent animationType="slide" onRequestClose={() => setDoc(null)}>
+<ReadAloudRoot>
         <View style={s.overlay}>
           <View style={[s.sheet, { backgroundColor: c.surface }]}>
             <View style={s.header}>
@@ -59,7 +62,8 @@ export default function PrivacyConsent({ checked, onChange, showError }: Props) 
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </ReadAloudRoot>
+</Modal>
     </View>
   );
 }

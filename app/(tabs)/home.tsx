@@ -2,7 +2,9 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Modal, Platform, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Animated, BackHandler, Dimensions, Image, ImageBackground, Modal, Platform, RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import SpeakButton from "@/components/SpeakButton";
 import { Palette } from "@/constants/theme";
@@ -588,6 +590,7 @@ export default function Home() {
         animationType="slide"
         onRequestClose={() => setShowMedicines(false)}
       >
+<ReadAloudRoot>
         <View style={styles.medOverlay}>
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
@@ -648,7 +651,8 @@ export default function Home() {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </ReadAloudRoot>
+</Modal>
 
       <EventJoinFormModal
         visible={!!joinFormEvent}

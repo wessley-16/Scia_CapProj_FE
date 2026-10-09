@@ -2,7 +2,9 @@ import { Palette } from "@/constants/theme";
 import { useSettings } from "@/context/SettingsContext";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useMemo } from "react";
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Modal, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 
 // Large-button replacement for the native dropdown (Picker).
 // NN/g's research with seniors 65+ found that dropdowns and other small touch
@@ -42,6 +44,7 @@ export default function BarangayPickerField({ value, options, disabled, placehol
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+<ReadAloudRoot>
         <View style={s.overlay}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setOpen(false)} />
           <View style={s.sheet}>
@@ -69,7 +72,8 @@ export default function BarangayPickerField({ value, options, disabled, placehol
             </ScrollView>
           </View>
         </View>
-      </Modal>
+      </ReadAloudRoot>
+</Modal>
     </>
   );
 }

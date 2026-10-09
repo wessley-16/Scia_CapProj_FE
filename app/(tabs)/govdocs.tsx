@@ -2,7 +2,8 @@ import { Palette } from "@/constants/theme";
 import BackBar from "@/components/BackBar";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useMemo } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, TouchableOpacity, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 

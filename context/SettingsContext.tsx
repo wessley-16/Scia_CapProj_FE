@@ -2,6 +2,7 @@ import { en, tl } from '@/constants/translations';
 import { ContrastMode, getPalette, Palette } from '@/constants/theme';
 import { setCurrentLanguage } from '@/lib/i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { configureReadAloud, type ReadAloudLang } from '@/lib/readAloud';
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 
 type TVars = Record<string, string | number>;
@@ -14,6 +15,12 @@ interface SettingsContextType {
   setFontScale: (scale: number) => void;
   setLanguage: (lang: string) => void;
   setContrast: (mode: ContrastMode) => void;
+  /** Touch any text to hear it read aloud. Off until the person turns it on. */
+  readAloud: boolean;
+  setReadAloud: (on: boolean) => void;
+  /** Language of the read-aloud voice. Tagalog unless changed. */
+  readAloudLang: ReadAloudLang;
+  setReadAloudLang: (lang: ReadAloudLang) => void;
   t: (key: string, vars?: TVars) => string;
 }
 
@@ -38,6 +45,8 @@ const DICTS: Record<string, Record<string, string>> = { en, tl };
 // to English in Settings (that choice is then remembered).
 const LANGUAGE_KEY = 'language_v2';
 const CONTRAST_KEY = 'contrast_v1';
+const READ_ALOUD_KEY = 'readAloud_v1';
+const READ_ALOUD_LANG_KEY = 'readAloudLang_v1';
 
 export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) => {
   // Larger text by default: NN/g found tiny type is a recurring problem for older users.
@@ -45,6 +54,8 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
   // Tagalog by default: most SCIA users are Filipino seniors.
   const [language, setLanguageState] = useState<string>('tl');
   const [contrast, setContrastState] = useState<ContrastMode>('standard');
+  const [readAloud, setReadAloudState] = useState<boolean>(false);
+  const [readAloudLang, setReadAloudLangState] = useState<ReadAloudLang>('tl');
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -52,6 +63,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         const storedFontScale = await AsyncStorage.getItem('fontScale');
         const storedLanguage = await AsyncStorage.getItem(LANGUAGE_KEY);
         const storedContrast = await AsyncStorage.getItem(CONTRAST_KEY);
+        const storedReadAloud = await AsyncStorage.getItem(READ_ALOUD_KEY);
+        const storedReadAloudLang = await AsyncStorage.getItem(READ_ALOUD_LANG_KEY);
+        if (storedReadAloud === '1') setReadAloudState(true);
+        if (storedReadAloudLang === 'en' || storedReadAloudLang === 'tl') setReadAloudLangState(storedReadAloudLang);
         if (storedContrast === 'standard' || storedContrast === 'high' || storedContrast === 'colorblind') {
           setContrastState(storedContrast);
         }
@@ -99,6 +114,29 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     }
   };
 
+  const setReadAloud = async (on: boolean) => {
+    setReadAloudState(on);
+    try {
+      await AsyncStorage.setItem(READ_ALOUD_KEY, on ? '1' : '0');
+    } catch (error) {
+      console.error('Failed to save readAloud:', error);
+    }
+  };
+
+  const setReadAloudLang = async (lang: ReadAloudLang) => {
+    setReadAloudLangState(lang);
+    try {
+      await AsyncStorage.setItem(READ_ALOUD_LANG_KEY, lang);
+    } catch (error) {
+      console.error('Failed to save readAloudLang:', error);
+    }
+  };
+
+  // Keep the touch-reader in step with the settings.
+  useEffect(() => {
+    configureReadAloud({ enabled: readAloud, lang: readAloudLang });
+  }, [readAloud, readAloudLang]);
+
   const colors = useMemo(() => getPalette(contrast), [contrast]);
 
   // t("key") or t("key", { name: "Juan" }) for strings with {name} placeholders.
@@ -123,6 +161,10 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
     setFontScale,
     setLanguage,
     setContrast,
+    readAloud,
+    setReadAloud,
+    readAloudLang,
+    setReadAloudLang,
     t,
   };
 

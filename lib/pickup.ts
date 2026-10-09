@@ -36,7 +36,7 @@ export interface OfficeSettings {
   status: OfficeState;
   statusNote: string;
   location: string;
-  phone: string; // OSCA office number shown on the Tulong (help) button
+  phone: string; // OSCA office number shown on the Gabay (guide) button
   schedule: OfficeSchedule;
   closedDates: string[];
   advanceDays: number;

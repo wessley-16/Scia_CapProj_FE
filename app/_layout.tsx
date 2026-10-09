@@ -2,6 +2,7 @@ import "@/lib/presenceTask"; // registers the background location task
 import { AuthProvider } from "@/context/AuthContext";
 import { LoginPromptProvider } from "@/context/LoginPromptContext";
 import { SettingsProvider } from "@/context/SettingsContext";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
 import { initMonitoring, wrapRoot } from "@/lib/monitoring";
 import { Slot } from "expo-router";
 import React from "react";
@@ -15,7 +16,9 @@ function RootLayout() {
     <SettingsProvider>
       <AuthProvider>
         <LoginPromptProvider>
-          <Slot />
+          <ReadAloudRoot>
+            <Slot />
+          </ReadAloudRoot>
         </LoginPromptProvider>
       </AuthProvider>
     </SettingsProvider>

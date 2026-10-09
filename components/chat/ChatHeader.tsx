@@ -2,7 +2,8 @@ import { useSettings } from "@/context/SettingsContext";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 
 export default function ChatHeader({
   fontScale,

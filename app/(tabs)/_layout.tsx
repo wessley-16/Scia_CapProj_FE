@@ -9,10 +9,10 @@ import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Host } from "react-native-portalize";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

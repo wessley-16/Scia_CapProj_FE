@@ -9,7 +9,8 @@ import { useSettings } from "@/context/SettingsContext";
 import { speak, stopSpeaking } from "@/lib/speak";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
-import { StyleProp, StyleSheet, Text, TouchableOpacity, ViewStyle } from "react-native";
+import { StyleProp, StyleSheet, TouchableOpacity, ViewStyle } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 
 interface Props {
   /** The text to read. Pass the same words that are shown on screen. */

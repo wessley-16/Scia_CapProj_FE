@@ -11,7 +11,8 @@ import { useSettings } from "@/context/SettingsContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 
 export default function BackBar({ onPress }: { onPress?: () => void }) {
   const { colors: c } = useSettings();

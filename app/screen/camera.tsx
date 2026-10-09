@@ -12,10 +12,10 @@ import {
   Image,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Text } from "@/components/ReadAloudText";
 
 const CameraScreen = () => {
   const { analyzeImage, reminders, isLoading, error, clearReminders } =
