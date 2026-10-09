@@ -23,6 +23,7 @@ import appCheck from "@react-native-firebase/app-check";
 import { getAuth } from "@react-native-firebase/auth";
 // Ensures lib/firebase.ts (which initializes App Check) has run first.
 import "@/lib/firebase";
+import { TAGALOG_LIVE_INSTRUCTION } from "@/lib/tagalogStyle";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -45,19 +46,22 @@ const OUT_SAMPLE_RATE = 24_000;   // Gemini Live API outputs 24 kHz
 const VERTEX_REGION   = "us-central1";
 const LIVE_MODEL      = "gemini-live-2.5-flash-native-audio";
 
-const SYSTEM_INSTRUCTION = {
-  role: "system" as const,
-  parts: [{
-    text:
-      "You are HealthAI, a warm and caring voice assistant for senior citizens " +
-      "in Valenzuela City, Philippines (the SCIA app). " +
-      "Speak simply, patiently, and in a friendly tone. " +
-      "Keep responses short — one to three sentences unless more detail is requested. " +
-      "Never diagnose; always recommend seeing a doctor for serious health concerns. " +
-      "If someone describes an emergency, immediately tell them to call 911 " +
-      "or tap the SOS button in the app.",
-  }],
-};
+const ENGLISH_LIVE_INSTRUCTION =
+  "You are HealthAI, a warm and caring voice assistant for senior citizens " +
+  "in Valenzuela City, Philippines (the SCIA app). " +
+  "Speak simply, patiently, and in a friendly tone. Reply in English. " +
+  "Keep responses short — one to three sentences unless more detail is requested. " +
+  "Never diagnose; always recommend seeing a doctor for serious health concerns. " +
+  "If someone describes an emergency, immediately tell them to call 911 " +
+  "or tap the SOS button in the app.";
+
+function buildSystemInstruction(language?: string | null) {
+  const tagalog = /^(tl|fil)|tagalog|filipino/i.test(String(language ?? "").trim());
+  return {
+    role: "system" as const,
+    parts: [{ text: tagalog ? TAGALOG_LIVE_INSTRUCTION : ENGLISH_LIVE_INSTRUCTION }],
+  };
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export type LiveStatus =
@@ -113,7 +117,10 @@ function buildWavUri(chunks: Uint8Array[], sampleRate: number): string {
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
-export function useLiveVoice() {
+/** `language` is the app language setting ("tl", "fil-PH", "Tagalog", "en" ...). */
+export function useLiveVoice(language?: string | null) {
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const sessionRef     = useRef<any>(null);
   const soundRef       = useRef<AudioPlayer | null>(null);
   const isRecordingRef = useRef(false);
@@ -272,7 +279,7 @@ export function useLiveVoice() {
           inputAudioTranscription:  {},
           outputAudioTranscription: {},
         },
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: buildSystemInstruction(languageRef.current),
       });
 
       safe.diag("Connecting to Gemini Live…");

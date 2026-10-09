@@ -20,6 +20,7 @@ import {
   readText,
   type ChatHistoryItem,
 } from "@/lib/firebaseAI";
+import { TAGALOG_REPLY_RULES, TAGALOG_TRANSCRIBE_HINT } from "@/lib/tagalogStyle";
 import { getGenerativeModel } from "@react-native-firebase/ai";
 
 export type VoiceLang = "en" | "tl";
@@ -48,12 +49,7 @@ const LANGUAGE_RULE: Record<VoiceLang, string> = {
   en:
     "LANGUAGE (this overrides any earlier rule about language): Reply ONLY in English, " +
     "in simple everyday words, even if the person spoke Tagalog or Taglish.",
-  tl:
-    "WIKA (mas mataas ito kaysa sa anumang naunang tuntunin tungkol sa wika): Sumagot LAMANG sa Tagalog (Filipino), " +
-    "sa simple at pang-araw-araw na salita, kahit English o Taglish ang tanong. Gumamit ng \"po\" at \"opo\". " +
-    "Isulat ito gaya ng sasabihin ng isang Pilipino, hindi salita-por-salita na salin mula sa English. " +
-    "Huwag sumagot sa English, maliban sa mga pangalan gaya ng OSCA o SOS, at sa mga numerong bibigkasin " +
-    "(halimbawa \"nine one one\").",
+  tl: TAGALOG_REPLY_RULES,
 };
 
 const LANGUAGE_NUDGE: Record<VoiceLang, string> = {
@@ -84,8 +80,8 @@ export async function transcribeAudioWithUsage(params: {
     { inlineData: { mimeType: params.mimeType, data: params.base64 } },
     {
       text:
-        "Transcribe exactly what the speaker says. The speaker is an elderly Filipino and may speak English, Tagalog, or a mix of both. " +
-        "Keep their original language — do not translate. " +
+        "Transcribe exactly what the speaker says. " +
+        TAGALOG_TRANSCRIBE_HINT + " " +
         "Output ONLY the transcript with no quotes and no extra words. " +
         "If there is no clear speech, output exactly: NO_SPEECH",
     },
@@ -114,7 +110,7 @@ export async function askHealthAIVoiceWithUsage(
       // Roomy on purpose: if the model "thinks" first, those tokens can
       // count against this limit and cut the spoken answer short.
       maxOutputTokens: 512,
-      temperature: 0.6,
+      temperature: language === "tl" ? 0.5 : 0.6, // a little steadier keeps Tagalog grammar clean
       topP: 0.9,
     },
   });

@@ -20,6 +20,8 @@ import { Palette } from "@/constants/theme";
 
 import { useSettings } from "@/context/SettingsContext";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
+import { hasFilipinoVoice } from "@/lib/speak";
+import { normalizeVoiceLanguage } from "@/lib/voiceAI";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState, useMemo } from "react";
@@ -78,7 +80,7 @@ export default function VoiceScreen() {
   const { colors: c } = useSettings();
   const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
-  const { fontScale, t } = useSettings();
+  const { fontScale, t, language } = useSettings();
 
   const {
     state,
@@ -90,7 +92,7 @@ export default function VoiceScreen() {
     toggleMic,
     cancel,
     replay,
-  } = useVoiceAssistant();
+  } = useVoiceAssistant(language);
 
   // ── Local conversation history ──────────────────────────────────────────
   // The hook only exposes the current exchange (transcript/reply). We
@@ -113,6 +115,18 @@ export default function VoiceScreen() {
       }
     }
   }, [state, transcript, reply]);
+
+  // Tagalog is read by the phone's own Filipino voice. If none is installed, tell the person how to add it.
+  const [missingFilipinoVoice, setMissingFilipinoVoice] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    if (normalizeVoiceLanguage(language) !== "tl") {
+      setMissingFilipinoVoice(false);
+      return undefined;
+    }
+    hasFilipinoVoice().then((ok) => { if (alive) setMissingFilipinoVoice(!ok); });
+    return () => { alive = false; };
+  }, [language]);
 
   const lastTurn = turns.length > 0 ? turns[turns.length - 1] : null;
 
@@ -244,6 +258,15 @@ export default function VoiceScreen() {
                 {partialQuestion}
               </Text>
             </View>
+          </View>
+        )}
+
+        {missingFilipinoVoice && (
+          <View style={styles.tipCard}>
+            <Ionicons name="information-circle" size={fs(24)} color="#1D4ED8" />
+            <Text style={[styles.tipText, { fontSize: fs(16) }]}>
+              Para mas malinaw at natural ang boses sa Tagalog, i-install po ang Filipino voice: Settings, Text-to-speech, Google, Install voice data.
+            </Text>
           </View>
         )}
 
@@ -392,6 +415,8 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     gap: 10,
   },
   statusText: { fontWeight: "700", color: c.text },
+  tipCard: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, borderRadius: 16, backgroundColor: "#EFF6FF", marginTop: 8 },
+  tipText: { flex: 1, color: "#1E3A8A", fontWeight: "600" },
 
   micWrap: { alignItems: "center", justifyContent: "center", height: 150, width: 150 },
   micButton: {

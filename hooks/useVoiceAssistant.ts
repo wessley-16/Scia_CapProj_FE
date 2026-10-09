@@ -28,6 +28,7 @@ import {
   transcribeAudioWithUsage,
   type VoiceLang,
 } from "@/lib/voiceAI";
+import { speakText, stopSpeaking } from "@/lib/speak";
 import {
   AudioModule,
   RecordingPresets,
@@ -36,7 +37,6 @@ import {
   type RecordingOptions,
 } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
-import * as Speech from "expo-speech";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type VoiceState =
@@ -64,8 +64,6 @@ const RECORDING_OPTIONS: RecordingOptions = {
   bitRate: 32000,
 };
 
-const SPEECH_LOCALE: Record<VoiceLang, string> = { en: "en-US", tl: "fil-PH" };
-
 // Messages shown/spoken by the assistant itself (not by the AI model).
 const TEXT: Record<VoiceLang, Record<string, string>> = {
   en: {
@@ -88,48 +86,8 @@ const TEXT: Record<VoiceLang, Record<string, string>> = {
   },
 };
 
-// ── Text-to-speech helpers ───────────────────────────────────────────────
-let voiceCache: Speech.Voice[] | null = null;
-let warnedMissingTagalog = false;
-
-async function pickVoiceId(lang: VoiceLang): Promise<string | undefined> {
-  try {
-    if (!voiceCache) voiceCache = await Speech.getAvailableVoicesAsync();
-    const prefixes = lang === "tl" ? ["fil", "tl"] : ["en-us", "en"];
-    for (const prefix of prefixes) {
-      const match = voiceCache.find((v) =>
-        v.language.toLowerCase().replace("_", "-").startsWith(prefix),
-      );
-      if (match) return match.identifier;
-    }
-    if (lang === "tl" && !warnedMissingTagalog) {
-      warnedMissingTagalog = true;
-      console.warn(
-        "[voice] No Filipino text-to-speech voice found on this phone. " +
-          "Install Filipino voice data in the phone's Text-to-speech settings, " +
-          "otherwise Tagalog will be read with an English voice.",
-      );
-    }
-  } catch (e) {
-    console.warn("[voice] Could not list voices:", e);
-  }
-  return undefined;
-}
-
-async function speakText(text: string, lang: VoiceLang): Promise<void> {
-  const voice = await pickVoiceId(lang);
-  await new Promise<void>((resolve) => {
-    Speech.speak(text, {
-      language: SPEECH_LOCALE[lang],
-      voice,
-      rate: 0.9, // a little slower — easier for older listeners
-      pitch: 1.0,
-      onDone: () => resolve(),
-      onStopped: () => resolve(),
-      onError: () => resolve(),
-    });
-  });
-}
+// Text-to-speech lives in lib/speak.ts (voice choice, sentence-by-sentence delivery, and
+// rewriting of times/numbers so Tagalog is read naturally).
 
 // ── The hook ─────────────────────────────────────────────────────────────
 export function useVoiceAssistant(languageSetting?: string | null) {
@@ -181,7 +139,7 @@ export function useVoiceAssistant(languageSetting?: string | null) {
     setError(null);
     setTranscript("");
     setReply("");
-    Speech.stop();
+    stopSpeaking();
 
     // Refuse BEFORE recording if the user's allowance is used up.
     try {
@@ -310,7 +268,7 @@ export function useVoiceAssistant(languageSetting?: string | null) {
   const cancel = useCallback(async () => {
     runIdRef.current += 1; // any request still in flight is now ignored
     clearTimer();
-    Speech.stop();
+    stopSpeaking();
     if (isRecordingActiveRef.current) {
       isRecordingActiveRef.current = false;
       try {
@@ -346,7 +304,7 @@ export function useVoiceAssistant(languageSetting?: string | null) {
     return () => {
       runIdRef.current += 1;
       if (timerRef.current) clearTimeout(timerRef.current);
-      Speech.stop();
+      stopSpeaking();
       if (isRecordingActiveRef.current) {
         isRecordingActiveRef.current = false;
         audioRecorder.stop().catch(() => {});
