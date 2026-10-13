@@ -17,13 +17,24 @@ export default function AccessibilityFab() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const last = String(pathname || "").split("/").filter(Boolean).pop() || "";
+  const last =
+    String(pathname || "")
+      .split("/")
+      .filter(Boolean)
+      .pop() || "";
   if (HIDE_ON.includes(last)) return null;
 
   return (
     <>
       <TouchableOpacity
-        style={[s.fab, { backgroundColor: c.primary, borderColor: c.surface, bottom: insets.bottom + 92 }]}
+        style={[
+          s.fab,
+          {
+            backgroundColor: c.primary,
+            borderColor: c.surface,
+            bottom: insets.bottom + 92,
+          },
+        ]}
         onPress={() => setOpen(true)}
         activeOpacity={0.85}
         accessibilityRole="button"
@@ -37,5 +48,16 @@ export default function AccessibilityFab() {
 }
 
 const s = StyleSheet.create({
-  fab: { position: "absolute", right: 14, width: 56, height: 56, borderRadius: 28, borderWidth: 3, alignItems: "center", justifyContent: "center", elevation: 8, zIndex: 50 },
+  fab: {
+    position: "absolute",
+    right: 14,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 8,
+    zIndex: 50,
+  },
 });
