@@ -1,4 +1,6 @@
 import BackBar from "@/components/BackBar";
+import ExplainPageButton from "@/components/ExplainPageButton";
+import { COLOUR_MODE_OPTIONS } from "@/constants/a11yModes";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useMemo } from "react";
 import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from "react-native";
@@ -20,11 +22,7 @@ const fontOptions = [
   { labelKey: "extraLarge", value: 1.5 },
 ];
 
-const contrastOptions = [
-  { labelKey: "contrastStandard", value: "standard" },
-  { labelKey: "contrastHigh", value: "high" },
-  { labelKey: "contrastColorblind", value: "colorblind" },
-] as const;
+const contrastOptions = COLOUR_MODE_OPTIONS;
 
 const languageOptions = [
   { labelKey: "english", value: "en" },
@@ -133,7 +131,7 @@ export default function SettingsScreen() {
           <Text style={[styles.sectionDescription, { fontSize: 15 * fontScale }]}>
             {t("contrastDescription")}
           </Text>
-          <View style={styles.optionsRow}>
+          <View style={[styles.optionsRow, { flexDirection: "column" }]}>
             {contrastOptions.map((option) => {
               const selected = contrast === option.value;
               return (
@@ -141,6 +139,7 @@ export default function SettingsScreen() {
                   key={option.value}
                   style={[
                     styles.optionCard,
+                    { flex: 0, width: "100%", marginBottom: 8 },
                     selected && styles.selectedOption,
                   ]}
                   onPress={() => setContrast(option.value)}
@@ -151,10 +150,19 @@ export default function SettingsScreen() {
                   <Text style={[styles.optionLabel, selected && styles.selectedOptionLabel, { fontSize: 17 * fontScale }]}>
                     {t(option.labelKey)}
                   </Text>
+                  <Text style={[styles.sectionDescription, { fontSize: 14 * fontScale, marginTop: 2, marginBottom: 0 }, selected && styles.selectedOptionLabel]}>
+                    {t(option.hintKey)}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
+          <Text style={[styles.sectionDescription, { fontSize: 14 * fontScale }]}>{t("a11yColorNote")}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { fontSize: 20 * fontScale }]}>{t("a11yExplain")}</Text>
+          <ExplainPageButton />
         </View>
 
         <View style={styles.section}>

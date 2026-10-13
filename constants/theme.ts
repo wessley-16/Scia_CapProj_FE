@@ -5,7 +5,11 @@
 // Screens read the active palette from useSettings().colors and build their
 // styles from it, so switching in Settings updates every screen at once.
 
-export type ContrastMode = "standard" | "high" | "colorblind";
+// Same six colour modes as the admin website's Accessibility panel.
+// ("colorblind" was the old single mode; it is now saved as "deuteranopia".)
+export type ContrastMode = "standard" | "high" | "protanopia" | "deuteranopia" | "tritanopia" | "grayscale";
+
+export const CONTRAST_MODES: ContrastMode[] = ["standard", "high", "protanopia", "deuteranopia", "tritanopia", "grayscale"];
 
 export interface Palette {
   // surfaces
@@ -119,11 +123,64 @@ export const colorblindPalette: Palette = {
   dangerSoft: "#FFE8D6",
   success: "#0072B2",
   successSoft: "#DCEEFB",
-  warning: "#8A5A00",
-  warningSoft: "#FFF1C7",
-  warningText: "#5C3B00",
+  // Very dark brown: with a burnt-orange danger colour, the old amber warning looked the same
+  // as danger to red-green colour-blind users (checked with a colour-vision simulation).
+  warning: "#3B2F00",
+  warningSoft: "#FEF3C7",
+  warningText: "#3B2F00",
   tileHealth: "#7A2E6B",
 };
 
-export const getPalette = (mode: ContrastMode): Palette =>
-  mode === "high" ? highContrastPalette : mode === "colorblind" ? colorblindPalette : standardPalette;
+// Blue-yellow colour blindness: plum + red + green stay distinct; no blue/green or
+// yellow/pink pair carries meaning.
+export const tritanopiaPalette: Palette = {
+  ...standardPalette,
+  surfaceSoft: "#F3F4F6",
+  primary: "#7A1F5C",
+  primaryStrong: "#651A4C",
+  primaryDark: "#4F143B",
+  link: "#651A4C",
+  info: "#7A1F5C",
+  infoSoft: "#F3F4F6",
+  danger: "#B91C1C",
+  dangerStrong: "#991B1B",
+  dangerSoft: "#FEE2E2",
+  success: "#166534",
+  successSoft: "#DCFCE7",
+  warning: "#9A3412",
+  warningSoft: "#FFEDD5",
+  warningText: "#5A1F0A",
+  tileHealth: "#166534",
+  tileInfo: "#7A1F5C",
+  tileNeutral: "#374151",
+};
+
+// Grayscale: every colour in the standard palette replaced by the grey of the same brightness,
+// so text contrast is unchanged and all colour is removed.
+const toGray = (hex: string): string => {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex; // "transparent" etc.
+  const n = parseInt(m[1], 16);
+  const g = Math.round(0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255));
+  const h = g.toString(16).padStart(2, "0");
+  return `#${h}${h}${h}`;
+};
+export const grayscalePalette: Palette = Object.fromEntries(
+  Object.entries(standardPalette).map(([k, v]) => [k, toGray(v as string)]),
+) as unknown as Palette;
+
+export const getPalette = (mode: ContrastMode): Palette => {
+  switch (mode) {
+    case "high":
+      return highContrastPalette;
+    case "protanopia":
+    case "deuteranopia":
+      return colorblindPalette;
+    case "tritanopia":
+      return tritanopiaPalette;
+    case "grayscale":
+      return grayscalePalette;
+    default:
+      return standardPalette;
+  }
+};
