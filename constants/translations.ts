@@ -451,7 +451,7 @@ export const en: Dict = {
 
     // Safety monitoring card
     smTurnOnTitle: 'Turn on Safety Monitoring?',
-    smTurnOnBody: 'SCIA will record your phone\'s location in the background, even when the app is closed. If your phone shows no activity for 60 minutes and you do not answer the "Are you safe?" message at the 50-minute mark, we will send a text with your last known location to your guardians and your barangay office.\n\nYou can turn this off any time.',
+    smTurnOnBody: 'SCIA will record your phone\'s location in the background, even when the app is closed. If your phone shows no activity for 60 minutes and you do not answer the "Are you safe?" message at the 50-minute mark, we will send a text with your last known location to your guardians and your barangay office.\n\nYou can turn this off any time.\n\nSo you can sleep in peace, the 60-minute timer pauses during sleeping hours (10 PM to 7 AM) and we will not wake you with an alert.',
     smNotNow: 'Not now',
     smAgree: 'I agree',
     smBgTitle: 'Allow location "all the time"',
@@ -467,7 +467,7 @@ export const en: Dict = {
     smRemoveTitle: 'Remove this guardian?',
     smRemove: 'Remove',
     smTitle: 'Safety Monitoring',
-    smOnBody: 'On. If we cannot reach your phone for 60 minutes, your guardians and barangay office will get a text with your last location. We will ask "Are you safe?" first, at 50 minutes.',
+    smOnBody: 'On. If we cannot reach your phone for 60 minutes, your guardians and barangay office will get a text with your last location. We will ask "Are you safe?" first, at 50 minutes. The timer pauses while you sleep (10 PM to 7 AM).',
     smOffBody: 'Turn this on so your guardians and barangay office are alerted if your phone shows no activity for an hour.',
     smGuardians: 'Guardians ({count}/{max})',
     smNoGuardian: 'No guardian added yet. Only your barangay office will be texted.',
@@ -1294,7 +1294,7 @@ export const tl: Dict = {
 
     // Safety monitoring card
     smTurnOnTitle: 'I-on ang Safety Monitoring?',
-    smTurnOnBody: 'Itatala ng SCIA ang lokasyon ng inyong telepono sa background, kahit nakasara ang app. Kung walang galaw sa inyong telepono sa loob ng 60 minuto at hindi kayo sumagot sa mensaheng "Ligtas ba kayo?" sa ika-50 minuto, magpapadala kami ng text na may huling lokasyon ninyo sa inyong mga guardian at sa barangay office.\n\nMaaari ninyo itong patayin anumang oras.',
+    smTurnOnBody: 'Itatala ng SCIA ang lokasyon ng inyong telepono sa background, kahit nakasara ang app. Kung walang galaw sa inyong telepono sa loob ng 60 minuto at hindi kayo sumagot sa mensaheng "Ligtas ba kayo?" sa ika-50 minuto, magpapadala kami ng text na may huling lokasyon ninyo sa inyong mga guardian at sa barangay office.\n\nMaaari ninyo itong patayin anumang oras.\n\nPara makatulog kayo nang mapayapa, humihinto ang 60-minutong bilang sa oras ng tulog (10 PM hanggang 7 AM) at hindi namin kayo gigisingin ng alerto.',
     smNotNow: 'Huwag muna',
     smAgree: 'Sumasang-ayon ako',
     smBgTitle: 'Payagan ang lokasyon "palagi"',
@@ -1310,7 +1310,7 @@ export const tl: Dict = {
     smRemoveTitle: 'Alisin ang guardian na ito?',
     smRemove: 'Alisin',
     smTitle: 'Safety Monitoring',
-    smOnBody: 'Naka-on. Kung hindi namin ma-contact ang inyong telepono sa loob ng 60 minuto, makakatanggap ng text ang inyong mga guardian at barangay office na may huling lokasyon ninyo. Tatanungin muna namin kayo ng "Ligtas ba kayo?" sa ika-50 minuto.',
+    smOnBody: 'Naka-on. Kung hindi namin ma-contact ang inyong telepono sa loob ng 60 minuto, makakatanggap ng text ang inyong mga guardian at barangay office na may huling lokasyon ninyo. Tatanungin muna namin kayo ng "Ligtas ba kayo?" sa ika-50 minuto. Humihinto ang bilang habang natutulog kayo (10 PM hanggang 7 AM).',
     smOffBody: 'I-on ito para maabisuhan ang inyong mga guardian at barangay office kung walang galaw sa inyong telepono sa loob ng isang oras.',
     smGuardians: 'Mga Guardian ({count}/{max})',
     smNoGuardian: 'Wala pang naidagdag na guardian. Ang barangay office lang ang matetext.',
