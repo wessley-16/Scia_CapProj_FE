@@ -1,5 +1,5 @@
 import { en, tl } from '@/constants/translations';
-import { ContrastMode, getPalette, Palette } from '@/constants/theme';
+import { CONTRAST_MODES, ContrastMode, getPalette, Palette } from '@/constants/theme';
 import { setCurrentLanguage } from '@/lib/i18n';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { configureReadAloud, type ReadAloudLang } from '@/lib/readAloud';
@@ -67,8 +67,13 @@ export const SettingsProvider: React.FC<SettingsProviderProps> = ({ children }) 
         const storedReadAloudLang = await AsyncStorage.getItem(READ_ALOUD_LANG_KEY);
         if (storedReadAloud === '1') setReadAloudState(true);
         if (storedReadAloudLang === 'en' || storedReadAloudLang === 'tl') setReadAloudLangState(storedReadAloudLang);
-        if (storedContrast === 'standard' || storedContrast === 'high' || storedContrast === 'colorblind') {
-          setContrastState(storedContrast);
+        // Restore the saved colour mode. All six modes are valid; the old single "colorblind"
+        // mode is now "deuteranopia". (Before this, only standard/high/colorblind were accepted,
+        // so a saved red-blind, blue-blind or grayscale choice was lost every time the app restarted.)
+        if (storedContrast === 'colorblind') {
+          setContrastState('deuteranopia');
+        } else if (storedContrast && (CONTRAST_MODES as string[]).includes(storedContrast)) {
+          setContrastState(storedContrast as ContrastMode);
         }
         if (storedFontScale) {
           // The old "Small" size (0.75) is no longer offered; lift it to the standard size.

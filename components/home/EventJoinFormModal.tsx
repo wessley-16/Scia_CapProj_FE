@@ -1,7 +1,8 @@
 import { useSettings } from "@/context/SettingsContext";
 import { Event, EventFormField } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Palette } from "@/constants/theme";
 import {
   ActivityIndicator,
   Alert,
@@ -39,7 +40,8 @@ export default function EventJoinFormModal({
   onClose,
   onSubmit,
 }: Props) {
-  const { t } = useSettings();
+  const { t, colors: c } = useSettings();
+  const styles = useMemo(() => makeStyles(c), [c]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [displayEvent, setDisplayEvent] = useState<Event | null>(null);
 
@@ -89,7 +91,7 @@ export default function EventJoinFormModal({
               {getTitle(displayEvent, t("evUntitled"))}
             </Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Ionicons name="close" size={26} color="#374151" />
+              <Ionicons name="close" size={26} color={c.textStrong} />
             </TouchableOpacity>
           </View>
 
@@ -98,13 +100,13 @@ export default function EventJoinFormModal({
             <View style={styles.detailsBlock}>
               {!!dateLabel && (
                 <View style={styles.detailRow}>
-                  <Ionicons name="calendar-outline" size={18} color="#4B5563" />
+                  <Ionicons name="calendar-outline" size={18} color={c.textSecondary} />
                   <Text style={[styles.detailText, { fontSize: 15 * fontScale }]}>{dateLabel}</Text>
                 </View>
               )}
               {!!getLocation(displayEvent) && (
                 <View style={styles.detailRow}>
-                  <Ionicons name="location-outline" size={18} color="#4B5563" />
+                  <Ionicons name="location-outline" size={18} color={c.textSecondary} />
                   <Text style={[styles.detailText, { fontSize: 15 * fontScale }]}>{getLocation(displayEvent)}</Text>
                 </View>
               )}
@@ -163,7 +165,7 @@ export default function EventJoinFormModal({
                         value={answers[field.id] ?? ""}
                         onChangeText={(v) => setAnswer(field.id, v)}
                         placeholder={field.label}
-                        placeholderTextColor="#6B7280"
+                        placeholderTextColor={c.textMuted}
                         keyboardType={field.type === "number" ? "numeric" : "default"}
                         multiline={field.type === "textarea"}
                         numberOfLines={field.type === "textarea" ? 3 : 1}
@@ -190,7 +192,7 @@ export default function EventJoinFormModal({
             activeOpacity={0.85}
           >
             {submitting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={c.onColor} />
             ) : (
               <Text style={[styles.joinBtnText, { fontSize: 17 * fontScale }]}>{t("evJoin")}</Text>
             )}
@@ -202,56 +204,56 @@ export default function EventJoinFormModal({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (c: Palette) => StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
   sheet: {
-    backgroundColor: "#fff",
+    backgroundColor: c.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
     maxHeight: "85%",
   },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 },
-  title: { fontWeight: "800", color: "#111827", flex: 1, marginRight: 12 },
+  title: { fontWeight: "800", color: c.text, flex: 1, marginRight: 12 },
   detailsBlock: { marginBottom: 4 },
   detailRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  detailText: { color: "#4B5563" },
-  description: { color: "#374151", lineHeight: 20, marginTop: 4 },
-  divider: { height: 1, backgroundColor: "#E5E7EB", marginVertical: 16 },
-  subtitle: { color: "#4B5563", marginBottom: 16 },
+  detailText: { color: c.textSecondary },
+  description: { color: c.textStrong, lineHeight: 20, marginTop: 4 },
+  divider: { height: 1, backgroundColor: c.border, marginVertical: 16 },
+  subtitle: { color: c.textSecondary, marginBottom: 16 },
   fieldsScroll: { marginBottom: 8 },
   fieldBlock: { marginBottom: 16 },
-  fieldLabel: { fontWeight: "700", color: "#111827", marginBottom: 8 },
-  required: { color: "#DC2626" },
+  fieldLabel: { fontWeight: "700", color: c.text, marginBottom: 8 },
+  required: { color: c.danger },
   input: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.surfaceAlt,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: "#111827",
+    color: c.text,
   },
   inputMultiline: { minHeight: 80, textAlignVertical: "top" },
   optionsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   optionChip: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: c.surfaceAlt,
     borderRadius: 20,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderWidth: 1.5,
     borderColor: "transparent",
   },
-  optionChipSelected: { backgroundColor: "#EEF2FF", borderColor: "#2356E1" },
-  optionChipText: { color: "#374151", fontWeight: "600" },
-  optionChipTextSelected: { color: "#2356E1" },
-  progressHint: { color: "#4B5563", textAlign: "center", marginBottom: 8 },
+  optionChipSelected: { backgroundColor: c.surfaceSoft, borderColor: c.primary },
+  optionChipText: { color: c.textStrong, fontWeight: "600" },
+  optionChipTextSelected: { color: c.primary },
+  progressHint: { color: c.textSecondary, textAlign: "center", marginBottom: 8 },
   joinBtn: {
-    backgroundColor: "#2356E1",
+    backgroundColor: c.primary,
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: "center",
     marginTop: 8,
   },
   // Grey while required fields are empty, blue once all are filled in.
-  joinBtnDisabled: { backgroundColor: "#D1D5DB" },
-  joinBtnText: { color: "#fff", fontWeight: "700" },
+  joinBtnDisabled: { backgroundColor: c.textMuted },
+  joinBtnText: { color: c.onColor, fontWeight: "700" },
 });

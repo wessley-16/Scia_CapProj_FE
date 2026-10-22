@@ -21,7 +21,8 @@ export default function ReadAloudRoot({
   }, []);
 
   return (
-    <View style={[styles.fill, style]} onTouchStartCapture={onTouchStartCapture}>
+    // onTouchStartCapture works at runtime but is missing from React Native's View typings.
+    <View style={[styles.fill, style]} {...({ onTouchStartCapture } as Record<string, unknown>)}>
       {children}
     </View>
   );
