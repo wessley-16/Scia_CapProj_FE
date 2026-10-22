@@ -7,6 +7,7 @@
 import ExplainPageButton from "@/components/ExplainPageButton";
 import { Text } from "@/components/ReadAloudText";
 import { COLOUR_MODE_OPTIONS } from "@/constants/a11yModes";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
 import { useSettings } from "@/context/SettingsContext";
 import { speakNatural, stopNatural } from "@/lib/neuralVoice";
 import { READ_ALOUD_MESSAGES, type ReadAloudLang } from "@/lib/readAloud";
@@ -118,6 +119,7 @@ export default function AccessibilityPanel({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <ReadAloudRoot>
       <SafeAreaView style={{ flex: 1, backgroundColor: c.bg }}>
         <View
           style={[
@@ -272,6 +274,7 @@ export default function AccessibilityPanel({
           </View>
         </ScrollView>
       </SafeAreaView>
+      </ReadAloudRoot>
     </Modal>
   );
 }

@@ -15,11 +15,12 @@ import {
   Modal,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import ReadAloudRoot from "@/components/ReadAloudRoot";
+import { Text } from "@/components/ReadAloudText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   Easing,
@@ -419,6 +420,7 @@ export default function Index() {
         animationType="fade"
         onRequestClose={() => setSettingsVisible(false)}
       >
+        <ReadAloudRoot>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <TouchableOpacity
@@ -493,6 +495,7 @@ export default function Index() {
             </TouchableOpacity>
           </View>
         </View>
+        </ReadAloudRoot>
       </Modal>
     </KeyboardAvoidingView>
   );

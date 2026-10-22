@@ -3,6 +3,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { LoginPromptProvider } from "@/context/LoginPromptContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import ReadAloudRoot from "@/components/ReadAloudRoot";
+import AccessibilityFab from "@/components/AccessibilityFab";
 import { initMonitoring, wrapRoot } from "@/lib/monitoring";
 import { Slot } from "expo-router";
 import React from "react";
@@ -18,6 +19,8 @@ function RootLayout() {
         <LoginPromptProvider>
           <ReadAloudRoot>
             <Slot />
+            {/* Floating Accessibility button, like the website's — on every screen */}
+            <AccessibilityFab />
           </ReadAloudRoot>
         </LoginPromptProvider>
       </AuthProvider>
