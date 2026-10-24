@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { Text } from "@/components/ReadAloudText";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Host } from "react-native-portalize";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -61,6 +62,7 @@ const CustomTabBar = ({
           activeOpacity={0.85}
           accessibilityRole="button"
           accessibilityLabel={t("sosTabA11y")}
+          accessibilityState={{ selected: isFocused }}
         >
           <View style={[styles.sosTab, isFocused && styles.sosTabActive]}>
             <Ionicons name="alert-circle" size={26} color={c.onColor} />
@@ -70,6 +72,10 @@ const CustomTabBar = ({
       );
     }
 
+    // The tab you are on gets a white highlight behind it, with dark-blue icon and text,
+    // so it stands out in every contrast mode (the old filled-icon-only change was hard to see).
+    const contentColor = isFocused ? c.primary : c.onColor;
+
     return (
       <TouchableOpacity
         key={route.key}
@@ -77,13 +83,15 @@ const CustomTabBar = ({
         style={styles.tabItem}
         accessibilityRole="button"
         accessibilityLabel={item.label}
+        accessibilityState={{ selected: isFocused }}
       >
+        {isFocused && <Animated.View entering={FadeIn.duration(180)} style={styles.activePill} />}
         <Ionicons
           name={isFocused ? item.active : item.icon}
           size={28}
-          color={isFocused ? c.onColor : c.onColorMuted}
+          color={contentColor}
         />
-        <Text style={[styles.label, { color: isFocused ? c.onColor : c.onColorMuted }]}>
+        <Text style={[styles.label, { color: contentColor }]}>
           {item.label}
         </Text>
       </TouchableOpacity>
@@ -250,6 +258,16 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     justifyContent: "center",
     height: "100%",
   },
+  // White highlight drawn behind the active tab's icon and label.
+  activePill: {
+    position: "absolute",
+    top: 6,
+    bottom: 6,
+    left: 2,
+    right: 2,
+    borderRadius: 16,
+    backgroundColor: c.surface,
+  },
   label: {
     fontSize: 15,
     marginTop: 4,
@@ -266,7 +284,13 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  sosTabActive: { backgroundColor: c.danger },
+  // Active SOS tab: thicker white ring and slightly larger, so it reads as "selected" too.
+  sosTabActive: {
+    backgroundColor: c.danger,
+    borderWidth: 4,
+    borderColor: c.surface,
+    transform: [{ scale: 1.08 }],
+  },
   sosText: { color: c.onColor, fontSize: 15, fontWeight: "900", letterSpacing: 0.5, marginTop: -2 },
   centerSlot: {
     width: 80,

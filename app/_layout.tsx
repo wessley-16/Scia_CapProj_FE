@@ -4,10 +4,15 @@ import { LoginPromptProvider } from "@/context/LoginPromptContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import ReadAloudRoot from "@/components/ReadAloudRoot";
 import AccessibilityFab from "@/components/AccessibilityFab";
+import AnimatedSplash from "@/components/AnimatedSplash";
 import { initMonitoring, wrapRoot } from "@/lib/monitoring";
 import { Slot } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import React from "react";
 import { StyleSheet } from "react-native";
+
+// Keep the native splash up until <AnimatedSplash /> has drawn its first frame.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Starts crash reporting before anything renders (no-op without a DSN / in dev).
 initMonitoring();
@@ -21,6 +26,8 @@ function RootLayout() {
             <Slot />
             {/* Floating Accessibility button, like the website's — on every screen */}
             <AccessibilityFab />
+            {/* Animated opening screen; covers everything, then fades away once the app is ready */}
+            <AnimatedSplash />
           </ReadAloudRoot>
         </LoginPromptProvider>
       </AuthProvider>
