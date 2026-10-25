@@ -14,13 +14,13 @@ import {
 } from "react-native";
 import { Text } from "@/components/ReadAloudText";
 import EventDetailModal from "./EventDetailModal";
-import { formatWhen, getDate, getDescription, getLocation, getTitle } from "./eventFields";
+import { getTitle } from "./eventFields";
 import { Palette } from "@/constants/theme";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_WIDTH = SCREEN_WIDTH - 20; // same 10px side margins as the ID card and other Home blocks
 const CARD_SPACING = 12;
-const AUTO_ADVANCE_MS = 10000;
+const AUTO_ADVANCE_MS = 5000;
 
 interface Props {
   events: Event[];
@@ -41,7 +41,7 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
     if (index !== activeIndex) setActiveIndex(index);
   };
 
-  // Auto-advances to the next announcement every 10 seconds so seniors
+  // Auto-advances to the next announcement every 5 seconds so seniors
   // don't have to swipe to see what else is posted.
   useEffect(() => {
     if (events.length <= 1) return;
@@ -89,8 +89,6 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
           // Only editorial_health docs the admin flagged carry isJoinable.
           // Plain announcements never do, so they get a "View" button instead.
           const isJoinable = !!item.isJoinable;
-          const dateLabel = formatWhen(getDate(item));
-          const description = getDescription(item);
 
           return (
             <View style={[styles.card, { width: CARD_WIDTH, marginRight: CARD_SPACING }]}>
@@ -98,26 +96,7 @@ export default function EventCarousel({ events, joinedEventIds, fontScale, onJoi
                 {getTitle(item, t("evUntitled"))}
               </Text>
 
-              {!!dateLabel && (
-                <View style={styles.metaRow}>
-                  <Ionicons name="calendar" size={22} color={c.link} />
-                  <Text style={[styles.metaText, { fontSize: 17 * fontScale }]}>{dateLabel}</Text>
-                </View>
-              )}
-              {!!getLocation(item) && (
-                <View style={styles.metaRow}>
-                  <Ionicons name="location" size={22} color={c.link} />
-                  <Text style={[styles.metaText, { fontSize: 17 * fontScale }]} numberOfLines={2}>
-                    {getLocation(item)}
-                  </Text>
-                </View>
-              )}
-              {!!description && (
-                <Text style={[styles.descText, { fontSize: 17 * fontScale }]} numberOfLines={3}>
-                  {description}
-                </Text>
-              )}
-
+              {/* Compact card: title only. Date, place and the full text are in the popup. */}
               <View style={styles.footerRow}>
                 {joined && (
                   <View style={styles.joinedBadge}>
@@ -179,7 +158,7 @@ const makeStyles = (c: Palette) => StyleSheet.create({
     backgroundColor: c.surface,
     borderRadius: 20,
     padding: 20,
-    minHeight: 170,
+    minHeight: 120,
     borderWidth: 2,
     borderColor: c.border,
     elevation: 3,

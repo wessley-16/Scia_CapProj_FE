@@ -4,7 +4,7 @@ import { LoginPromptProvider } from "@/context/LoginPromptContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import ReadAloudRoot from "@/components/ReadAloudRoot";
 import AccessibilityFab from "@/components/AccessibilityFab";
-import AnimatedSplash from "@/components/AnimatedSplash";
+import AnimatedSplash from "@/components/home/AnimatedSplash";
 import { initMonitoring, wrapRoot } from "@/lib/monitoring";
 import { Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";

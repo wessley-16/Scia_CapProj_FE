@@ -23,7 +23,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-const logo = require("../assets/images/splash-logo.png");
+const logo = require("../../assets/images/splash-logo.png");
 
 // Keep LOGO_SIZE equal to "imageWidth" of the expo-splash-screen plugin in app.json,
 // so the hand-over from the native splash to this view does not jump.
