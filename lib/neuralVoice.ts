@@ -8,10 +8,11 @@
 // sentence is saved on the phone after the first time, so repeated labels play
 // instantly, offline, and are only generated (and billed) once.
 //
-// If anything goes wrong (no internet, not signed in, daily limit, function not
+// If anything goes wrong (no internet, daily limit, function not
 // deployed) it quietly falls back to the phone's built-in voice from lib/speak.ts,
 // so touching something never results in silence.
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { auth } from "@/lib/firebase";
 import { prepareForSpeech, speakText, stopSpeaking as stopDeviceVoice, type SpeechLang } from "@/lib/speak";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
@@ -51,18 +52,31 @@ async function ensureDir() {
 }
 
 // ── server ──────────────────────────────────────────────────────────────
+// Guests ("Bisita") have no account, so the server counts them by a random id made once per install.
+async function getInstallId(): Promise<string> {
+  try {
+    const saved = await AsyncStorage.getItem("tts_install_id_v1");
+    if (saved && /^[a-f0-9]{16,48}$/.test(saved)) return saved;
+    const fresh = Array.from({ length: 24 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
+    await AsyncStorage.setItem("tts_install_id_v1", fresh);
+    return fresh;
+  } catch {
+    return "0".repeat(24); // storage unavailable: still works, just shares one guest allowance
+  }
+}
+
 async function fetchFromServer(text: string, lang: SpeechLang): Promise<string | null> {
-  const user = auth.currentUser;
-  if (!user) return null; // the function requires a signed-in account
+  const user = auth.currentUser; // null for a guest: still allowed, with the guest allowance
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    const token = await user.getIdToken();
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
     const res = await fetch(`${FUNCTIONS_BASE}/synthesizeSpeech`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ data: { text, lang } }),
+      headers,
+      body: JSON.stringify({ data: { text, lang, deviceId: await getInstallId() } }),
       signal: controller.signal,
     });
     const body = await res.json().catch(() => null);
