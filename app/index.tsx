@@ -1,4 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
+import { getAuth } from "@react-native-firebase/auth";
 import { useSettings } from "@/context/SettingsContext";
 import { loginByIdentifier, logoutUser } from "@/lib/firebase";
 import { Ionicons } from "@expo/vector-icons";
@@ -141,6 +142,12 @@ export default function Index() {
     if (authLoading || user || loginParam === "1" || autoGuestStarted.current) return;
     autoGuestStarted.current = true;
     (async () => {
+      // A Firebase session with no loaded profile is a signed-in senior whose profile did not load
+      // (weak signal, offline). Retry the profile instead of switching them to guest mode.
+      if (getAuth().currentUser) {
+        await refreshUser();
+        return;
+      }
       await enterGuestMode();
       router.replace("/(tabs)/home");
     })();
@@ -666,5 +673,3 @@ const styles = StyleSheet.create({
   },
   modalDoneText: { color: "white", fontWeight: "700" },
 });
-
-

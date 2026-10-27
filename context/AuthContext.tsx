@@ -49,6 +49,9 @@ interface AuthContextType {
 // account. These must be wiped whenever we sign out or switch to Guest mode,
 // otherwise the next person to use the device (or Guest mode itself) can see
 // the previous user's cached name/barangay/medicines/etc.
+// The caches that identify a signed-in person.
+const GUEST_CLEAR_KEYS = ["user", "userId", "userName", "userBarangay", "userDistrict", "profileImage"];
+
 const USER_CACHE_KEYS = [
   "user",
   "userId",
@@ -126,7 +129,10 @@ export const AuthProvider: React.FC<Props> = ({ children }) => {
   const enterGuestMode = async () => {
     setUser(null);
     setIsGuest(true);
-    await AsyncStorage.multiRemove(USER_CACHE_KEYS);
+    // Only the signed-in identity is cleared here. Guest mode now starts on every cold start, so
+    // wiping the on-device medicine list, joined events and notifications would delete a senior's
+    // medicine reminders each time the app opens. Signing out (clearUser) still clears everything.
+    await AsyncStorage.multiRemove(GUEST_CLEAR_KEYS);
   };
 
   useEffect(() => {
