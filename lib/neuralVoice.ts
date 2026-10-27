@@ -13,6 +13,7 @@
 // so touching something never results in silence.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import appCheck from "@react-native-firebase/app-check";
 import { auth } from "@/lib/firebase";
 import { prepareForSpeech, speakText, stopSpeaking as stopDeviceVoice, type SpeechLang } from "@/lib/speak";
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
@@ -73,6 +74,13 @@ async function fetchFromServer(text: string, lang: SpeechLang): Promise<string |
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+    // Proof that this is the real app (the server requires it for guests).
+    try {
+      const { token } = await appCheck().getToken();
+      if (token) headers["X-Firebase-AppCheck"] = token;
+    } catch {
+      /* no token: signed-in users still work; a guest falls back to the phone voice */
+    }
     const res = await fetch(`${FUNCTIONS_BASE}/synthesizeSpeech`, {
       method: "POST",
       headers,

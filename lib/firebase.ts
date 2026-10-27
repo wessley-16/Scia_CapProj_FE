@@ -244,6 +244,10 @@ export async function registerUser(data: UserRegistration) {
       setDoc(doc(db, COLLECTIONS.USER_LOOKUP, key), {
         idNumber: effectiveIdNumber,
         uid,
+      }).catch(() => {
+        // The key already belongs to someone (two seniors with the same name, for example).
+        // Existing keys cannot be overwritten, and that must not fail the whole sign-up:
+        // the senior can still log in with their ID number or phone.
       })
     )
   );

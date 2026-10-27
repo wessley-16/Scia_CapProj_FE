@@ -6,7 +6,11 @@ import appCheck from "@react-native-firebase/app-check";
 //   Manage debug tokens > Add debug token.
 // If it is not registered there, App Check rejects every token and Gemini
 // calls fail with "401 Firebase App Check token is invalid".
-const APP_CHECK_DEBUG_TOKEN = "C0071C18-3761-4F4B-8BF0-1D0C84B13742";
+// Read from the environment instead of being written here: this repository is public, and anyone
+// holding a registered debug token can get valid App Check tokens from their own computer.
+// Put it in a git-ignored .env.local (EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN=...) or in the EAS
+// "preview" profile's env; never commit it.
+const APP_CHECK_DEBUG_TOKEN = process.env.EXPO_PUBLIC_APPCHECK_DEBUG_TOKEN ?? "";
 
 // true  -> "debug" provider (uses the debug token above). Used by:
 //           - dev builds (npx expo start / development client), and
