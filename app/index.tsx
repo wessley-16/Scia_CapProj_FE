@@ -13,16 +13,13 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
-import ReadAloudRoot from "@/components/ReadAloudRoot";
 import { Text } from "@/components/ReadAloudText";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -38,27 +35,15 @@ const logo = require("../assets/images/Logo.png");
 const background = require("../assets/images/Background.png");
 const defaultAvatar = require("../assets/images/default-profile.png");
 
-const fontOptions = [
-  { labelKey: "small", value: 0.75 },
-  { labelKey: "medium", value: 1 },
-  { labelKey: "large", value: 1.25 },
-];
-
-const languageOptions = [
-  { labelKey: "english", value: "en" },
-  { labelKey: "tagalog", value: "tl" },
-];
-
 // After this many wrong passwords in a row, offer the Forgot Password flow.
 const FORGOT_PROMPT_AFTER = 3;
 
 export default function Index() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const { user, loading: authLoading, refreshUser, clearUser, enterGuestMode } = useAuth();
   const { login: loginParam } = useLocalSearchParams<{ login?: string }>();
   const autoGuestStarted = useRef(false);
-  const { fontScale, language, setFontScale, setLanguage, t } = useSettings();
+  const { fontScale, t } = useSettings();
 
   const [showLogin, setShowLogin] = useState(false);
   const [identifier, setIdentifier] = useState("");
@@ -66,7 +51,6 @@ export default function Index() {
   // Wrong-password tries on this screen; after a few we point to Forgot Password.
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [settingsVisible, setSettingsVisible] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   // --- Opening-screen animation values ---
@@ -268,17 +252,6 @@ export default function Index() {
         <View style={styles.backgroundTint} />
       </Animated.View>
 
-      <TouchableOpacity
-        style={[styles.settingsBtn, { top: insets.top + 10 }]}
-        onPress={() => setSettingsVisible(true)}
-        accessibilityLabel={t("languageAndFont")}
-      >
-        <Ionicons name="globe-outline" size={18} color="#2563EB" style={styles.settingsBtnIcon} />
-        <Text style={[styles.settingsBtnText, { fontSize: 15 * fontScale }]}>
-          {t("languageAndFont")}
-        </Text>
-      </TouchableOpacity>
-
       <View style={styles.inner}>
         <Animated.View style={[styles.logoShadowWrapper, logoAnimatedStyle]}>
           <View style={styles.logoBorder}>
@@ -421,89 +394,6 @@ export default function Index() {
         )}
       </View>
 
-      <Modal
-        visible={settingsVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSettingsVisible(false)}
-      >
-        <ReadAloudRoot>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setSettingsVisible(false)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={26} color="#111827" />
-            </TouchableOpacity>
-
-            <Text style={[styles.modalTitle, { fontSize: 20 * fontScale }]}>
-              {t("fontSize")}
-            </Text>
-            <View style={styles.optionsRow}>
-              {fontOptions.map((option) => {
-                const selected = fontScale === option.value;
-                return (
-                  <TouchableOpacity
-                    key={option.labelKey}
-                    style={[styles.optionCard, selected && styles.selectedOption]}
-                    onPress={() => setFontScale(option.value)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.optionLabel,
-                        selected && styles.selectedOptionLabel,
-                        { fontSize: 16 * fontScale },
-                      ]}
-                    >
-                      {t(option.labelKey)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={[styles.modalTitle, { fontSize: 20 * fontScale, marginTop: 20 }]}>
-              {t("language")}
-            </Text>
-            <View style={styles.optionsRow}>
-              {languageOptions.map((option) => {
-                const selected = language === option.value;
-                return (
-                  <TouchableOpacity
-                    key={option.labelKey}
-                    style={[styles.optionCard, selected && styles.selectedOption]}
-                    onPress={() => setLanguage(option.value)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.optionLabel,
-                        selected && styles.selectedOptionLabel,
-                        { fontSize: 16 * fontScale },
-                      ]}
-                    >
-                      {t(option.labelKey)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalDoneBtn}
-              onPress={() => setSettingsVisible(false)}
-            >
-              <Text style={[styles.modalDoneText, { fontSize: 16 * fontScale }]}>
-                {t("done")}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-        </ReadAloudRoot>
-      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -541,22 +431,6 @@ const styles = StyleSheet.create({
     height: "100%",
     resizeMode: "contain",
   },
-  settingsBtn: {
-    position: "absolute",
-    right: 16,
-    zIndex: 2,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#EEF2FF",
-    borderRadius: 22,
-    minHeight: 44,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: "#C7D2FE",
-  },
-  settingsBtnIcon: { marginRight: 6 },
-  settingsBtnText: { color: "#2563EB", fontWeight: "700" },
   formContainer: {
     width: "100%",
     backgroundColor: "#d8d7d7",
@@ -636,40 +510,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textDecorationLine: "underline",
   },
-
-  // Language & Font modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    justifyContent: "center",
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: "white",
-    borderRadius: 20,
-    padding: 24,
-    paddingTop: 40,
-  },
-  modalCloseBtn: { position: "absolute", top: 8, right: 8, width: 52, height: 52, alignItems: "center", justifyContent: "center" },
-  modalTitle: { fontWeight: "700", color: "#111827", marginBottom: 10 },
-  optionsRow: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5 },
-  optionCard: {
-    backgroundColor: "#EEF2FF",
-    borderRadius: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginRight: 10,
-    marginBottom: 10,
-  },
-  selectedOption: { backgroundColor: "#2356E1" },
-  optionLabel: { color: "#1F2937", fontWeight: "600" },
-  selectedOptionLabel: { color: "#fff" },
-  modalDoneBtn: {
-    backgroundColor: "#2356E1",
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  modalDoneText: { color: "white", fontWeight: "700" },
 });

@@ -859,8 +859,8 @@ export const en: Dict = {
     tileQuickTitle: 'What do you need today?',
 
     // Accessibility panel (matches the admin site)
-    a11yTitle: 'Accessibility',
-    a11yOpen: 'Open accessibility options',
+    a11yTitle: 'Make it easier to use',
+    a11yOpen: 'Open language, text size, colours and read aloud',
     a11yColorMode: 'Colour mode',
     contrastHintStandard: 'Normal colours',
     contrastHintHigh: 'Stronger text and borders',
@@ -1731,8 +1731,8 @@ export const tl: Dict = {
     tileQuickTitle: 'Ano po ang kailangan ninyo ngayon?',
 
     // Accessibility panel (matches the admin site)
-    a11yTitle: 'Accessibility',
-    a11yOpen: 'Buksan ang mga opsyon sa accessibility',
+    a11yTitle: 'Mas madaling gamitin',
+    a11yOpen: 'Buksan ang wika, laki ng font, kulay at pagbasa nang malakas',
     a11yColorMode: 'Kulay ng screen',
     contrastHintStandard: 'Normal na kulay',
     contrastHintHigh: 'Mas matingkad na teksto at hangganan',
