@@ -30,6 +30,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { canonicalBarangay } from "@/constants/valenzuelaDistricts";
 import { Medicine } from "@/interfaces/interfaces";
 import { submitAppointment, subscribeToUserAppointments } from "@/lib/firebase";
+import MedicineRequest from "@/components/MedicineRequest"; // MEDICINE REQUEST (a)
 import AppointmentStatusTracker, {
   APPOINTMENT_STATUS_LABEL,
   normalizeAppointmentStatus,
@@ -68,6 +69,7 @@ export default function Healthcare() {
   const myBarangay = canonicalBarangay(user?.barangay);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<ActiveTab>("medicine");
+  const [medSub, setMedSub] = useState<"reminder" | "request">("reminder"); // MEDICINE REQUEST (b)
 
   // Medicine State
   const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -570,10 +572,35 @@ export default function Healthcare() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* MEDICINE REQUEST (c): sub-switcher Reminder | Request Medicine */}
+        {activeTab === "medicine" && (
+          <View style={[styles.tabSwitcher, { marginTop: 8 }]}>
+            {(["reminder", "request"] as const).map((k) => (
+              <TouchableOpacity
+                key={k}
+                style={[styles.tabBtn, medSub === k && styles.tabBtnActive]}
+                onPress={() => setMedSub(k)}
+              >
+                <MaterialCommunityIcons
+                  name={k === "reminder" ? "alarm" : "package-variant"}
+                  size={18}
+                  color={medSub === k ? c.onColor : c.primary}
+                />
+                <Text style={[styles.tabBtnText, medSub === k && styles.tabBtnTextActive, { fontSize: 15 * fontScale }]}>
+                  {t(k === "reminder" ? "mrSubReminder" : "mrSubRequest")}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
-      {/* Medicine Tab */}
-      {activeTab === "medicine" && (
+      {/* Medicine Tab: Request Medicine */}
+      {activeTab === "medicine" && medSub === "request" && <MedicineRequest />}
+
+      {/* Medicine Tab: Intake Reminder */}
+      {activeTab === "medicine" && medSub === "reminder" && (
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.tabContent}

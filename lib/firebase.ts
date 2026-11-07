@@ -63,6 +63,7 @@ export const COLLECTIONS = {
   DIGITAL_ID_REQUESTS: "digital_id_requests",
   NCSC_REGISTRATIONS: "ncsc_registrations",
   ID_VERIFICATIONS: "id_verifications",
+  MEDICINE_REQUESTS: "medicine_requests",
 };
 
 // ── AUTH STATE ────────────────────────────────────────────────────────────────
@@ -759,6 +760,74 @@ export function subscribeToUserAppointments(
     unsubscribeAuth();
     if (unsubscribeSnapshot) unsubscribeSnapshot();
   };
+}
+
+// ── MEDICINE REQUESTS ─────────────────────────────────────────────────────────
+export type MedicineRequestStatus =
+  | "pending" | "approved" | "rejected" | "released" | "cancelled";
+
+export interface MedicineRequestInput {
+  seniorName: string;
+  seniorId: string;
+  medicineName: string;
+  quantity: number;
+  reason: string;
+  hasPrescription: boolean;
+}
+
+export async function submitMedicineRequest(data: MedicineRequestInput) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("Not signed in");
+
+  // Routed by the barangay filled in at sign-up, same as appointments.
+  const profile = await getDoc(doc(db, COLLECTIONS.USERS, uid));
+  const signedUpBarangay: string | undefined = profile.exists()
+    ? (profile.data() as any).barangay
+    : undefined;
+
+  const ref = await addDoc(
+    collection(db, COLLECTIONS.MEDICINE_REQUESTS),
+    stripUndefined({
+      ...data,
+      uid,
+      barangay: adminBarangayName(signedUpBarangay),
+      status: "pending",
+      createdAt: serverTimestamp(),
+    }),
+  );
+  return ref.id;
+}
+
+export function subscribeToMyMedicineRequests(
+  callback: (list: any[]) => void,
+  onError?: (e: unknown) => void,
+) {
+  let unsubSnap: (() => void) | null = null;
+  const time = (a: any) => (a.createdAt ? toMillis(a.createdAt) : Number.MAX_SAFE_INTEGER);
+
+  const unsubAuth = onAuthStateChanged(auth, (user) => {
+    if (unsubSnap) { unsubSnap(); unsubSnap = null; }
+    if (!user) { callback([]); return; }
+    // No orderBy: where(uid)+orderBy needs a composite index. Sort here.
+    unsubSnap = onSnapshot(
+      query(collection(db, COLLECTIONS.MEDICINE_REQUESTS), where("uid", "==", user.uid)),
+      (snap) => {
+        if (!snap) return;
+        const list = (snap.docs ?? []).map((d) => ({ id: d.id, ...d.data() }));
+        list.sort((a: any, b: any) => time(b) - time(a));
+        callback(list);
+      },
+      (e) => { console.warn("subscribeToMyMedicineRequests error:", e); onError?.(e); },
+    );
+  });
+  return () => { unsubAuth(); if (unsubSnap) unsubSnap(); };
+}
+
+export async function cancelMedicineRequest(id: string) {
+  await updateDoc(doc(db, COLLECTIONS.MEDICINE_REQUESTS, id), {
+    status: "cancelled",
+    updatedAt: serverTimestamp(),
+  });
 }
 
 // ── DIGITAL ID ────────────────────────────────────────────────────────────────
