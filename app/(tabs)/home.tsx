@@ -313,10 +313,11 @@ export default function Home() {
     readRemote: boolean;
   };
 
-  // Where a notification takes the senior. An explicit `link` wins; otherwise by type.
+    // Where a notification takes the senior. An explicit `link` wins; otherwise by type.
   const linkFor = (type: string, link?: string): string | null => {
     if (link && link.startsWith("/")) return link;
     if (type === "id_request_status") return "/(tabs)/account";
+    if (type === "medicine_request_status") return "/(tabs)/healthcare";
     if (type === "SOS") return "/(tabs)/emergency";
     return null;
   };

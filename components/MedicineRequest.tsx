@@ -1,7 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Notifications from "expo-notifications";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator, Alert, Modal, ScrollView, StyleSheet,
   Switch, TextInput, TouchableOpacity, View,
@@ -35,36 +34,15 @@ export default function MedicineRequest() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const seen = useRef<Record<string, string>>({});
-  const firstLoad = useRef(true);
-
   useEffect(() => {
     return subscribeToMyMedicineRequests(
       (list) => {
-        // Local notification when the barangay office decides on a request.
-        if (!firstLoad.current) {
-          list.forEach((r) => {
-            const prev = seen.current[r.id];
-            if (prev && prev !== r.status && ["approved", "rejected", "released"].includes(r.status)) {
-              Notifications.scheduleNotificationAsync({
-                content: {
-                  title: t("mrNotifTitle"),
-                  body: t("mrNotifBody", { medicine: r.medicineName, status: t(STATUS_KEY[r.status]) }),
-                },
-                trigger: null,
-              }).catch(() => {});
-            }
-          });
-        }
-        list.forEach((r) => { seen.current[r.id] = r.status; });
-        firstLoad.current = false;
         setRequests(list);
         setLoading(false);
         setLoadError(false);
       },
       () => { setLoading(false); setLoadError(true); },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const badge = (status: string) => {
@@ -93,7 +71,7 @@ export default function MedicineRequest() {
     setError("");
     try {
       const seniorName = (await AsyncStorage.getItem("userName")) || "Senior";
-      const seniorId = (await AsyncStorage.getItem("userId")) || "N/A";
+      const seniorId = user?.idNumber || (await AsyncStorage.getItem("userId")) || "N/A";
       await submitMedicineRequest({
         seniorName, seniorId, medicineName: name.trim(),
         quantity: q, reason: reason.trim(), hasPrescription: hasRx,
