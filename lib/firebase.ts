@@ -1298,6 +1298,8 @@ export interface AppNotification {
   type: string;
   title?: string;
   body?: string;
+  titleEn?: string;
+  bodyEn?: string;
   read?: boolean;
   link?: string;
   createdAt?: any;
@@ -1326,4 +1328,38 @@ export function subscribeToMyNotifications(
 /** Marks a server notification as read (the only field rules let a senior change). */
 export async function markNotificationRead(id: string) {
   await updateDoc(doc(db, "notifications", id), { read: true });
+}
+
+
+// ── MISSING REQUIREMENTS (OSCA / barangay asks for a document) ─────────────────
+// Written by the requestMissingRequirements Cloud Function onto users/{uid}.missingRequirements.
+// The senior only reads it here; uploading goes through submitSeniorDocuments().
+export interface MissingRequirementItem {
+  kind: SeniorDocKind | "other";
+  label: string | null;
+  method: "app" | "in_person" | "either";
+  submitted: boolean;
+}
+export interface MissingRequirements {
+  open: boolean;
+  items: MissingRequirementItem[];
+  note: string | null;
+}
+
+export function subscribeToMyMissingRequirements(
+  uid: string,
+  callback: (value: MissingRequirements | null) => void,
+) {
+  return onSnapshot(
+    doc(db, "users", uid),
+    (snap: any) => {
+      const exists = typeof snap.exists === "function" ? snap.exists() : snap.exists;
+      const mr = exists ? snap.data()?.missingRequirements : null;
+      callback(mr && mr.open && Array.isArray(mr.items) ? (mr as MissingRequirements) : null);
+    },
+    (error: any) => {
+      console.warn("subscribeToMyMissingRequirements error:", error);
+      callback(null);
+    },
+  );
 }

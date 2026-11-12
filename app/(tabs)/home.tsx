@@ -28,7 +28,7 @@ export default function Home() {
   const styles = useMemo(() => makeStyles(c), [c]);
   const router = useRouter();
   const { user, isGuest, clearUser } = useAuth();
-  const { fontScale, t } = useSettings();
+  const { fontScale, t, language } = useSettings();
   const { requireLogin } = useRequireLogin();
   const name = user ? (`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || t("homeNoName")) : t("homeNoName");
   const idNumber = user?.idNumber ?? t("homeNoId");
@@ -318,6 +318,7 @@ export default function Home() {
     if (link && link.startsWith("/")) return link;
     if (type === "id_request_status") return "/(tabs)/account";
     if (type === "medicine_request_status") return "/(tabs)/healthcare";
+    if (type === "missing_requirements") return "/screen/missing-docs";
     if (type === "SOS") return "/(tabs)/emergency";
     return null;
   };
@@ -336,8 +337,8 @@ export default function Home() {
     const remote = serverNotifs.map((n) => ({
       id: `server:${n.id}`,
       type: n.type,
-      title: n.title || t("homeNotifGeneric"),
-      body: n.body || "",
+      title: (language === "en" && n.titleEn) || n.title || t("homeNotifGeneric"),
+      body: (language === "en" && n.bodyEn) || n.body || "",
       ts: n.createdAt?.toMillis?.() ?? 0,
       link: linkFor(n.type, n.link),
       server: true,
@@ -346,7 +347,7 @@ export default function Home() {
     return [...local, ...remote]
       .filter((n) => !notifState.closed[n.id])
       .sort((a, b) => b.ts - a.ts);
-  }, [notifications, serverNotifs, notifState.closed, t]);
+  }, [notifications, serverNotifs, notifState.closed, t, language]);
 
   const isNotifRead = (n: PanelNotif) => n.readRemote || !!notifState.read[n.id];
   const unreadCount = panelNotifs.filter((n) => !isNotifRead(n)).length;
