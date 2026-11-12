@@ -2,7 +2,7 @@
   "expo": {
     "name": "SCIA",
     "slug": "scia",
-    "version": "1.0.0",
+    "version": "1.1.6",
     "orientation": "portrait",
     "icon": "./assets/images/Logo.png",
     "scheme": "scia",

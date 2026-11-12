@@ -16,6 +16,7 @@ import { Text } from "@/components/ReadAloudText";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { requestDigitalId } from "@/lib/firebase";
+import QRCode from "react-native-qrcode-svg";
 import { useDigitalId, useDigitalIdRequest } from "@/hooks/useDigitalID";
 
 /**
@@ -23,7 +24,7 @@ import { useDigitalId, useDigitalIdRequest } from "@/hooks/useDigitalID";
  *
  * It is a port of the admin dashboard's card (SCIA_Admin_Firebase ->
  * src/components/Oscaidcard.jsx + Oscaidcard.css), which is what prints on the
- * physical ID: Valenzuela seal / OSCA header / NCSC logo, Name, Address,
+ * physical ID: Valenzuela seal / OSCA header / record QR, Name, Address,
  * Date of Birth, Sex, Date Issued, photo, signature line, security seal, red
  * Control No., and the R.A. 9994 benefits on the back. Like the web card it is
  * drawn at a fixed 540x340 and scaled as one unit, so every proportion holds
@@ -45,7 +46,6 @@ const RED = "#cc1111";
 const MONO = Platform.select({ ios: "Courier", default: "monospace" });
 
 const valLogo = require("@/assets/images/vallogo.png");
-const ncscLogo = require("@/assets/images/ncsclogo.png");
 
 const BENEFITS = [
   "Free medical / dental, diagnostic & laboratory services in all government facilities",
@@ -150,7 +150,11 @@ function IdFront({
           </View>
         </View>
         <View style={f.logoBox}>
-          <Image source={ncscLogo} style={f.logo} resizeMode="contain" />
+          {/^VAL-OSCA-\d{4}-\d{6}$/.test(controlNo) ? (
+            <QRCode value={controlNo} size={40} backgroundColor="#FFFFFF" color="#000000" />
+          ) : (
+            <Image source={valLogo} style={f.logo} resizeMode="contain" />
+          )}
         </View>
       </View>
 
@@ -199,7 +203,7 @@ function IdFront({
         </View>
         <View style={{ alignItems: "flex-end" }}>
           <Text allowFontScaling={false} style={f.controlNo}>{controlNo}</Text>
-          <Text allowFontScaling={false} style={f.controlLbl}>Control No.</Text>
+          <Text allowFontScaling={false} style={f.controlLbl}>OSCA Record No.</Text>
         </View>
       </View>
 

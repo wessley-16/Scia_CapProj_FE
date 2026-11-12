@@ -26,7 +26,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useSettings } from "@/context/SettingsContext";
 import { useAuth } from "@/context/AuthContext";
 import GuestAccount from "@/components/GuestAccount";
-import IdVerificationCard from "@/components/IdVerificationCard";
+import SeniorRecordCard from "@/components/SeniorRecordCard";
 import IdRequestTracker, { isFinishedIdRequest } from "@/components/IdRequestTracker";
 import PickupModal from "@/components/PickupModal";
 import PickupPicker, { OfficeStatusBanner } from "@/components/PickupPicker";
@@ -382,8 +382,8 @@ function AccountInner() {
           )}
         </View>
 
-        {/* Physical OSCA ID → admin verifies → real ID number + Digital ID */}
-        <IdVerificationCard />
+        {/* OSCA Valenzuela local registry: pending → verified record number + QR */}
+        <SeniorRecordCard />
 
         {/* QR code card: identity for event check-in */}
         {user && (

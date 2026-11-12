@@ -1,17 +1,11 @@
 import { Palette } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import {
-  NCSC_FORM_URL,
-  NcscSeniorStatus,
-  registerUser,
-  saveNcscStatus,
-} from "@/lib/firebase";
+import { registerUser } from "@/lib/firebase";
 import { DISTRICT_1_BARANGAYS, DISTRICT_2_BARANGAYS } from "@/constants/barangays";
 import BarangayPickerField from "@/components/BarangayPickerField";
 import PrivacyConsent from "@/components/PrivacyConsent";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { pickIdImage as pickIdPhoto, PickedIdImage } from "@/lib/idImage";
 import {
   DISTRICTS,
   RULES,
@@ -29,8 +23,6 @@ import {
   ActivityIndicator,
   Alert,
   BackHandler,
-  Image,
-  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -59,7 +51,6 @@ export default function Signup() {
     }
   }, [user]);
 
-  const [idImage, setIdImage] = useState<PickedIdImage | null>(null);
   const [firstName, setFirstName] = useState("");
   const [midName, setMidName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -70,7 +61,6 @@ export default function Signup() {
   const [gender, setGender] = useState("");
   const [dob, setDob] = useState("");
   const [dobDate, setDobDate] = useState(new Date(1960, 0, 1));
-  const [idNumber, setIdNumber] = useState("");
   const [password, setPassword] = useState("");
   const [guardianName, setGuardianName] = useState("");
   const [guardianPhone, setGuardianPhone] = useState("");
@@ -87,11 +77,6 @@ export default function Signup() {
   // Typing a birthday is easier than a spinner for many seniors (NN/g: "why won't they just let me type the time").
   const [dobText, setDobText] = useState("");
   const [dobTextError, setDobTextError] = useState("");
-
-  const [hasSciaId, setHasSciaId] = useState<null | boolean>(null);
-  // The user is not signed in yet on this screen, so the NCSC progress is
-  // kept here and written to Firestore right after the account is created.
-  const [ncscStatus, setNcscStatus] = useState<NcscSeniorStatus | null>(null);
 
   const barangayOptions =
     district === "District 1" ? DISTRICT_1_BARANGAYS
@@ -143,7 +128,6 @@ export default function Signup() {
     add("guardianName", validate("name", guardianName));
     add("guardianPhone", validate("phone", guardianPhone));
     add("guardianRelation", validate("relation", guardianRelation, { required: false }));
-    add("idNumber", validate("idNumber", idNumber, { required: hasSciaId === true }));
     add("district", validateOption(district, DISTRICTS, "district"));
     add("barangay", validateOption(barangay, barangayOptions, "barangay"));
     add("gender", validateGender(gender));
@@ -176,22 +160,6 @@ export default function Signup() {
     setDob(formatStoredDate(d));
   };
 
-  const pickIdImage = async () => {
-    try {
-      const picked = await pickIdPhoto();
-      if (picked) setIdImage(picked);
-    } catch (e: any) {
-      Alert.alert(
-        t("ivPhotoTitle"),
-        e?.code === "photo-permission"
-          ? t("ivPhotoPermission")
-          : e?.code === "photo-too-large"
-            ? t("ivPhotoTooLarge")
-            : t("ivPhotoFail"),
-      );
-    }
-  };
-
   const formatDisplayDate = (date: Date) =>
     date.toLocaleDateString("en-US", {
       year: "numeric",
@@ -201,8 +169,10 @@ export default function Signup() {
 
   const formatStoredDate = (date: Date) => date.toLocaleDateString();
 
-  // Steps: 0 ID question, 1 name, 2 birthday + gender, 3 phone, 4 address,
-  // 5 guardian, 6 password (+ ID number and photo), 7 review.
+  // Steps: 0 intro (how OSCA verifies), 1 name, 2 birthday + gender, 3 phone,
+  // 4 address, 5 guardian, 6 password, 7 review.
+  // OSCA Valenzuela is the local registry: no NCSC step, no ID number asked here.
+  // The record number (VAL-OSCA-YYYY-NNNNNN) is issued by OSCA after verification.
   const STEP_COUNT = 8;
   const LAST_STEP = STEP_COUNT - 1;
 
@@ -212,15 +182,13 @@ export default function Signup() {
     3: ["conNumber"],
     4: ["district", "barangay", "street"],
     5: ["guardianName", "guardianPhone", "guardianRelation"],
-    6: ["idNumber", "password"],
+    6: ["password"],
   };
 
   // Checks one step with the same validators as before. Sets the inline
   // field errors and returns an alert (title + message) or null when fine.
   const validateStep = (n: number): { title: string; msg: string } | null => {
-    if (n === 0) {
-      return hasSciaId === null ? { title: t("suStatusTitle"), msg: t("suStatusBody") } : null;
-    }
+    if (n === 0) return null; // intro screen only
     const fields = STEP_FIELDS[n];
     if (!fields) return null;
     const e: Record<string, string> = {};
@@ -244,7 +212,6 @@ export default function Signup() {
       add("guardianPhone", validate("phone", guardianPhone));
       add("guardianRelation", validate("relation", guardianRelation, { required: false }));
     } else if (n === 6) {
-      add("idNumber", validate("idNumber", idNumber, { required: hasSciaId === true }));
       add("password", validatePassword(password));
     }
     setErrors((prev) => {
@@ -260,9 +227,6 @@ export default function Signup() {
     if (first) return { title: t("suCheckEntries"), msg: first };
     if (n === 5 && !isPhMobile(guardianPhone.trim())) {
       return { title: t("suCheckNumberTitle"), msg: t("suCheckNumberBody") };
-    }
-    if (n === 6 && hasSciaId === true && !idImage) {
-      return { title: t("suIdPhotoTitle"), msg: t("suIdPhotoBody") };
     }
     return null;
   };
@@ -355,27 +319,6 @@ export default function Signup() {
       );
       return;
     }
-    if (hasSciaId === null) {
-      Alert.alert(
-        t("suStatusTitle"),
-        t("suStatusBody"),
-      );
-      return;
-    }
-    if (hasSciaId === true && !idNumber.trim()) {
-      Alert.alert(
-        t("suIdNumTitle"),
-        t("suIdNumBody"),
-      );
-      return;
-    }
-    if (hasSciaId === true && !idImage) {
-      Alert.alert(
-        t("suIdPhotoTitle"),
-        t("suIdPhotoBody"),
-      );
-      return;
-    }
     setLoading(true);
     try {
       await registerUser({
@@ -389,37 +332,11 @@ export default function Signup() {
         conNumber,
         gender,
         dob,
-        idNumber: idNumber || "",
         password,
         guardianName: guardianName.trim(),
         guardianPhone: guardianPhone.trim(),
         guardianRelation: guardianRelation.trim(),
-        imageBase64: hasSciaId === true ? idImage?.base64 : undefined,
       });
-      if (hasSciaId === false && ncscStatus) {
-        try {
-          await saveNcscStatus(ncscStatus, {
-            barangay,
-            fullName: `${firstName} ${midName} ${lastName}`.replace(/\s+/g, " ").trim(),
-          });
-        } catch (e) {
-          console.warn("saveNcscStatus failed:", e);
-        }
-      }
-      // "Yes, I'm registered": record it so OSCA sees it under NCSC
-      // Registrations and can verify the ID number by hand.
-      if (hasSciaId === true) {
-        try {
-          await saveNcscStatus("completed_claimed", {
-            barangay,
-            fullName: `${firstName} ${midName} ${lastName}`.replace(/\s+/g, " ").trim(),
-            alreadyRegistered: true,
-            idNumber: idNumber.trim(),
-          });
-        } catch (e) {
-          console.warn("saveNcscStatus (already registered) failed:", e);
-        }
-      }
       await refreshUser();
       router.replace("/(tabs)/home");
     } catch (error: any) {
@@ -461,94 +378,10 @@ export default function Signup() {
         </View>
 
         <View style={styles.noIdSection}>
-          <Text style={styles.noIdQuestion}>
-            {t("suQuestion")}
-          </Text>
-
-          {hasSciaId === null && (
-            <View style={styles.idAnswerRow}>
-              <TouchableOpacity
-                style={styles.idAnswerYes}
-                onPress={() => setHasSciaId(true)}
-              >
-                <Text style={styles.idAnswerYesText}>{t("suYes")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.idAnswerNo}
-                onPress={() => setHasSciaId(false)}
-              >
-                <Text style={styles.idAnswerNoText}>{t("suNotYet")}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {hasSciaId === true && (
-            <View style={styles.idActionCard}>
-              <Text style={styles.idActionText}>
-                {t("suEnterId")}
-              </Text>
-              <TouchableOpacity onPress={() => setHasSciaId(null)}>
-                <Text style={styles.changeAnswerText}>{t("suChangeAnswer")}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {hasSciaId === false && (
-            <View style={styles.idActionCard}>
-              {ncscStatus === "started" ? (
-                <>
-                  <Text style={styles.idActionText}>
-                    {t("suNcscFinished")}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.oscaButton}
-                    onPress={() => setNcscStatus("completed_claimed")}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.oscaButtonText}>{t("suYesFinished")}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.idAnswerNo}
-                    onPress={() => setNcscStatus("cancelled")}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.idAnswerNoText}>{t("suCancelled")}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => Linking.openURL(NCSC_FORM_URL)}>
-                    <Text style={styles.changeAnswerText}>{t("suReopenForm")}</Text>
-                  </TouchableOpacity>
-                </>
-              ) : ncscStatus === "completed_claimed" ? (
-                <Text style={styles.idActionText}>
-                  {t("suNcscThanks")}
-                </Text>
-              ) : (
-                <>
-                  <Text style={styles.idActionText}>
-                    {t("suNcscOptional")}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.oscaButton}
-                    onPress={() => {
-                      setNcscStatus("started");
-                      Linking.openURL(NCSC_FORM_URL);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.oscaButtonText}>{t("suRegisterNcsc")}</Text>
-                  </TouchableOpacity>
-                </>
-              )}
-              <TouchableOpacity
-                onPress={() => {
-                  setHasSciaId(null);
-                  setNcscStatus(null);
-                }}
-              >
-                <Text style={styles.changeAnswerText}>{t("suChangeAnswer")}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <Text style={styles.noIdQuestion}>{t("suOscaTitle")}</Text>
+          <View style={styles.idActionCard}>
+            <Text style={styles.idActionText}>{t("suOscaBody")}</Text>
+          </View>
         </View>
 
         </>
@@ -770,27 +603,6 @@ export default function Signup() {
         <>
         <Text style={styles.stepTitle}>{t("suStepAccountTitle")}</Text>
         <View style={styles.inputGroup}>
-          <View style={styles.optionalWrapper}>
-            <TextInput
-              placeholder={
-                hasSciaId === true
-                  ? t("suIdNumberReq")
-                  : t("suIdNumberOpt")
-              }
-              placeholderTextColor={c.textMuted}
-              style={inputStyle("idNumber", { paddingRight: 90 })}
-              value={idNumber}
-              onChangeText={(v) => onText("idNumber", "idNumber", v, setIdNumber)}
-              autoCapitalize="characters"
-              autoCorrect={false}
-            />
-            <View style={styles.optionalBadge}>
-              <Text style={styles.optionalBadgeText}>
-                {hasSciaId === true ? t("suRequired") : t("suOptional")}
-              </Text>
-            </View>
-          </View>
-          {fieldError("idNumber")}
           <TextInput
             placeholder={t("suPassword")}
             placeholderTextColor={c.textMuted}
@@ -810,34 +622,6 @@ export default function Signup() {
           {fieldError("password")}
         </View>
 
-        {hasSciaId === true && (
-        <>
-        <Text style={styles.sectionLabel}>{t("suUploadLabel")}</Text>
-        <TouchableOpacity
-          style={styles.uploadCard}
-          onPress={pickIdImage}
-          activeOpacity={0.7}
-        >
-          {idImage ? (
-            <>
-              <Image source={{ uri: idImage.uri }} style={styles.idPreview} />
-              <Text style={styles.uploadChangeText}>{t("suChangePhoto")}</Text>
-            </>
-          ) : (
-            <>
-              <View style={styles.uploadIconBox}>
-                <Text style={styles.uploadIconText}>ID</Text>
-              </View>
-              <Text style={styles.uploadTitle}>{t("suUploadTitle")}</Text>
-              <Text style={styles.uploadHint}>
-                {t("suUploadHint")}
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
-        </>
-        )}
-
         </>
         )}
 
@@ -856,8 +640,6 @@ export default function Signup() {
             value: [guardianName, guardianPhone, guardianRelation].filter((v) => v.trim()).join(" - "),
             to: 5,
           },
-          ...(idNumber.trim() ? [{ label: t("suRvId"), value: idNumber.trim(), to: 6 }] : []),
-          ...(hasSciaId === true && idImage ? [{ label: t("suRvIdPhoto"), value: t("suRvAttached"), to: 6 }] : []),
         ].map((row) => (
           <View key={row.label} style={styles.reviewRow}>
             <View style={styles.reviewText}>
