@@ -150,7 +150,7 @@ function IdFront({
           </View>
         </View>
         <View style={f.logoBox}>
-          {/^VAL-OSCA-\d{4}-\d{6}$/.test(controlNo) ? (
+          {/^\d{6}$/.test(controlNo) ? (
             <QRCode value={controlNo} size={40} backgroundColor="#FFFFFF" color="#000000" />
           ) : (
             <Image source={valLogo} style={f.logo} resizeMode="contain" />

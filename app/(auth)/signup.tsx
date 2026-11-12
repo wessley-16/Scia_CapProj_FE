@@ -1,7 +1,8 @@
 import { Palette } from "@/constants/theme";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
-import { registerUser } from "@/lib/firebase";
+import { registerUser, submitSeniorDocuments, SeniorDocInput } from "@/lib/firebase";
+import DocumentUploader from "@/components/DocumentUploader";
 import { DISTRICT_1_BARANGAYS, DISTRICT_2_BARANGAYS } from "@/constants/barangays";
 import BarangayPickerField from "@/components/BarangayPickerField";
 import PrivacyConsent from "@/components/PrivacyConsent";
@@ -39,6 +40,7 @@ export default function Signup() {
   const router = useRouter();
   const { user, refreshUser } = useAuth();
   const { t } = useSettings();
+  const [docs, setDocs] = useState<SeniorDocInput[]>([]);
 
   // Block signup if a user is already logged in (can be reached via deep link).
   useEffect(() => {
@@ -170,10 +172,10 @@ export default function Signup() {
   const formatStoredDate = (date: Date) => date.toLocaleDateString();
 
   // Steps: 0 intro (how OSCA verifies), 1 name, 2 birthday + gender, 3 phone,
-  // 4 address, 5 guardian, 6 password, 7 review.
+  // 4 address, 5 guardian, 6 password, 7 documents (valid ID / birth certificate), 8 review.
   // OSCA Valenzuela is the local registry: no NCSC step, no ID number asked here.
-  // The record number (VAL-OSCA-YYYY-NNNNNN) is issued by OSCA after verification.
-  const STEP_COUNT = 8;
+  // The OSCA number (6 digits) is issued by OSCA after it verifies the documents.
+  const STEP_COUNT = 9;
   const LAST_STEP = STEP_COUNT - 1;
 
   const STEP_FIELDS: Record<number, string[]> = {
@@ -189,6 +191,7 @@ export default function Signup() {
   // field errors and returns an alert (title + message) or null when fine.
   const validateStep = (n: number): { title: string; msg: string } | null => {
     if (n === 0) return null; // intro screen only
+    if (n === 7) return docs.length === 0 ? { title: t("suDocNeedTitle"), msg: t("suDocNeedBody") } : null;
     const fields = STEP_FIELDS[n];
     if (!fields) return null;
     const e: Record<string, string> = {};
@@ -337,7 +340,12 @@ export default function Signup() {
         guardianPhone: guardianPhone.trim(),
         guardianRelation: guardianRelation.trim(),
       });
+      // The account exists now; send the documents so OSCA can verify. A failed upload must not
+      // block the senior, who is told and can send them again from the Account screen.
+      let docsOk = true;
+      try { await submitSeniorDocuments(docs); } catch { docsOk = false; }
       await refreshUser();
+      if (!docsOk) Alert.alert(t("suDocsLaterTitle"), t("suDocsLaterBody"));
       router.replace("/(tabs)/home");
     } catch (error: any) {
       Alert.alert(t("errorTitle"), t("suFail"));
@@ -625,6 +633,14 @@ export default function Signup() {
         </>
         )}
 
+        {step === 7 && (
+        <>
+        <Text style={styles.stepTitle}>{t("suDocsTitle")}</Text>
+        <Text style={styles.sectionHint}>{t("suDocsHint")}</Text>
+        <DocumentUploader value={docs} onChange={setDocs} />
+        </>
+        )}
+
         {step === LAST_STEP && (
         <>
         <Text style={styles.stepTitle}>{t("suReviewTitle")}</Text>
@@ -640,6 +656,7 @@ export default function Signup() {
             value: [guardianName, guardianPhone, guardianRelation].filter((v) => v.trim()).join(" - "),
             to: 5,
           },
+          { label: t("suDocsRv"), value: t("suDocsCount", { n: docs.length }), to: 7 },
         ].map((row) => (
           <View key={row.label} style={styles.reviewRow}>
             <View style={styles.reviewText}>

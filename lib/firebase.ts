@@ -61,7 +61,7 @@ export const COLLECTIONS = {
   USER_LOOKUP: "user_lookup",
   DIGITAL_IDS: "digital_ids",
   DIGITAL_ID_REQUESTS: "digital_id_requests",
-  NCSC_REGISTRATIONS: "ncsc_registrations",
+  SENIOR_DOCUMENTS: "senior_documents",
   ID_VERIFICATIONS: "id_verifications",
   MEDICINE_REQUESTS: "medicine_requests",
 };
@@ -1223,63 +1223,26 @@ export function subscribeToMyIdVerification(
   );
 }
 
-// ── NCSC REGISTRATION ─────────────────────────────────────────────────────────
-// One doc per senior (doc id = uid) in ncsc_registrations. The senior may only
-// move the status between started / cancelled / completed_claimed; an admin
-// later sets verified / rejected. firestore.rules requires the FIRST write to
-// be status "started", so a new doc is always created as "started" and then
-// moved to the requested status.
-export const NCSC_FORM_URL = "https://www.ncsc.gov.ph/seniorcitizensdataform";
+// ── SENIOR DOCUMENTS (valid ID / birth certificate) ───────────────────────────
+// The senior provides these at sign-up; OSCA Valenzuela checks them in Senior Records.
+// One doc per photo in senior_documents (a Firestore doc is capped at 1 MiB, so one image each).
+export type SeniorDocKind = "id" | "birth_certificate" | "barangay_certificate";
+export interface SeniorDocInput {
+  kind: SeniorDocKind;
+  imageBase64: string;
+}
 
-export type NcscSeniorStatus = "started" | "cancelled" | "completed_claimed";
-
-export async function saveNcscStatus(
-  status: NcscSeniorStatus,
-  extra: {
-    barangay?: string;
-    fullName?: string;
-    // Set when the senior answered "Yes, I'm already registered": the admin
-    // sees the OSCA ID number on the NCSC Registrations page to verify by hand.
-    alreadyRegistered?: boolean;
-    idNumber?: string;
-  } = {},
-) {
+export async function submitSeniorDocuments(docs: SeniorDocInput[]) {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("Not signed in");
-
-  const ref = doc(db, COLLECTIONS.NCSC_REGISTRATIONS, uid);
-  const base = stripUndefined({
-    uid,
-    barangay: extra.barangay ?? null,
-    fullName: extra.fullName ?? null,
-    source: "mobile_app",
-    ...(extra.alreadyRegistered
-      ? { alreadyRegistered: true, idNumber: extra.idNumber ?? null }
-      : {}),
-  });
-
-  const existing = await getDoc(ref);
-  if (!existing.exists()) {
-    await setDoc(ref, {
-      ...base,
-      status: "started",
-      startedAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+  for (const d of docs.slice(0, 3)) {
+    await addDoc(collection(db, COLLECTIONS.SENIOR_DOCUMENTS), {
+      uid,
+      kind: d.kind,
+      imageBase64: d.imageBase64,
+      submittedAt: serverTimestamp(),
     });
-    if (status === "started") return;
   }
-
-  await setDoc(
-    ref,
-    {
-      ...base,
-      status,
-      updatedAt: serverTimestamp(),
-      ...(status === "cancelled" ? { cancelledAt: serverTimestamp() } : {}),
-      ...(status === "completed_claimed" ? { claimedAt: serverTimestamp() } : {}),
-    },
-    { merge: true },
-  );
 }
 
 // ── PASSWORD RECOVERY (Forgot Password + SMS one-time code) ───────────────────

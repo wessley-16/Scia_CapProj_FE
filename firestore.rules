@@ -200,6 +200,22 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ── /senior_documents ────────────────────────────────────────────────
+    // Photos of the valid ID / birth certificate a senior provides at sign-up (one image per doc,
+    // under the 1 MiB Firestore limit). The senior creates their own; OSCA staff review them in
+    // Senior Records. Nobody edits them: only OSCA (super_admin) can delete.
+    match /senior_documents/{docId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid', 'kind', 'imageBase64', 'submittedAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.kind in ['id', 'birth_certificate']
+        && request.resource.data.imageBase64 is string
+        && request.resource.data.imageBase64.size() < 700000;
+      allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isSuperAdmin());
+      allow update: if false;
+      allow delete: if isSuperAdmin();
+    }
+
     // ── /id_verifications ────────────────────────────────────────────────
     match /id_verifications/{docId} {
       // A senior can only submit for themselves, and only as "pending";

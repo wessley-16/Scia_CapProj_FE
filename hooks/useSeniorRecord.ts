@@ -7,7 +7,7 @@ import { doc, getFirestore, onSnapshot } from "@react-native-firebase/firestore"
 // never write it (see firestore.rules).
 export interface SeniorRecord {
   uid: string;
-  recordNo: string; // VAL-OSCA-2026-000001
+  recordNo: string; // plain 6-digit OSCA number, e.g. 000001
   status: "active" | "revoked";
   fullName: string;
   dob?: string;

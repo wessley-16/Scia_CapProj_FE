@@ -21,17 +21,32 @@ const ATTEMPTS: { width: number; compress: number }[] = [
 
 /** Opens the photo library, returns null if the person cancels. */
 export async function pickIdImage(): Promise<PickedIdImage | null> {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  return pickDocumentImage("library");
+}
+
+/** Takes a photo with the camera or picks one from the library (valid ID, birth certificate). */
+export async function pickDocumentImage(source: "camera" | "library"): Promise<PickedIdImage | null> {
+  const permission =
+    source === "camera"
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
-    throw Object.assign(new Error("Please allow access to your photo library."), { code: "photo-permission" });
+    throw Object.assign(
+      new Error(source === "camera" ? "Please allow access to your camera." : "Please allow access to your photo library."),
+      { code: "photo-permission" },
+    );
   }
 
-  const result = await ImagePicker.launchImageLibraryAsync({
+  const options: ImagePicker.ImagePickerOptions = {
     mediaTypes: ["images"],
     quality: 1,
-    // No cropping: the admin needs to see the whole card.
+    // No cropping: the admin needs to see the whole card or page.
     allowsEditing: false,
-  });
+  };
+  const result =
+    source === "camera"
+      ? await ImagePicker.launchCameraAsync(options)
+      : await ImagePicker.launchImageLibraryAsync(options);
   if (result.canceled || !result.assets?.[0]) return null;
 
   const asset = result.assets[0];
