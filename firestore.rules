@@ -1,3 +1,6 @@
+// SOURCE OF TRUTH: SCIA_Admin_Firebase/firestore.rules
+// This is a copy so the mobile repo can never deploy older rules. Do not edit here;
+// change the admin repo's file and copy it over.
 rules_version = '2';
 
 service cloud.firestore {
@@ -34,21 +37,39 @@ service cloud.firestore {
         : null;
     }
 
-    function canSeeBarangay(bgy) {
-      return isSuperAdmin()
-        || (adminRole() == 'sub_admin' && (bgy == null || myBarangay() == null || myBarangay() == bgy));
-    }
-
     // Barangay names are spelled two ways for Gen. T. de Leon (the mobile
     // sign-up list vs. the admin dashboard). Keep in sync with GEN_T in
     // src/lib/barangay.js.
     function isGenT(b) {
-      return b in ['General T. de Leon', 'Gen. T. de Leon', 'Gen T. de Leon', 'Hen. T. de Leon'];
+      return b is string
+        && b.lower() in ['general t. de leon', 'general t de leon', 'gen. t. de leon',
+                         'gen t. de leon', 'gen t de leon', 'hen. t. de leon'];
     }
 
     function sameBarangay(a, b) {
       return a is string && b is string && a != '' && b != ''
         && (a.lower() == b.lower() || (isGenT(a) && isGenT(b)));
+    }
+
+    // Which records a barangay sub_admin may see / act on. Uses sameBarangay()
+    // so "General T. de Leon" (dashboard) and "Gen. T. de Leon" (mobile app)
+    // count as the same barangay. This used to compare strings exactly, which
+    // is why the Gen. T. de Leon sub_admin could see SOS alerts (the dashboard
+    // filters with the alias-aware helper) but was denied when dispatching.
+    function canSeeBarangay(bgy) {
+      return isSuperAdmin()
+        || (adminRole() == 'sub_admin'
+            && (bgy == null || myBarangay() == null || myBarangay() == ''
+                || sameBarangay(myBarangay(), bgy)));
+    }
+
+    // SOS alerts: an alert from outside Valenzuela is routed to the senior's
+    // HOME barangay (see functions/sosRouting.js) and the dashboard lists it
+    // for that office, so that office must be able to dispatch it too.
+    function canHandleSos(data) {
+      return canSeeBarangay(data.get('barangay', null))
+        || (adminRole() == 'sub_admin'
+            && sameBarangay(myBarangay(), data.get('homeBarangay', null)));
     }
 
     // Who may work with a record that belongs to barangay `bgy`:
@@ -69,7 +90,21 @@ service cloud.firestore {
 
     // ── /admins ──────────────────────────────────────────────────────────
     match /admins/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      // An admin reads their own record; the OSCA Super Admin can list every
+      // admin so they can lock / unlock Barangay accounts. Writes go through
+      // the setAdminLock Cloud Function only.
+      allow read: if request.auth != null && (request.auth.uid == uid || isSuperAdmin());
+      allow write: if false;
+    }
+
+    // One-time password-reset codes: server only (Admin SDK bypasses rules).
+    match /password_resets/{uid} {
+      allow read, write: if false;
+    }
+
+    // Audit trail written by the account-control functions.
+    match /admin_audit/{id} {
+      allow read: if isSuperAdmin();
       allow write: if false;
     }
 
@@ -87,12 +122,28 @@ service cloud.firestore {
       // Seniors may edit their own profile but never the fields that decide
       // whether they are verified or which OSCA ID they hold.
       allow update: if request.auth != null
-        && (isSuperAdmin()
+        && ((isSuperAdmin()
+              // Deactivation (status -> SUSPENDED) is only possible through the
+              // deactivateInactiveUser function, which enforces the 180-day rule.
+              && (request.resource.data.get('status', '') != 'SUSPENDED'
+                  || resource.data.get('status', '') == 'SUSPENDED')
+              // Approve, reject and flag go through the reviewSenior function, so every decision
+              // is recorded with its reviewer, time and reason (and an admin_audit entry). The
+              // dashboard itself may not write those fields, and may change status / isVerified
+              // only to reactivate a suspended account.
+              && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                   'reviewedBy', 'reviewerName', 'reviewedAt', 'reviewDecision', 'reviewReason',
+                   'rejectionReason', 'flagged', 'flagNote', 'flaggedBy', 'flaggedByName', 'flaggedAt',
+                   'missingRequirements'])
+              && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'isVerified'])
+                  || resource.data.get('status', '') == 'SUSPENDED'))
             || (request.auth.uid == userId
                 && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
                      'isVerified', 'status', 'idNumber', 'hasTempId', 'role',
                      'verifiedAt', 'previousIdNumber', 'tempIdReplacedAt',
-                     'safety_alert'])));
+                     'safety_alert', 'missingRequirements',
+                     'reviewedBy', 'reviewerName', 'reviewedAt', 'reviewDecision', 'reviewReason',
+                     'rejectionReason', 'flagged', 'flagNote', 'flaggedBy', 'flaggedByName', 'flaggedAt'])));
 
       allow delete: if isSuperAdmin();
     }
@@ -147,6 +198,16 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // ── /admin_notifications ─────────────────────────────────────────────
+    // Written by Cloud Functions (e.g. a physical ID was received / claimed).
+    // Only the OSCA Super Admin reads them and may flip `read`.
+    match /admin_notifications/{notificationId} {
+      allow read: if isSuperAdmin();
+      allow update: if isSuperAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false;
+    }
+
     // ── /emergencies ─────────────────────────────────────────────────────
     match /emergencies/{docId} {
       allow create: if request.auth != null;
@@ -154,7 +215,7 @@ service cloud.firestore {
       allow read: if request.auth != null
         && (isOwner() || isSubOrSuperAdmin());
 
-      allow update: if isSubOrSuperAdmin() && canSeeBarangay(resource.data.get('barangay', null));
+      allow update: if isSubOrSuperAdmin() && canHandleSos(resource.data);
 
       allow delete: if isSuperAdmin();
     }
@@ -190,6 +251,33 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ── /medicine_requests ───────────────────────────────────────────────
+    match /medicine_requests/{docId} {
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && (seniorBarangay() == null || seniorBarangay() == ''
+              ? request.resource.data.get('barangay', null) == null
+              : sameBarangay(request.resource.data.get('barangay', null), seniorBarangay()));
+
+      allow read: if request.auth != null
+        && (isOwner()
+            || (isSubOrSuperAdmin() && canManageBarangay(resource.data.get('barangay', null))));
+
+      allow update: if
+        // barangay admin reviews / releases (never moves barangay or owner)
+        (isSubOrSuperAdmin()
+          && canManageBarangay(resource.data.get('barangay', null))
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['barangay', 'uid']))
+        // senior may only cancel their own pending request
+        || (isOwner()
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']));
+
+      allow delete: if isSuperAdmin();
+    }
+
     // ── /medications ─────────────────────────────────────────────────────
     match /medications/{docId} {
       allow read: if request.auth != null
@@ -208,7 +296,7 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.keys().hasOnly(['uid', 'kind', 'imageBase64', 'submittedAt'])
         && request.resource.data.uid == request.auth.uid
-        && request.resource.data.kind in ['id', 'birth_certificate']
+        && request.resource.data.kind in ['id', 'birth_certificate', 'barangay_certificate']
         && request.resource.data.imageBase64 is string
         && request.resource.data.imageBase64.size() < 700000;
       allow read: if request.auth != null && (resource.data.uid == request.auth.uid || isSuperAdmin());
@@ -232,23 +320,35 @@ service cloud.firestore {
     }
 
     // ── /id_requests ─────────────────────────────────────────────────────
-    // Sub-admins now need read+update here too: IDManagement.jsx's barangay-
-    // scoped listener (where barangay == myBarangay) requires every matched
-    // doc to pass the read rule, and handleReceived/handleCollected update
-    // this doc via syncRequestStatus() when a barangay marks an ID
-    // received/claimed.
+    // Physical ID requests are handled by the OSCA admin only (super_admin).
+    // Barangay sub-admins cannot read or touch them. The senior who filed a
+    // request can read their own, to follow its progress in the app.
     match /id_requests/{docId} {
       allow create: if request.auth != null;
 
       allow read: if request.auth != null
-        && (isOwner()
-            || isSuperAdmin()
-            || (adminRole() == 'sub_admin' && canSeeBarangay(resource.data.get('barangay', null))));
+        && (isOwner() || isSuperAdmin());
 
-      allow update: if isSuperAdmin()
-        || (adminRole() == 'sub_admin' && canSeeBarangay(resource.data.get('barangay', null)));
+      allow update: if isSuperAdmin();
 
       allow delete: if isSuperAdmin();
+    }
+
+    // ── /osca_office ─────────────────────────────────────────────────────
+    // settings: office hours + live status (open / break / closed). Everyone signed
+    // in can read it (the app shows it when booking a pickup); only OSCA edits it.
+    match /osca_office/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isSuperAdmin();
+    }
+
+    // ── /pickup_slots ────────────────────────────────────────────────────
+    // pickup_slots/{YYYY-MM-DD} = { counts: { "08:00": 2 } }. Read-only for
+    // clients; the bookIdPickup Cloud Function is the only writer, so a full
+    // time slot cannot be overbooked from the app.
+    match /pickup_slots/{day} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
 
     // ── /health_centers ──────────────────────────────────────────────────
@@ -274,16 +374,26 @@ service cloud.firestore {
 
     // ── /user_lookup ─────────────────────────────────────────────────────
     match /user_lookup/{lookupKey} {
-      allow read: if true;
-      allow create, update: if request.auth != null;
+      // Login needs to read ONE key (ID number, phone or name) before the person is signed in,
+      // so a single get stays public. Listing is blocked: before, anyone could download the whole
+      // collection (every senior's name, phone, ID number and account id) with just the public API key.
+      allow get: if true;
+      allow list: if false;
+      // A signed-in person may only create a key that points at their own account, and may not
+      // overwrite an existing key (before, any signed-in user could re-point anyone's login name).
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['idNumber', 'uid'])
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if false;
       allow delete: if isSuperAdmin();
     }
 
     // ── /released_ids ────────────────────────────────────────────────────
+    // Record of physical IDs the OSCA admin handed out. OSCA admin only.
     match /released_ids/{docId} {
-      allow read: if request.auth != null && canSeeBarangay(resource.data.get('barangay', null));
+      allow read: if isSuperAdmin();
       allow create: if isSuperAdmin();
-      allow update: if isSubOrSuperAdmin();
+      allow update: if isSuperAdmin();
       allow delete: if isSuperAdmin();
     }
 
@@ -295,12 +405,36 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // ── /digital_id_requests ─────────────────────────────────────────────
+    // The senior's "Claim" tap in the app. A senior may only (re)raise their
+    // own request (status 'requested'); the onDigitalIdRequested Cloud Function
+    // checks they are verified, creates digital_ids/{uid} and writes the result
+    // (status 'issued' / 'denied' + message) back here.
+    match /digital_id_requests/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isSuperAdmin());
+
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.status == 'requested'
+        && request.resource.data.keys().hasOnly(['uid', 'status', 'requestedAt']);
+
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.uid == uid
+        && request.resource.data.status == 'requested'
+        && resource.data.status in ['requested', 'denied', 'issued']
+        && request.resource.data.keys().hasOnly(['uid', 'status', 'requestedAt', 'code', 'message', 'processedAt']);
+
+      allow delete: if false;
+    }
+
     // ── /sos_events (legacy) ─────────────────────────────────────────────
     match /sos_events/{docId} {
       allow create: if request.auth != null;
       allow read: if request.auth != null
         && (isOwner() || isSubOrSuperAdmin());
-      allow update: if isSubOrSuperAdmin() && canSeeBarangay(resource.data.get('barangay', null));
+      allow update: if isSubOrSuperAdmin() && canHandleSos(resource.data);
       allow delete: if isSuperAdmin();
     }
 
@@ -313,34 +447,30 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ── /ncsc_registrations ──────────────────────────────────────────────
-    // One doc per user (doc id = uid). The app records that the senior opened
-    // the NCSC registration form, then whether they finished or cancelled.
-    // Admins verify or reject after checking.
-    match /ncsc_registrations/{uid} {
-      allow read: if request.auth != null
-        && (request.auth.uid == uid
-            || isSuperAdmin()
-            || (adminRole() == 'sub_admin' && canSeeBarangay(resource.data.get('barangay', null))));
+    // ── /senior_records ──────────────────────────────────────────────────
+    // The Valenzuela local registry (source of truth). Written ONLY by the
+    // verifyAndIssueSeniorRecord / revokeSeniorRecord functions (Admin SDK).
+    // A senior may read their own record; OSCA staff read all.
+    match /senior_records/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isSubOrSuperAdmin());
+      allow write: if false;
+    }
 
-      allow create: if request.auth != null
-        && request.auth.uid == uid
-        && request.resource.data.uid == uid
-        && request.resource.data.status == 'started';
+    // ── /senior_applications ─────────────────────────────────────────────
+    // Assisted sign-up applications waiting for OSCA verification. Server-written only;
+    // OSCA (super_admin) reads them, including the scanned documents.
+    match /senior_applications/{id} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+      match /documents/{docId} {
+        allow read: if isSuperAdmin();
+        allow write: if false;
+      }
+    }
 
-      // The senior can only move between started / cancelled / completed_claimed
-      allow update: if request.auth != null
-        && request.auth.uid == uid
-        && request.resource.data.uid == uid
-        && resource.data.status in ['started', 'cancelled', 'completed_claimed']
-        && request.resource.data.status in ['started', 'cancelled', 'completed_claimed'];
-
-      // Admins can only verify or reject
-      allow update: if (isSuperAdmin()
-            || (adminRole() == 'sub_admin' && canSeeBarangay(resource.data.get('barangay', null))))
-        && request.resource.data.status in ['verified', 'rejected'];
-
-      allow delete: if isSuperAdmin();
+    // Record-number counter: server only.
+    match /counters/{id} {
+      allow read, write: if false;
     }
 
     // ── /ai_usage ────────────────────────────────────────────────────────
