@@ -108,7 +108,7 @@ const makeStyles = (c: any) =>
     qrWrap: { alignItems: "center", marginVertical: 14 },
     qrBox: { backgroundColor: "#FFFFFF", padding: 14, borderRadius: 12 },
     label: { fontSize: 15, color: c.textSecondary, marginTop: 10 },
-    recordNo: { fontSize: 24, fontWeight: "800", color: c.primaryDark, letterSpacing: 0.5 },
+    recordNo: { fontSize: 24, fontWeight: "800", color: c.primaryDark, letterSpacing: 0.5, fontVariant: ["tabular-nums"] },
     value: { fontSize: 19, fontWeight: "600", color: c.text },
   });
   
