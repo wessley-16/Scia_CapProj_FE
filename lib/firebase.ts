@@ -1112,8 +1112,7 @@ export async function updateGuardianContact(input: {
 // The senior sends the OSCA ID number and a photo of the card. The admin's ID
 // Management page shows name + ID number + photo, checks it against OSCA's own
 // list and presses Verify. The `approveIdVerification` Cloud Function then, in
-// one step: counts the senior in ncsc_registrations (with this submittedAt and
-// the approval time), replaces a TEMP ID with the real number, and issues
+// one step: replaces a TEMP ID with the real number, and issues
 // digital_ids/{uid} from the photo. The app never writes any of that itself; it
 // only creates the submission and listens for the result.
 export type IdVerificationStatus = "pending" | "approved" | "rejected";
